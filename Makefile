@@ -57,13 +57,15 @@ clean:
 %/:
 	-mkdir -p $@
 
-$(obj)/modulos.iso: cfg/grub.cfg $(obj)/modulos | $(obj)/iso/boot/grub/
+$(obj)/modulos.iso: cfg/grub.cfg $(obj)/modulos LICENSE | $(obj)/iso/boot/grub/
 	cp $(obj)/modulos $(obj)/iso/boot/
 	cp $< $(obj)/iso/boot/grub/
+	cp LICENSE $(obj)/iso/
 	grub-mkrescue -o $@ $(obj)/iso/
 
 $(obj)/modulos: cfg/kernel.ld $(KERNEL_TARGETS) | $(obj)/
-	$(KERNEL_LD) -o $@ -T $^
+	$(KERNEL_LD) -o $@-dbg -T $^
+	strip -s -o $@ $@-dbg
 
 # Multiboot2
 $(ALL_TARGETS_S): $(obj)/multiboot2/%.o: multiboot2/%.S | $(obj)/multiboot2/

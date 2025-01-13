@@ -36,4 +36,6 @@ SECTIONS {
 	.bss BLOCK(4K) : ALIGN(4K) {
 		*(.bss)
 	}
+
+	. = 4M;
 }
