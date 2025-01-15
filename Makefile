@@ -17,7 +17,7 @@
 
 KERNEL_CC := x86_64-elf-gcc
 KERNEL_LD := x86_64-elf-ld
-KERNEL_AR := x86_64-elf-ar
+KERNEL_STRIP := x86_64-elf-strip
 
 obj := $(CURDIR)/build
 incl := $(CURDIR)/include
@@ -40,7 +40,7 @@ ALL_TARGETS := $(ALL_TARGETS_S) $(ALL_TARGETS_C)
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-CFLAGS := $(CWARN) -O2 -fno-pie -ffreestanding -c -g -F dwarf -I $(CURDIR)/include/
+CFLAGS := $(CWARN) -O2 -fno-pie -static -ffreestanding -fomit-frame-pointer -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
 
 export
 
@@ -65,7 +65,7 @@ $(obj)/modulos.iso: cfg/grub.cfg $(obj)/modulos LICENSE | $(obj)/iso/boot/grub/
 
 $(obj)/modulos: cfg/kernel.ld $(KERNEL_TARGETS) | $(obj)/
 	$(KERNEL_LD) -o $@-dbg -T $^
-	strip -s -o $@ $@-dbg
+	$(KERNEL_STRIP) -s -o $@ $@-dbg
 
 # Multiboot2
 $(ALL_TARGETS_S): $(obj)/multiboot2/%.o: multiboot2/%.S | $(obj)/multiboot2/

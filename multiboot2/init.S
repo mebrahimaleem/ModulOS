@@ -155,21 +155,32 @@ msg_nosupport:
 vga_offset:
 	.long 0xb8000
 
+/* GDT */
+
 	.align 8
+	.globl gdt
 gdt:
 	gdt.nullseg:
 		.quad 0
 	gdt.codeseg:
-		.quad	0x00a09a000000ffff
+		.quad 0x00a09a000000ffff
 	gdt.dataseg:
-		.quad	0x00a092000000ffff
+		.quad 0x00a092000000ffff
 	gdt.tssseg:
-		.quad		0 /* TODO */
+		.quad 0 /* TODO */
+	gdt.code32seg:
+		.quad 0xCF9A000000FFFF
+	gdt.data32seg:
+		.quad 0xCF92000000FFFF
+	gdt.code16seg:
+		.quad 0x9A000000FFFF
+	gdt.data16seg:
+		.quad 0x92000000FFFF
 	gdt.end:
 
 gdt_ptr:
-	.short		gdt.end - gdt - 1
-	.quad			gdt
+	.short gdt.end - gdt - 1
+	.quad gdt
 
 	.bss
 
