@@ -29,7 +29,7 @@ pm2long:
 	movl $msg_loading, %esi
 	call pm_print
 
-	/* reenter real mode to set video mode and get memory map */
+	/* reenter real mode to set video mode */
 
 	lgdt gdt_ptr32
 
@@ -117,6 +117,13 @@ enter64:
 	mov %ax, %fs
 	mov %ax, %gs
 	mov %ax, %ss
+
+	/* clear screen */
+
+	movq $8000, %rcx
+	movq $0xa0000, %rdi
+	movq $0x101010101010101, %rax
+	rep stosq
 
 	/* TODO: call kernel */
 

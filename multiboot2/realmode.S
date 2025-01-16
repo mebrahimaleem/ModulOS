@@ -66,6 +66,12 @@ enterreal:
 	
 	sti
 
+	/* set vga to 320x200 256 color mode */
+
+	xorb %ah, %ah
+	movb $0x13, %al
+	int $0x10 
+
 	/* back to pm */
 	cli
 	movl %cr0, %eax
@@ -76,7 +82,15 @@ enterreal:
 	push $enterpm
 	retf
 
+	.code32
 enterpm:
+	mov $0x28, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
 	ret
 
 idt_ptr:
