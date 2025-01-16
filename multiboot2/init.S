@@ -28,7 +28,21 @@ pm2long:
 
 	movl $msg_loading, %esi
 	call pm_print
-	
+
+	/* reenter real mode to set video mode and get memory map */
+
+	lgdt gdt_ptr32
+
+	/* setup up the stackframe for returning */
+	push $enter32
+
+	/* setup stackframe for realmode */
+	push $0x30
+	push $0x7040
+	retfl
+
+	.code32
+enter32:
 	/* Check if hardware is supported by OS */
 
 	/* Check for CPUID */
@@ -79,9 +93,9 @@ pm2long:
 
 	/* Enter compat mode */
 
-	movl $0xC0000080, %ecx
+	movl $0xC0000080, %ecx /* EFER */
 	rdmsr
-	orl $0x100, %eax
+	orl $0x100, %eax /* LME */
 	wrmsr
 
 	movl %cr0, %eax
@@ -90,15 +104,14 @@ pm2long:
 
 	/* Enter 64-bit mode */
 	lgdt gdt_ptr
-	
-	.code64
 
-	push $(gdt.codeseg - gdt)
+	push $0x8
 	push $enter64
-	retfq
+	retfl
 
+	.code64
 enter64:
-	mov $(gdt.dataseg - gdt), %ax
+	mov $0x10, %ax
 	mov %ax, %ds
 	mov %ax, %es
 	mov %ax, %fs
@@ -157,30 +170,13 @@ vga_offset:
 
 /* GDT */
 
-	.align 8
-	.globl gdt
-gdt:
-	gdt.nullseg:
-		.quad 0
-	gdt.codeseg:
-		.quad 0x00a09a000000ffff
-	gdt.dataseg:
-		.quad 0x00a092000000ffff
-	gdt.tssseg:
-		.quad 0 /* TODO */
-	gdt.code32seg:
-		.quad 0xCF9A000000FFFF
-	gdt.data32seg:
-		.quad 0xCF92000000FFFF
-	gdt.code16seg:
-		.quad 0x9A000000FFFF
-	gdt.data16seg:
-		.quad 0x92000000FFFF
-	gdt.end:
-
 gdt_ptr:
-	.short gdt.end - gdt - 1
-	.quad gdt
+	.short 0x3F
+	.quad 0x7000
+
+gdt_ptr32:
+	.short 0x3F
+	.long 0x7000
 
 	.bss
 

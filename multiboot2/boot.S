@@ -55,7 +55,7 @@ multiboot_header_end:
 	.globl _start
 _start:
 	/* init stack */
-	movl $(stack + STACK_SIZE), %esp
+	movl $(0x8000 + STACK_SIZE), %esp /* place stack right after gdt */
 	movl %esp, %ebp
 
 	/* eflags */
@@ -63,8 +63,5 @@ _start:
 	popfl
 
 	jmp	pm2long
-
-	/* stack */
-	.comm		stack, STACK_SIZE
 
 #endif /* MULTIBOOT_BOOT_S */

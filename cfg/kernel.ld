@@ -18,15 +18,17 @@
 ENTRY(_start)
 
 SECTIONS {
+	. = 0x7000;
+
+	.text.gdt BLOCK(4K) : ALIGN(4K) {
+		*(.text.gdt)
+	}
+
 	. = 1M;
 	
 	.text BLOCK(4K) : ALIGN(4K) {
 		*(.multiboot)
 		*(.text)
-	}
-
-	.rodata BLOCK(4K) : ALIGN(4K) {
-		*(.rodata)
 	}
 
 	.data BLOCK(4K) : ALIGN(4K) {
