@@ -15,15 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef MULTIBOOT_INIT_S
-#define MULTIBOOT_INIT_S
+#ifndef MULTIBOOT2_INIT_S
+#define MULTIBOOT2_INIT_S
 
 	.code32
-	.text
+	.section .text.boot
 
 	.globl pm2long
 pm2long:
+	pushl $0
 	pushl %ebx
+	pushl $0
 	pushl %eax /* later passed to kernel */
 
 	movl $msg_loading, %esi
@@ -69,21 +71,32 @@ enter32:
 
 	/* A20 line already enabled by grub */
 
-	/* Identity map first four mebibytes */
+	/* Identity map first four mibibytes*/
 	
 	movl $PML4T, %edi
 	movl %edi, %cr3
 
-	movl $(PDPT + 3), (%edi)
+	movl $(PDPT0 + 3), (%edi)
+
+	movl $(PML4T + 0x1000 - 8), %edi
+	movl $(PDPT1 + 3), (%edi)
 	
-	movl $PDPT, %edi
+	movl $PDPT0, %edi
 	movl $(PDT + 3), (%edi)
 
-	movl $PDT, %edi
-	movl $(0x83), (%edi) /* First two mebibytes */
+	movl $(PDT), %edi
+	movl $(0x83), (%edi) /* First two mibibytes */
 
 	movl $(PDT + 8), %edi
-	movl $(0x200000 + 0x83), (%edi) /* Second two mebibytes */
+	movl $(0x200000 + 0x83), (%edi) /* Second two mibibytes */
+
+	/* Map last two gibibytes to first two */
+
+	movl $(PDPT1 + 0x1000 - 16), %edi
+	movl $(0x83), (%edi) /* First gibibytes */
+
+	movl $(PDPT1 + 0x1000 - 8), %edi
+	movl $(0x200000 + 0x83), (%edi) /* Second  gibibyte */
 
 	/* Enable PAE and PSE */
 
@@ -125,18 +138,20 @@ enter64:
 	movq $0x101010101010101, %rax
 	rep stosq
 
-	/* TODO: call kernel */
+	/* far return to ktransfer */
+	push $0x8
+	push $ktransfer
+	retfq
 
-	/* fallback halt */
-loop:
+hang_loop:
 	hlt
-	jmp loop
+	jmp hang_loop
 
 	.code32
 nosupport:
 	movl $msg_nosupport, %esi
 	call pm_print
-	jmp	loop
+	jmp	hang_loop
 
 pm_print: // pm_print, esi points to string, modifies esi
 	push %eax
@@ -164,7 +179,7 @@ pm_print.done:
 	popl %eax
 	ret
 
-	.data
+	.section .data.boot
 
 msg_loading:
 	.asciz "Loading..."
@@ -185,14 +200,30 @@ gdt_ptr32:
 	.short 0x3F
 	.long 0x7000
 
-	.bss
-
 /* Paging Structures */
 
 	.align 0x1000
 
-	.comm PML4T, 0x1000
-	.comm PDPT, 0x1000
-	.comm PDT, 0x1000
+PML4T:
+.rept 0x200
+	.quad 0
+.endr
 
-#endif /* MULTIBOOT_INIT_S */
+PDPT0:
+.rept 0x200
+	.quad 0
+.endr
+
+PDPT1:
+.rept 0x200
+	.quad 0
+.endr
+
+PDT:
+.rept 0x200
+	.quad 0
+.endr
+
+	.section .bss.boot
+
+#endif /* MULTIBOOT2_INIT_S */

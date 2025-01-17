@@ -22,8 +22,8 @@ KERNEL_STRIP := x86_64-elf-strip
 obj := $(CURDIR)/build
 incl := $(CURDIR)/include
 
-KERNEL_REQS_S := $(shell find multiboot2/ -type f -name "*.S")
-KERNEL_REQS_C := $(shell find multiboot2/ -type f -name "*.c")
+KERNEL_REQS_S := $(shell find multiboot2/ -type f -name "*.S") $(shell find core/ -type f -name "*.S")
+KERNEL_REQS_C := $(shell find multiboot2/ -type f -name "*.c") $(shell find core/ -type f -name "*.c")
 
 KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_REQS_S))
 KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_REQS_C))
@@ -37,9 +37,17 @@ ALL_TARGETS_S := $(KERNEL_TARGETS_S)
 ALL_TARGETS_C := $(KERNEL_TARGETS_C)
 ALL_TARGETS := $(ALL_TARGETS_S) $(ALL_TARGETS_C)
 
+MULTIBOOT2_TARGETS_S := $(filter $(obj)/multiboot2/%,$(ALL_TARGETS_S))
+MULTIBOOT2_TARGETS_C := $(filter $(obj)/multiboot2/%,$(ALL_TARGETS_C))
+MULTIBOOT2_TARGETS := $(MULTIBOOT2_TARGETS_S) $(MULTIBOOT2_TARGETS_C)
+
+CORE_TARGETS_S := $(filter $(obj)/core/%,$(ALL_TARGETS_S))
+CORE_TARGETS_C := $(filter $(obj)/core/%,$(ALL_TARGETS_C))
+CORE_TARGETS := $(CORE_TARGETS_S) $(CORE_TARGETS_C)
+
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-CFLAGS := $(CWARN) -O2 -static -mcmodel=kernel -ffreestanding -fomit-frame-pointer -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
+CFLAGS := $(CWARN) -O2 -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
 
 export
 
@@ -62,13 +70,22 @@ $(obj)/modulos.iso: cfg/grub.cfg $(obj)/modulos LICENSE | $(obj)/iso/boot/grub/
 	cp LICENSE $(obj)/iso/
 	grub-mkrescue -o $@ $(obj)/iso/
 
-$(obj)/modulos: cfg/kernel.ld $(KERNEL_TARGETS) | $(obj)/
-	$(KERNEL_LD) -o $@-dbg -T $^
-	$(KERNEL_STRIP) -s -o $@ $@-dbg
+$(obj)/modulos: $(obj)/modulos-dbg | $(obj)/
+	$(KERNEL_STRIP) -s -o $@ $<
+
+$(obj)/modulos-dbg: cfg/kernel.ld $(KERNEL_TARGETS) | $(obj)/
+	$(KERNEL_LD) -o $@ -T $^
 
 # Multiboot2
-$(ALL_TARGETS_S): $(obj)/multiboot2/%.o: multiboot2/%.S | $(obj)/multiboot2/
+$(MULTIBOOT2_TARGETS_S): $(obj)/multiboot2/%.o: multiboot2/%.S | $(obj)/multiboot2/
 	$(MAKE) -C multiboot2/ $@
 
-$(ALL_TARGETS_C): $(obj)/multiboot2/%.o: multiboot2/%.c $(incl)/multiboot2/%.h | $(obj)/multiboot2/
+$(MULTIBOOT2_TARGETS_C): $(obj)/multiboot2/%.o: multiboot2/%.c $(incl)/multiboot2/%.h | $(obj)/multiboot2/
 	$(MAKE) -C multiboot2/ $@
+
+# Core
+$(CORE_TARGETS_S): $(obj)/core/%.o: core/%.S | $(obj)/core/
+	$(MAKE) -C core/ $@
+
+$(CORE_TARGETS_C): $(obj)/core/%.o: core/%.c $(incl)/core/%.h | $(obj)/core/
+	$(MAKE) -C core/ $@

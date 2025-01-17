@@ -17,20 +17,18 @@
 
 #define ASM_FILE
 
-#ifndef MULTIBOOT_BOOT_S
-#define MULTIBOOT_BOOT_S
+#ifndef MULTIBOOT2_BOOT_S
+#define MULTIBOOT2_BOOT_S
 
 #define MULTIBOOT2_MAGIC	0xE85250D6
 #define ARCH_I386_PM			0
 
-#define FRAMEBUFFER_TAG		5
-#define TAG_NOOPT					0
-#define TAG_END						0
+#define MB2TAG_TYPE_MEMMAP	6
 
 #define STACK_SIZE				0x4000
 
 	.code32
-	.section .multiboot
+	.section .text.multiboot
 
 	.align	8
 multiboot_header:
@@ -46,12 +44,20 @@ multiboot_header:
 	/* checksum */
 	.long		-(MULTIBOOT2_MAGIC + ARCH_I386_PM + (multiboot_header_end - multiboot_header))
 
+	/* information request (memmap) tag */
+multiboot_header.memmap_start:
+	.short	1
+	.short	0
+	.long		multiboot_header.memmap_end - multiboot_header.memmap_start
+	.long		MB2TAG_TYPE_MEMMAP
+multiboot_header.memmap_end:
+
 	/* terminate tags */
-	.short	TAG_END
+	.short	0
 	.long		8
 multiboot_header_end:
 
-	.text
+	.section .text.boot
 	.globl _start
 _start:
 	/* init stack */
@@ -64,4 +70,4 @@ _start:
 
 	jmp	pm2long
 
-#endif /* MULTIBOOT_BOOT_S */
+#endif /* MULTIBOOT2_BOOT_S */

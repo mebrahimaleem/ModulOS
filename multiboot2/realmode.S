@@ -17,7 +17,7 @@
 
 #ifndef MULTIBOOT_REALMODE_S
 #define MULTIBOOT_REALMODE_S
-	.section .text.gdt
+	.section .text.real
 gdt:
 	gdt.nullseg:
 		.quad 0

@@ -17,25 +17,41 @@
 
 ENTRY(_start)
 
+KERNEL_VMA = -0x80000000;
+
 SECTIONS {
 	. = 0x7000;
 
-	.text.gdt BLOCK(4K) : ALIGN(4K) {
-		*(.text.gdt)
+	.text.real BLOCK(4K) : {
+		*(.text.real)
 	}
 
 	. = 1M;
+
+	.text.boot BLOCK(4K) : {
+		*(.text.multiboot)
+		*(.text.boot)
+	}
+
+	.data.boot BLOCK(4K) : {
+		*(.data.boot)
+	}
+
+	.bss.boot BLOCK(4K) : {
+		*(.bss.boot)
+	}
 	
-	.text BLOCK(4K) : ALIGN(4K) {
-		*(.multiboot)
+	. = KERNEL_VMA + ADDR(.bss.boot) + SIZEOF(.bss.boot) + 4K - (SIZEOF(.bss.boot) % 4K);
+	
+	.text BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + 4K - (SIZEOF(.bss.boot) % 4K)) {
 		*(.text)
 	}
 
-	.data BLOCK(4K) : ALIGN(4K) {
+	.data BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + SIZEOF(.text) + 4K - (SIZEOF(.bss.boot) % 4K) + 4K - (SIZEOF(.text) % 4K)) {
 		*(.data)
 	}
 
-	.bss BLOCK(4K) : ALIGN(4K) {
+	.bss BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + SIZEOF(.text) + SIZEOF(.data) + 4K - (SIZEOF(.bss.boot) % 4K) + 4K - (SIZEOF(.text) % 4K) + 4K - (SIZEOF(.data) % 4K)) {
 		*(.bss)
 	}
 }
