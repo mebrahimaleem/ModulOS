@@ -31,6 +31,37 @@ pm2long:
 	movl $msg_loading, %esi
 	call pm_print
 
+	/* Check if hardware is supported by OS */
+
+	/* Check for CPUID */
+	pushfl
+	xorl $0x200000, (%esp)
+	movl (%esp), %eax
+	popfl
+	pushfl
+	xorl (%esp), %eax
+	andl $0x200000, %eax
+	jnz nosupport
+	addl $4, %esp
+
+	/* Check cpuid */
+	movl $1, %eax
+	cpuid
+	and $((1 << 3) /* PSE */ + (1 << 5) /* MSR */ + (1 << 6) /* PAE */ + (1 << 9) /* APIC */), %edx
+	cmp $((1 << 3) /* PSE */ + (1 << 5) /* MSR */ + (1 << 6) /* PAE */ + (1 << 9) /* APIC */), %edx
+	jne nosupport
+
+	/* Check for long mode */
+	movl $0x80000000, %eax /* check cpuid extensions long mode */
+	cpuid
+	cmpl $0x80000001, %eax
+	jb nosupport
+
+	movl $0x80000001, %eax /* check long mode */
+	cpuid
+	test $0x20000000, %edx
+	jz nosupport
+
 	/* reenter real mode to set video mode */
 
 	lgdt gdt_ptr32
@@ -45,32 +76,6 @@ pm2long:
 
 	.code32
 enter32:
-	/* Check if hardware is supported by OS */
-
-	/* Check for CPUID */
-	pushfl
-	xorl $0x200000, (%esp)
-	movl (%esp), %eax
-	popfl
-	pushfl
-	xorl (%esp), %eax
-	andl $0x200000, %eax
-	jnz nosupport
-	addl $4, %esp
-
-	/* Check for long mode */
-	movl $0x80000000, %eax
-	cpuid
-	cmpl $0x80000001, %eax
-	jb nosupport
-
-	movl $0x80000001, %eax
-	cpuid
-	test $0x20000000, %edx
-	jz nosupport
-
-	/* A20 line already enabled by grub */
-
 	/* Identity map first four mibibytes*/
 	
 	movl $PML4T, %edi

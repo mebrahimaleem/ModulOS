@@ -28,8 +28,6 @@ ktransfer:
 	/* set gdt to high memory */
 	lgdt gdt_ptr_high
 
-	/* TODO: set idt */
-
 	/* call kernel */
 	popq %rsi
 	popq %rdi
@@ -44,5 +42,5 @@ fallback_loop:
 	.data
 
 gdt_ptr_high:
-	.short 0x3F
-	.quad -0x80000000 + 0x7000
+	.short	0x3F
+	.quad		-0x80000000 + 0x7000
