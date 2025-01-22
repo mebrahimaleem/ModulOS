@@ -26,6 +26,8 @@ SECTIONS {
 		*(.text.real)
 	}
 
+	ASSERT(. <= KERNEL_VMA + 0x80000, "Error: Core kernel has overlap with EBDA")
+
 	. = 1M;
 
 	.text.boot BLOCK(4K) : {
@@ -54,4 +56,9 @@ SECTIONS {
 	.bss BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + SIZEOF(.text) + SIZEOF(.data) + 4K - (SIZEOF(.bss.boot) % 4K) + 4K - (SIZEOF(.text) % 4K) + 4K - (SIZEOF(.data) % 4K)) {
 		*(.bss)
 	}
+
+	ASSERT(. <= KERNEL_VMA + 4M, "Error: Core kernel exceeds 4MiB limit")
+
+	_kheap_shared = . + 4K - (. % 4K);
+	_kheap_private = (-0x1 - kheap_shared + 0x1) / 0x2 + kheap_shared + 4K - (((-0x1 - kheap_shared + 0x1) / 0x2 + kheap_shared) % 4K) - 0x00000000;
 }

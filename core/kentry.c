@@ -20,7 +20,12 @@
 
 #include <multiboot2/multiboot2.h>
 #include <multiboot2/tags.h>
+
 #include <core/kentry.h>
+#include <core/memory.h>
+
+struct avail_memory_t kavail_memory;
+PML4T_t volatile kPML4T;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	if (mb2magic != MULTIBOOT2_MAGIC) {
@@ -54,6 +59,12 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 				break; //ignore others
 		}
 	}
+
+	/* set kernel instance to 0 */
+	kPML4T = k0PML4T;
+	
+	/* init memory manager */
+	kmeminit();
 
 	return;
 }

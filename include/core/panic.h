@@ -1,4 +1,4 @@
-/* ktransfer.S - transfer from low memory to high kernel */
+/* panic.h - kernel panic functions */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,37 +15,16 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_PANIC_H
+#define CORE_PANIC_H
 
-#ifndef CORE_KTRANSFER_S
-#define CORE_KTRANSFER_S
+#include <stdint.h>
 
-	.code64
-	.text
+#define KPANIC_UNK		0
+#define KPANIC_NOMEM	1
 
-	.globl ktransfer
-ktransfer:
-	/* offset esp */
-	movq $(-0x80000000), %rax
-	addq %rax, %rsp
+__attribute__((noreturn)) void kpanic_hlt(void);
 
-	/* set gdt to high memory */
-	lgdt gdt_ptr_high
+__attribute__((noreturn)) void kpanic(uint64_t err);
 
-	/* call kernel */
-	popq %rsi
-	popq %rdi
-
-	call kentry
-
-	/* fallback halt */
-fallback_loop:
-	hlt
-	jmp fallback_loop
-
-	.data
-
-gdt_ptr_high:
-	.short	0x3F
-	.quad		-0x80000000 + 0x7000
-
-#endif /* CORE_KTRANSFER_S */
+#endif /* CORE_PANIC_H */

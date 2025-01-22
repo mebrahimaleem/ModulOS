@@ -1,4 +1,4 @@
-/* ktransfer.S - transfer from low memory to high kernel */
+/* asmroutines.S - assembly routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -16,36 +16,39 @@
 */
 
 
-#ifndef CORE_KTRANSFER_S
-#define CORE_KTRANSFER_S
+#ifndef CORE_ASMROUTINES_S
+#define CORE_ASMROUTINES_S
 
 	.code64
 	.text
 
-	.globl ktransfer
-ktransfer:
-	/* offset esp */
-	movq $(-0x80000000), %rax
-	addq %rax, %rsp
+/* void ktlbflush_addr(uint64_t addr); */
+	.globl ktlbflush_addr
+ktlbflush_addr:
+	invlpg (%rdi)
+	ret
 
-	/* set gdt to high memory */
-	lgdt gdt_ptr_high
+/* void ktlb_flush(void); */
+	.globl ktlbflush
+ktlbflush:
+	movq %cr3, %rax
+	movq %rax, %cr3
+	ret
 
-	/* call kernel */
-	popq %rsi
-	popq %rdi
-
-	call kentry
-
-	/* fallback halt */
-fallback_loop:
+/* __noreturn__ void kpanic_hlt(void); */
+	.globl kpanic_hlt
+kpanic_hlt:
 	hlt
-	jmp fallback_loop
+	jmp kpanic_hlt
 
-	.data
+	.bss
 
-gdt_ptr_high:
-	.short	0x3F
-	.quad		-0x80000000 + 0x7000
+/* 32 mibibyte granularity so 256TiB * 1024 * 1024 / 32 / 8 = 1MiB bitmap*/
+	.align 8
+	.globl kpmembitmap
+kpmembitmap:
+.rept 0x20000
+	.quad 0
+.endr
 
-#endif /* CORE_KTRANSFER_S */
+#endif /* CORE_ASMROUTINES_S */

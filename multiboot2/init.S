@@ -87,21 +87,24 @@ enter32:
 	movl $(PDPT1 + 3), (%edi)
 	
 	movl $PDPT0, %edi
-	movl $(PDT + 3), (%edi)
+	movl $(PDT0 + 3), (%edi)
 
-	movl $(PDT), %edi
+	movl $(PDT0), %edi
 	movl $(0x83), (%edi) /* First two mibibytes */
 
-	movl $(PDT + 8), %edi
+	movl $(PDT0 + 8), %edi
 	movl $(0x200000 + 0x83), (%edi) /* Second two mibibytes */
 
-	/* Map last two gibibytes to first two */
+	/* Map high memory 6MiB (last two for static shared kernel heap) */
 
 	movl $(PDPT1 + 0x1000 - 16), %edi
-	movl $(0x83), (%edi) /* First gibibytes */
+	movl $(PDT1 + 3), (%edi) /* First gibibytes */
 
-	movl $(PDPT1 + 0x1000 - 8), %edi
-	movl $(0x200000 + 0x83), (%edi) /* Second  gibibyte */
+	movl $(PDT1), %edi
+	movl $(0x83), (%edi) /* First two mibibytes */
+
+	movl $(PDT1 + 8), %edi
+	movl $(0x200000 + 0x83), (%edi) /* Second two mibibytes */
 
 	/* Enable PAE and PSE */
 
@@ -205,10 +208,14 @@ gdt_ptr32:
 	.short 0x3F
 	.long 0x7000
 
+	.section .bss.boot
+
 /* Paging Structures */
 
 	.align 0x1000
 
+	.globl k0PML4T
+k0PML4T:
 PML4T:
 .rept 0x200
 	.quad 0
@@ -224,11 +231,14 @@ PDPT1:
 	.quad 0
 .endr
 
-PDT:
+PDT0:
 .rept 0x200
 	.quad 0
 .endr
 
-	.section .bss.boot
+PDT1:
+.rept 0x200
+	.quad 0
+.endr
 
 #endif /* MULTIBOOT2_INIT_S */

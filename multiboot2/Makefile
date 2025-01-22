@@ -24,8 +24,8 @@ build: $(filter $(obj)/multiboot2/%.o,$(ALL_TARGETS))
 %/:
 	-mkdir -p $@
 
-$(ALL_TARGETS_S): $(obj)/multiboot2/%.o: %.S
+$(MULTIBOOT2_TARGETS_S): $(obj)/multiboot2/%.o: %.S
 	$(KERNEL_CC) $(CFLAGS) -o $@ $<
 
-$(ALL_TARGETS_C): $(obj)/multiboot2/%.o: %.c $(incl)/multiboot2/%.h
+$(MULTIBOOT2_TARGETS_C): $(obj)/multiboot2/%.o: %.c $(incl)/multiboot2/%.h
 	$(KERNEL_CC) $(CFLAGS) -o $@ $<
