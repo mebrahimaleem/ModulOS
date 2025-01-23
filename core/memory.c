@@ -22,6 +22,7 @@
 
 #include <core/memory.h>
 #include <core/panic.h>
+#include <core/utils.h>
 #include <core/kentry.h>
 
 #include <multiboot2/multiboot2.h>
@@ -161,7 +162,7 @@ uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length) {
 
 }
 
-void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {	
+void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {	/* TODO: implement heap mutux (add third reserved descriptor for mutex */
 	const uint64_t lim = heapbase[1].size - sizeof(struct BlockDescriptor);
 
 	/* adjust length to force alignment and allocate descriptor */
@@ -235,16 +236,49 @@ void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
 }
 
 void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length) {
+	const uint64_t alen = count * length;
 
+	void* ret = kmalloc(heapbase, alen);
+	kfill(ret, alen, 0);
+	return ret;
 }
 
 void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length) {
+	struct BlockDescriptor* volatile block = (struct BlockDescriptor* volatile)((uint64_t)ptr - sizeof(struct BlockDescriptor));
+	void* ret;
 
+	if (block->size >= length + sizeof(struct BlockDescriptor)) {
+		return ptr;
+	}
+	else {
+		ret = kmalloc(heapbase, length);
+		kcopy(ptr, ret, block->size - sizeof(struct BlockDescriptor));
+		kfree(ptr);
+		return ret;
+	}
 }
 
-void kfree(struct BlockDescriptor* heapbase, void* ptr) {
+void kfree(void* ptr) {
+	struct BlockDescriptor* volatile block = (struct BlockDescriptor* volatile)((uint64_t)ptr - sizeof(struct BlockDescriptor));
+	const struct BlockDescriptor* nblk = (struct BlockDescriptor* volatile)((uint64_t)(block) + block->size);
 
+	/* check if next is last */
+	if (nblk->flags == KMEM_BLOCK_LAST) {
+		block->flags = KMEM_BLOCK_FREE;
+		block->size = 0;
+
+		/* TODO: implement page freeing (if needed) */
+	}
+	
+	/* check if next is free */
+	else if (nblk->flags == KMEM_BLOCK_FREE) {
+		block->flags = KMEM_BLOCK_FREE;
+		block->size += nblk->size;
+	}
+
+	else {
+		block->flags = KMEM_BLOCK_FREE;
+	}
 }
 
 #endif /* CORE_MEMORY_C */
-

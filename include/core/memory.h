@@ -89,7 +89,7 @@ void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length)
 
 void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length);
 
-void kfree(struct BlockDescriptor* heapbase, void* ptr);
+void kfree(void* ptr);
 
 #endif /* CORE_MEMORY_H */
 
