@@ -49,7 +49,8 @@ CORE_TARGETS := $(CORE_TARGETS_S) $(CORE_TARGETS_C)
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
 #CDEBUG := -D DEBUG -O0
-CFLAGS := $(CWARN) -O2 $(CDEBUG) -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
+CFLAGS := $(CWARN) -O2 $(CDEBUG) -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
+	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
 
 export
 
@@ -57,32 +58,55 @@ export
 all: build
 
 .PHONY: build
-build: $(obj)/modulos.iso
+build: $(obj)/modulos.img
 
 .PHONY: clean
 clean:
 	-rm -rd build/* test/*
 
 .PHONY: simulateqemu
-simulateqemu: $(obj)/modulos.iso | $(test)/
-	echo "$(shell date --iso=seconds)" > $(test)/serial
-	qemu-system-x86_64 -s -S -smp sockets=1,cores=2,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -cdrom $<
+simulateqemu: $(obj)/modulos.img | $(test)/
+	qemu-system-x86_64 -s -S -smp sockets=1,cores=2,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
 
 .PHONY: debuggdb
 debuggdb: $(obj)/modulos-dbg
-	gdb -q -tui \
+	-gdb -q -tui \
 		--init-eval-command="tar rem localhost:1234" \
 		--init-eval-command="la sp" \
 		--init-eval-command="sy $<" \
 		--init-eval-command="c"
 
+
+.PHONY: rootfs
+rootfs: | $(obj)/iso/
+	mkdir -p \
+		$|bin/ \
+		$|boot/ \
+		$|dev/ \
+		$|etc/ \
+		$|home/ \
+		$|lib/ \
+		$|media/ \
+		$|mnt/ \
+		$|opt/ \
+		$|proc/ \
+		$|root/ \
+		$|sbin/ \
+		$|srv/ \
+		$|sys/ \
+		$|tmp/ \
+		$|usr/ $|usr/include/ $|usr/lib/ $|usr/libexec/ $|usr/local/ $|usr/share/ \
+		$|var/ $|var/log/ $|var/mail/ $|var/spool/ $|var/src/ $|var/tmp/
+
 %/:
 	-mkdir -p $@
 
-$(obj)/modulos.iso: cfg/grub.cfg $(obj)/modulos LICENSE | $(obj)/iso/boot/grub/
-	cp $(obj)/modulos $(obj)/iso/boot/
-	cp $< $(obj)/iso/boot/grub/
-	cp LICENSE $(obj)/iso/
+$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg LICENSE | rootfs
+	mkdir -p $(obj)/iso/boot/grub/ $(obj)/iso/usr/share/doc/ModulOS/
+	cp $< $(obj)/iso/boot/
+	cp cfg/grub.cfg $(obj)/iso/boot/grub/
+	cp LICENSE $(obj)/iso/usr/share/doc/ModulOS/
+
 	grub-mkrescue -o $@ $(obj)/iso/
 
 $(obj)/modulos: $(obj)/modulos-dbg | $(obj)/
