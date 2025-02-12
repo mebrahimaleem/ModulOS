@@ -1,4 +1,4 @@
-/* panic.h - kernel panic functions */
+/* portio.h - port io functions */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,16 +15,20 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
+#ifndef CORE_PORTIO_H
+#define CORE_PORTIO_H
 
 #include <stdint.h>
 
-#define KPANIC_UNK		0
-#define KPANIC_NOMEM	1
+void outb(uint16_t addr, uint8_t x);
+void outw(uint16_t addr, uint16_t x);
+void outd(uint16_t addr, uint32_t x);
 
-__attribute__((noreturn)) void panic_hlt(void);
+uint8_t inb(uint16_t addr);
+uint16_t inw(uint16_t addr);
+uint32_t ind(uint16_t addr);
 
-__attribute__((noreturn)) void panic(uint64_t err);
+void iowait(void);
 
-#endif /* CORE_PANIC_H */
+#endif /* CORE_PORTIO_H */
+

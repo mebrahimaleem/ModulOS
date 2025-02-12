@@ -24,5 +24,12 @@ void kcopy(void* src, void* dst, uint64_t len);
 
 void kfill(void* dst, uint64_t len, uint8_t val);
 
+/*
+ * Converts num to base string and stores it into str of length strlen (excluding null terminating byte)
+ */
+uint64_t intToString(uint64_t num, uint8_t base, char* str, uint64_t strlen);
+
+void kstrcpy(const char* from, char* to);
+
 #endif /* CORE_UTILS_H */
 

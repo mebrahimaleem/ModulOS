@@ -22,6 +22,9 @@
 #include <multiboot2/tags.h>
 
 #include <core/kentry.h>
+#include <core/atomic.h>
+#include <core/serial.h>
+#include <core/panic.h>
 #include <core/memory.h>
 
 struct avail_memory_t kavail_memory;
@@ -62,10 +65,33 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 
 	/* set kernel instance to 0 */
 	kPML4T = k0PML4T;
+
+	/* init atomic */
+	atomicinit();
+
+	/* init serial */
+	serialinit();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "START: SERIAL 1\r\nSTATUS: Starting core init...\r\n");
+	serialWriteStr(SERIAL2, "START: SERIAL 2\r\nSTATUS: Starting core init...\r\n");
+#endif /* DEBUG */
 	
 	/* init memory manager */
-	kmeminit();
+	meminit();
 
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Memory init done\r\n");
+	serialWriteStr(SERIAL2, "STATUS: Memory init done\r\n");
+#endif /* DEBUG */
+
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Core init done\r\n");
+	serialWriteStr(SERIAL2, "STATUS: Core init done\r\n");
+#endif /* DEBUG */
+
+	panic(KPANIC_UNK);
 	return;
 }
 

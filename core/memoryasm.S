@@ -1,4 +1,4 @@
-/* panic.h - kernel panic functions */
+/* memoryasm.S - memory assembly routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,16 +15,34 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
 
-#include <stdint.h>
+#ifndef CORE_MEMORYASM_S
+#define CORE_MEMORYASM_S
 
-#define KPANIC_UNK		0
-#define KPANIC_NOMEM	1
+	.code64
+	.text
 
-__attribute__((noreturn)) void panic_hlt(void);
+/* void ktlbflush_addr(uint64_t addr); */
+	.globl tlbflush_addr
+tlbflush_addr:
+	invlpg (%rdi)
+	ret
 
-__attribute__((noreturn)) void panic(uint64_t err);
+/* void tlbflush(void); */
+	.globl tlbflush
+tlbflush:
+	movq %cr3, %rax
+	movq %rax, %cr3
+	ret
 
-#endif /* CORE_PANIC_H */
+	.bss
+
+/* 32 mibibyte granularity so 256TiB * 1024 * 1024 / 32 / 8 = 1MiB bitmap*/
+	.align 8
+	.globl pmembitmap
+pmembitmap:
+.rept 0x20000
+	.quad 0
+.endr
+
+#endif /* CORE_MEMORYASM_S */

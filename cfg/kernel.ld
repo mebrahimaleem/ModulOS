@@ -31,7 +31,7 @@ SECTIONS {
 	. = 1M;
 
 	.text.boot BLOCK(4K) : {
-		*(.text.multiboot)
+		KEEP(*(.text.multiboot))
 		*(.text.boot)
 	}
 

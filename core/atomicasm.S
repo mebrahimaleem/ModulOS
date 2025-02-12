@@ -1,4 +1,4 @@
-/* asmroutines.S - assembly routines */
+/* atomicasm.S - cpu interrupt controlling routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,40 +15,29 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_ATOMICASM_S
+#define CORE_ATOMICASM_S
 
-#ifndef CORE_ASMROUTINES_S
-#define CORE_ASMROUTINES_S
+  .globl disableInterrupts
+disableInterrupts:
+.byte 0
 
-	.code64
-	.text
+/* void ksti(void); */
+  .globl ksti
+ksti:
+  movb (disableInterrupts), %al
+  testb %al, %al
+  jnz ksti.nosti
+  sti
+ksti.nosti:
+  ret
 
-/* void ktlbflush_addr(uint64_t addr); */
-	.globl ktlbflush_addr
-ktlbflush_addr:
-	invlpg (%rdi)
-	ret
+/* void kcli(void); */
+  .globl kcli
+kcli:
+  cli
+  ret
 
-/* void ktlb_flush(void); */
-	.globl ktlbflush
-ktlbflush:
-	movq %cr3, %rax
-	movq %rax, %cr3
-	ret
+#endif /* CORE_ATOMICASM_S*/
 
-/* __noreturn__ void kpanic_hlt(void); */
-	.globl kpanic_hlt
-kpanic_hlt:
-	hlt
-	jmp kpanic_hlt
 
-	.bss
-
-/* 32 mibibyte granularity so 256TiB * 1024 * 1024 / 32 / 8 = 1MiB bitmap*/
-	.align 8
-	.globl kpmembitmap
-kpmembitmap:
-.rept 0x20000
-	.quad 0
-.endr
-
-#endif /* CORE_ASMROUTINES_S */

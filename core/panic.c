@@ -18,12 +18,24 @@
 #ifndef CORE_PANIC_C
 #define CORE_PANIC_C
 
+#include <core/utils.h>
+#include <core/serial.h>
 #include <core/panic.h>
 
-__attribute__((noreturn)) void kpanic(uint64_t err) {
-	//TODO: log error
+static const char* panicstr_st = "PANIC: 0x";
+static char panicstr[sizeof(panicstr_st) + 256 + 3]; //st + buffer + crlf0
+
+__attribute__((noreturn)) void panic(uint64_t err) {
+	uint64_t offset = 255 - intToString(err, 16, panicstr + sizeof(panicstr_st) - 1, 256);
+	kstrcpy(panicstr_st, panicstr + offset);
+	panicstr[sizeof(panicstr_st) + 256 + 0] = '\r';
+	panicstr[sizeof(panicstr_st) + 256 + 1] = '\n';
+	panicstr[sizeof(panicstr_st) + 256 + 2] = 0;
+
+	serialWriteStr(SERIAL1, panicstr + offset);
+	serialWriteStr(SERIAL2, panicstr + offset);
 	
-	kpanic_hlt();
+	panic_hlt();
 }
 
 #endif /* CORE_PANIC_C */

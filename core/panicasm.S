@@ -1,4 +1,4 @@
-/* panic.h - kernel panic functions */
+/* panicasm.S - panic assembly routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,16 +15,16 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
+#ifndef CORE_PANICASM_S
+#define CORE_PANICASM_S
 
-#include <stdint.h>
+	.code64
+	.text
 
-#define KPANIC_UNK		0
-#define KPANIC_NOMEM	1
+/* __noreturn__ void panic_hlt(void); */
+	.globl panic_hlt
+panic_hlt:
+	hlt
+	jmp panic_hlt
 
-__attribute__((noreturn)) void panic_hlt(void);
-
-__attribute__((noreturn)) void panic(uint64_t err);
-
-#endif /* CORE_PANIC_H */
+#endif /* CORE_PANICASM_S */

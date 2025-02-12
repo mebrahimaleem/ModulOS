@@ -1,4 +1,4 @@
-/* panic.h - kernel panic functions */
+/* atomic.h - atomic functions */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,16 +15,25 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
+#ifndef CORE_ATOMIC_H
+#define CORE_ATOMIC_H
 
 #include <stdint.h>
 
-#define KPANIC_UNK		0
-#define KPANIC_NOMEM	1
+typedef uint64_t MutexHandle;
 
-__attribute__((noreturn)) void panic_hlt(void);
+void atomicinit(void);
 
-__attribute__((noreturn)) void panic(uint64_t err);
+MutexHandle kcreateMutex(void);
 
-#endif /* CORE_PANIC_H */
+void kacquireMutex(MutexHandle handle);
+
+void kreleaseMutex(MutexHandle handle);
+
+void ksti(void);
+
+void kcli(void);
+
+void setInterrupts(uint8_t set);
+
+#endif /* CORE_ATOMIC_H */

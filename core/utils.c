@@ -36,4 +36,37 @@ void kfill(void* dst, uint64_t len, uint8_t val) {
 	}
 }
 
+uint64_t intToString(uint64_t num, uint8_t base, char* str, uint64_t strlen) {
+	if (num == 0 && strlen > 0){
+		*(str + strlen) = '0';
+		return 1;
+	}
+	uint64_t i = 0;
+	for (char* c = str + strlen; c >= str; c--) {
+		*c = (char)(num % base);
+
+		if (*c > 9) {
+			// alpha
+			*c += 'A' - 10;
+		}
+		else {
+			// numeric
+			*c += '0';
+		}
+
+		num /= base;
+
+		i++;
+		if (num == 0) break;
+	}
+
+	return i;
+}
+
+void kstrcpy(const char* from, char* to) {
+	for (int i = 0; from[i] != 0; i++) {
+		to[i] = from[i]; //TODO: manually optimize with asm
+	}
+}
+
 #endif /* CORE_UTILS_C */

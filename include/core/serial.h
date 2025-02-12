@@ -1,4 +1,4 @@
-/* panic.h - kernel panic functions */
+/* serial.h - serial port functions */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,16 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
+#ifndef CORE_SERIAL_H
+#define CORE_SERIAL_H
 
 #include <stdint.h>
 
-#define KPANIC_UNK		0
-#define KPANIC_NOMEM	1
+#define SERIAL1  1
+#define SERIAL2  2
+#define SERIAL3  4
+#define SERIAL4  8
+#define SERIAL5  16
+#define SERIAL6  32
+#define SERIAL7  64
+#define SERIAL8  128
 
-__attribute__((noreturn)) void panic_hlt(void);
+void serialinit(void);
 
-__attribute__((noreturn)) void panic(uint64_t err);
+void serialWriteStr(uint8_t com, const char* str);
 
-#endif /* CORE_PANIC_H */
+#endif /* CORE_SERIAL_H */
+

@@ -34,7 +34,7 @@ struct Blocks32M* kmemblocks32M;
 struct BlockDescriptor* volatile kheap_shared;
 struct BlockDescriptor* volatile kheap_private;
 
-void kmeminit(void) {
+void meminit(void) {
 	uint32_t i;
 	uint64_t j;
 
@@ -69,14 +69,14 @@ void kmeminit(void) {
 
 		
 		for (j = t0; j <= t1; j += 0x2000000) {
-			kpmembitmap[j / 0x10000000] = 1 << (j % 0x10000000);
+			pmembitmap[j / 0x10000000] = 1 << (j % 0x10000000);
 		}
 	}
 
 	/* mark first 2 gibibytes as taken (by kernel) */
 	/* 2 gibibytes * 1024 / 32 / 64 = 8 qwords */
 	for (i = 0; i < 8; i++) {
-		kpmembitmap[i] = 0;
+		pmembitmap[i] = 0;
 	}
 
 
@@ -103,13 +103,13 @@ void kmeminit(void) {
 /*
 * finds a free continious block of 32MiB physical memory of size length
 */
-uint64_t kmemfcb(uint64_t length) {
+uint64_t memfcb(uint64_t length) {
 	uint64_t ret = 0;
 	uint64_t cont = 0;
 
-	/* first pass */
+	/* first pass, uses hint */
 	for (; kphint < 0x1000000000000; kphint += 0x2000000) {
-		if ((kpmembitmap[kphint / 0x10000000] >> (kphint % 0x10000000)) & 1) {
+		if ((pmembitmap[kphint / 0x10000000] >> (kphint % 0x10000000)) & 1) {
 			if (ret == 0) {
 				ret = kphint;
 				cont = 0;
@@ -128,7 +128,7 @@ uint64_t kmemfcb(uint64_t length) {
 	kphint = 0;
 
 	for (; kphint < 0x1000000000000; kphint += 0x2000000) {
-		if ((kpmembitmap[kphint / 0x10000000] >> (kphint % 0x10000000)) & 1) {
+		if ((pmembitmap[kphint / 0x10000000] >> (kphint % 0x10000000)) & 1) {
 			if (ret == 0) {
 				ret = kphint;
 				cont = 0;
@@ -149,9 +149,83 @@ uint64_t kmemfcb(uint64_t length) {
 /*
 * maps virtual memory to physical address
 * all arguments in bytes and must be 4K page aligned
+* undefined behavior when overwriting previous entries with a different granularity
 */
-uint8_t kmapv2p(PML4T_t pml4t, void* vaddr, void* paddr, enum PageGranularity granularity) {
+void mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity) { /* TODO: make thread safe */
+	/* TODO: guarantee there is always enough heap to allocate paging structures */
+
+	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
+	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
+	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
+	const uint64_t l1 = 0x1FF & ((uint64_t)vaddr / 0x1000); // identify 2GiB
+
+	uint64_t t0;
+
+	if (((uint64_t)pml4t[l4] & 1) == 0) { // page not present
+		t0 = (uint64_t)kcalloc(kheap_shared, 0x1000, 1);
+		pml4t[l4] = (PDPT_t)(t0 | flags);
+	}
+
+	if (granularity == PAGE_GRANULARITY_1G) {
+		pml4t[l4][l3] = (PDT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
+		tlbflush();
+		return;
+	}
+
+	if (((uint64_t)pml4t[l4][l3] & 1) == 0) { // page not present
+		t0 = (uint64_t)kcalloc(kheap_shared, 0x1000, 1);
+		pml4t[l4][l3] = (PDT_t)(t0 | flags);
+	}
+
+	if (granularity == PAGE_GRANULARITY_2M) {
+		pml4t[l4][l3][l2] = (PT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
+		tlbflush();
+		return;
+	}
 	
+	if (((uint64_t)pml4t[l4][l3][l2] & 1) == 0) { // page not present
+		t0 = (uint64_t)kcalloc(kheap_shared, 0x1000, 1);
+		pml4t[l4][l3][l2] = (PT_t)(t0 | flags);
+	}
+
+	pml4t[l4][l3][l2][l1] = (uint64_t)paddr | flags;
+	tlbflush_addr(vaddr);
+}
+
+void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {
+	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
+	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
+	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
+	const uint64_t l1 = 0x1FF & ((uint64_t)vaddr / 0x1000); // identify 2GiB
+
+	uint64_t t0;
+
+	if (((uint64_t)pml4t[l4] & 1) == 0) { // page not present
+		return; // already unmaped
+	}
+
+	if (granularity == PAGE_GRANULARITY_1G) {
+		pml4t[l4][l3] = (PDT_t)(0);
+		tlbflush();
+		return;
+	}
+
+	if (((uint64_t)pml4t[l4][l3] & 1) == 0) { // page not present
+		return; // already unmaped
+	}
+
+	if (granularity == PAGE_GRANULARITY_2M) {
+		pml4t[l4][l3][l2] = (PT_t)(0);
+		tlbflush();
+		return;
+	}
+	
+	if (((uint64_t)pml4t[l4][l3][l2] & 1) == 0) { // page not present
+		return; // already unmaped
+	}
+
+	pml4t[l4][l3][l2][l1] = 0;
+	tlbflush_addr(vaddr);
 }
 
 void* kmmap(PML4T_t pml4t, void* addr, uint64_t flags, uint64_t length) {
@@ -162,7 +236,7 @@ uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length) {
 
 }
 
-void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {	/* TODO: implement heap mutux (add third reserved descriptor for mutex */
+void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {	/* TODO: implement heap mutux (add third reserved descriptor for mutex) */
 	const uint64_t lim = heapbase[1].size - sizeof(struct BlockDescriptor);
 
 	/* adjust length to force alignment and allocate descriptor */

@@ -27,9 +27,11 @@
 
 #define KMEM_BLOCK_SIZEMASK	0x3FFFFFFFFFFFFFFF
 
-typedef uint64_t* PML4T_t;
-typedef uint64_t* PDPT_t;
-typedef uint64_t* PDT_t;
+#define KMEM_PAGEFLAG_PS		0x80
+
+typedef uint64_t**** PML4T_t;
+typedef uint64_t*** PDPT_t;
+typedef uint64_t** PDT_t;
 typedef uint64_t* PT_t;
 
 struct Blocks32M {
@@ -47,37 +49,39 @@ enum PageGranularity {
 	PAGE_GRANULARITY_4K,
 	PAGE_GRANULARITY_2M,
 	PAGE_GRANULARITY_1G,
-	PAGE_GRANULARITY_512G,
-	PAGE_GRANULARITY_256T
 };
 
-extern uint64_t* volatile kpmembitmap;
+extern uint64_t* volatile pmembitmap;
 extern const void _kheap_shared;
 extern const void _kheap_private;
+extern struct BlockDescriptor* volatile kheap_shared;
+extern struct BlockDescriptor* volatile kheap_private;
 
-void kmeminit(void);
+void meminit(void);
 
 /*
 * finds a free continious block of physical memory of size length (must be 4K page aligned)
 */
-uint64_t kmemfcb(uint64_t length);
+uint64_t memfcb(uint64_t length);
 
 /*
 * flushes the tlb entry for a single page (addr)
 * addr must tbe 4K page aligned
 */
-void ktlbflush_addr(uint64_t addr);
+void tlbflush_addr(void* addr);
 
 /*
 * flushes the entire tlb
 */
-void ktlb_flush(void);
+void tlbflush(void);
 
 /*
 * maps virtual memory to physical address
 * all arguments in bytes and must be 4K page aligned
 */
-uint8_t kmapv2p(PML4T_t pml4t, void* vaddr, void* paddr, enum PageGranularity granularity);
+void mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity);
+
+void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity);
 
 void* kmmap(PML4T_t pml4t, void* addr, uint64_t flags, uint64_t length);
 
