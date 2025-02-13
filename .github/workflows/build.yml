@@ -21,11 +21,11 @@ jobs:
       
       - name: Export variables
         run: |
-          export LDVER=$(ld --version | head -1 | rev | cut -d " " -f1 | rev)
-          export GCCVER=$(gcc --version | head -1 | rev | cut -d " " -f1 | rev)
-          export PREFIX=/opt/x86_64-elf/
+          echo "LDVER=$(ld --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
+          echo "GCCVER=$(gcc --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
+          echo "PREFIX=/opt/x86_64-elf/" >> $GITHUB_ENV
           mkdir -p $PREFIX
-          export PATH=${PREFIX}/bin:$PATH
+          echo "${PREFIX}/bin:$PATH" >> $GITHUB_PATH
       
       - name: Download binutils
         run: |
