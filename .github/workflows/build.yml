@@ -16,9 +16,6 @@ jobs:
           sudo apt update
           sudo apt install build-essential bison flex texinfo xorriso mtools
 
-      - name: Get GNU keyring
-        run: wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
-      
       - name: Export variables
         run: |
           echo "LDVER=$(ld --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
@@ -26,6 +23,10 @@ jobs:
           echo "PREFIX=/opt/x86_64-elf/" >> $GITHUB_ENV
           mkdir -p /opt/x86_64-elf
           echo "/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
+
+      - name: Get GNU keyring
+        run: |
+#           wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
       
       - name: Download binutils
         run: |
@@ -44,14 +45,14 @@ jobs:
 #          mkdir build-gcc
       
       - name: Build binutils
-        working-directory: build-binutils
+#        working-directory: build-binutils
         run: |
 #          ../binutils-${LDVER}/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
 #          make -j5
 #          sudo make install
 
       - name: Build gcc
-        working-directory: build-gcc
+#        working-directory: build-gcc
         run: |
 #          (cd ../gcc-${GCCVER}/ && exec contrib/download_prerequisites)
 #          ../gcc-${GCCVER}/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers 
