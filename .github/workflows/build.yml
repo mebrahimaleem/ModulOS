@@ -24,8 +24,8 @@ jobs:
           echo "LDVER=$(ld --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
           echo "GCCVER=$(gcc --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
           echo "PREFIX=/opt/x86_64-elf/" >> $GITHUB_ENV
-          mkdir -p $PREFIX
-          echo "${PREFIX}/bin:$PATH" >> $GITHUB_PATH
+          mkdir -p /opt/x86_64-elf
+          echo "/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
       
       - name: Download binutils
         run: |
