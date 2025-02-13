@@ -1,6 +1,5 @@
 name: Build OS
 on:
-  push:
   pull_request:
   workflow_dispatch:
 
@@ -11,6 +10,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get GNU keyring
+        run: wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
+
+      - name: Download binutils
+        run: |
+          wget http://ftp.gnu.org/gnu/binutils/binutils-$(ld --version | head -1 | rev | cut -d " " -f1 | rev).tar.gz.sig
+          wget http://ftp.gnu.org/gnu/binutils/binutils-$(ld --version | head -1 | rev | cut -d " " -f1 | rev).tar.gz
+          gpgv --keyring ./gnu-keyring.gpg binutils-$(ld --version | head -1 | rev | cut -d " " -f1 | rev).tar.gz.sig binutils-$(ld --version | head -1 | rev | cut -d " " -f1 | rev).tar.gz
 
       # TODO: add build command
 
