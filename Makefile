@@ -15,12 +15,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-#KERNEL_CC := x86_64-elf-gcc
-#KERNEL_LD := x86_64-elf-ld
-#KERNEL_STRIP := x86_64-elf-strip
-KERNEL_CC := gcc
-KERNEL_LD := ld
-KERNEL_STRIP := strip
+KERNEL_CC := x86_64-elf-gcc
+KERNEL_LD := x86_64-elf-ld
+KERNEL_STRIP := x86_64-elf-strip
 
 obj := $(CURDIR)/build
 incl := $(CURDIR)/include
