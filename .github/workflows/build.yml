@@ -1,6 +1,5 @@
 name: Build OS
 on:
-  push:
   pull_request:
   workflow_dispatch:
 
@@ -12,14 +11,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # TODO: add build command
+      - name: Install apt packages
+        run: |
+          sudo apt update
+          sudo apt install build-essential bison flex texinfo xorriso mtools
 
-      # Runs a single command using the runners shell
-      #- name: Run a one-line script
-      #  run: echo Hello, world!
+      - name: Export variables
+        run: |
+          echo "LDVER=$(ld --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
+          echo "GCCVER=$(gcc --version | head -1 | rev | cut -d " " -f1 | rev)" >> $GITHUB_ENV
+          echo "PREFIX=/opt/x86_64-elf/" >> $GITHUB_ENV
+          mkdir -p /opt/x86_64-elf
+          echo "/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
 
-      # Runs a set of commands using the runners shell
-      #- name: Run a multi-line script
-      #  run: |
-      #    echo Add other actions to build,
-      #    echo test, and deploy your project.
+      - name: Get GNU keyring
+        run: |
+           wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
+      
+      - name: Download binutils
+        run: |
+          wget http://ftp.gnu.org/gnu/binutils/binutils-${LDVER}.tar.gz.sig
+          wget http://ftp.gnu.org/gnu/binutils/binutils-${LDVER}.tar.gz
+          gpgv --keyring ./gnu-keyring.gpg binutils-${LDVER}.tar.gz.sig binutils-${LDVER}.tar.gz
+          tar xf binutils-${LDVER}.tar.gz
+          mkdir build-binutils
+
+      - name: Download gcc
+        run: |
+          wget https://ftp.gnu.org/gnu/gcc/gcc-${GCCVER}/gcc-${GCCVER}.tar.gz.sig
+          wget https://ftp.gnu.org/gnu/gcc/gcc-${GCCVER}/gcc-${GCCVER}.tar.gz
+          gpgv --keyring ./gnu-keyring.gpg gcc-${GCCVER}.tar.gz.sig gcc-${GCCVER}.tar.gz
+          tar xf gcc-${GCCVER}.tar.gz
+          mkdir build-gcc
+      
+      - name: Build binutils
+        working-directory: build-binutils
+        run: |
+          ../binutils-${LDVER}/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
+          make -j5
+          sudo make install
+
+      - name: Build gcc
+        working-directory: build-gcc
+        run: |
+          (cd ../gcc-${GCCVER}/ && exec contrib/download_prerequisites)
+          ../gcc-${GCCVER}/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers 
+          make -j5 all-gcc
+          sudo make install-gcc
+
+      - name: Build ModulOS
+        run: |
+          make -j5
