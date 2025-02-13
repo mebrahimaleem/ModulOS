@@ -32,7 +32,7 @@ jobs:
           wget http://ftp.gnu.org/gnu/binutils/binutils-${LDVER}.tar.gz.sig
           wget http://ftp.gnu.org/gnu/binutils/binutils-${LDVER}.tar.gz
           gpgv --keyring ./gnu-keyring.gpg binutils-${LDVER}.tar.gz.sig binutils-${LDVER}.tar.gz
-          tar xf binutils-{LDVER}.tar.gz
+          tar xf binutils-${LDVER}.tar.gz
           mkdir build-binutils
 
       - name: Download gcc
