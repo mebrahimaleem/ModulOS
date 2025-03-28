@@ -22,15 +22,19 @@
 
 extern uint8_t disableInterrupts;
 
-// max mutex needs to be constant because a dynamic amount would need an atomic heap which needs a mutex -> self dependency
-#define MAX_KMUTEX 0x1000
+#define MAX_KSTATICMUTEX 0x1000
 
-static uint8_t kmutexes[MAX_KMUTEX / sizeof(uint8_t)];
+static uint8_t kstaticmutexes[MAX_KSTATICMUTEX / sizeof(uint8_t)];
+
+uint8_t* kmutexes;
 
 uint64_t knextMutex;
+uint64_t knumMutex;
 
 void atomicinit(void) {
 	knextMutex = 0;
+	knumMutex = MAX_KSTATICMUTEX;
+	kmutexes = kstaticmutexes;
 	disableInterrupts = 1;
 }
 
@@ -38,6 +42,9 @@ MutexHandle kcreateMutex() {
 	kcli();
 	kmutexes[knextMutex / sizeof(uint8_t)] &= (uint8_t)~(1 << (knextMutex % sizeof(uint8_t))); // clear mutex bit
 	knextMutex++;
+	if (knextMutex >= knumMutex) {
+		//TODO: allocate more mutexes
+	}
 	ksti();
 	return knextMutex - 1;
 }
@@ -65,6 +72,8 @@ void kreleaseMutex(MutexHandle handle) {
 	kmutexes[handle / sizeof(uint8_t)] &= (uint8_t)~(1 << (handle % sizeof(uint8_t))); // clear mutex bit
 	ksti();
 }
+
+// TODO: implement destroying mutexes by adding their handles to a list, then using the list items when a new mutex in requested
 
 void setInterrupts(uint8_t set) {
 	disableInterrupts = set;

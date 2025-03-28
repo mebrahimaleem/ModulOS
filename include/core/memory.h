@@ -26,8 +26,12 @@
 #define KMEM_BLOCK_RESV	3
 
 #define KMEM_BLOCK_SIZEMASK	0x3FFFFFFFFFFFFFFF
+#define PS_ADDR_MASK				0xFFFFFFFFFF000
 
 #define KMEM_PAGEFLAG_PS		0x80
+
+#define KMEM_PAGE_PRESENT		0x1
+#define KMEM_PAGE_WRITE			0x2
 
 typedef uint64_t**** PML4T_t;
 typedef uint64_t*** PDPT_t;
@@ -38,6 +42,12 @@ struct Blocks32M {
 	uint16_t allocated;
 	uint64_t bitmap[128];
 	struct Blocks32M* next;
+};
+
+struct PagesFree {
+	uint8_t* addr;
+	uint64_t length;
+	struct PagesFree* next;
 };
 
 struct BlockDescriptor {
@@ -51,7 +61,9 @@ enum PageGranularity {
 	PAGE_GRANULARITY_1G,
 };
 
-extern uint64_t* volatile pmembitmap;
+extern PML4T_t volatile kPML4T;
+
+extern uint8_t _pmembitmap;
 extern const void _kheap_shared;
 extern const void _kheap_private;
 extern struct BlockDescriptor* volatile kheap_shared;
@@ -60,7 +72,7 @@ extern struct BlockDescriptor* volatile kheap_private;
 void meminit(void);
 
 /*
-* finds a free continious block of physical memory of size length (must be 4K page aligned)
+* finds free continious blocks of 32MiB physical memory of at least size length
 */
 uint64_t memfcb(uint64_t length);
 
@@ -83,7 +95,7 @@ void mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGra
 
 void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity);
 
-void* kmmap(PML4T_t pml4t, void* addr, uint64_t flags, uint64_t length);
+uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length);
 
 uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length);
 
@@ -94,6 +106,8 @@ void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length)
 void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length);
 
 void kfree(void* ptr);
+
+uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr);
 
 #endif /* CORE_MEMORY_H */
 

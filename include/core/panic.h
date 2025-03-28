@@ -20,8 +20,9 @@
 
 #include <stdint.h>
 
-#define KPANIC_UNK		0
-#define KPANIC_NOMEM	1
+#define KPANIC_UNK		0x0
+#define KPANIC_NOMEM	0x1
+#define KPANIC_MAX		0x1
 
 __attribute__((noreturn)) void panic_hlt(void);
 

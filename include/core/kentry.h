@@ -31,8 +31,7 @@ struct avail_memory_t {
 
 extern struct avail_memory_t kavail_memory;
 
-extern PML4T_t volatile k0PML4T;
-extern PML4T_t volatile kPML4T;
+extern volatile uint64_t k0PML4T;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic);
 

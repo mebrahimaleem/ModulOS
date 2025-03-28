@@ -26,6 +26,8 @@ void atomicinit(void);
 
 MutexHandle kcreateMutex(void);
 
+/* TODO: implement inter cpu locking */
+
 void kacquireMutex(MutexHandle handle);
 
 void kreleaseMutex(MutexHandle handle);

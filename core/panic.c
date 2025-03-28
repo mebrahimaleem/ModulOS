@@ -23,17 +23,25 @@
 #include <core/panic.h>
 
 static const char* panicstr_st = "PANIC: 0x";
-static char panicstr[sizeof(panicstr_st) + 256 + 3]; //st + buffer + crlf0
+static char panicstr[sizeof(panicstr_st) + 256 + 2]; //no crlf, just 0
+
+static const char* panicmsgs[] = {
+	": UNKOWN\r\n",
+	": OUT OF MEMORY\r\n"};
 
 __attribute__((noreturn)) void panic(uint64_t err) {
 	uint64_t offset = 255 - intToString(err, 16, panicstr + sizeof(panicstr_st) - 1, 256);
 	kstrcpy(panicstr_st, panicstr + offset);
-	panicstr[sizeof(panicstr_st) + 256 + 0] = '\r';
-	panicstr[sizeof(panicstr_st) + 256 + 1] = '\n';
-	panicstr[sizeof(panicstr_st) + 256 + 2] = 0;
+	panicstr[sizeof(panicstr_st) + 256 + 0] = 0;
+
+	if (err > KPANIC_MAX) {
+		err = KPANIC_UNK;
+	}
 
 	serialWriteStr(SERIAL1, panicstr + offset);
+	serialWriteStr(SERIAL1, panicmsgs[err]);
 	serialWriteStr(SERIAL2, panicstr + offset);
+	serialWriteStr(SERIAL2, panicmsgs[err]);
 	
 	panic_hlt();
 }

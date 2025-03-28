@@ -28,7 +28,6 @@
 #include <core/memory.h>
 
 struct avail_memory_t kavail_memory;
-PML4T_t volatile kPML4T;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	if (mb2magic != MULTIBOOT2_MAGIC) {
@@ -64,7 +63,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	}
 
 	/* set kernel instance to 0 */
-	kPML4T = k0PML4T;
+	kPML4T = (PML4T_t volatile)&k0PML4T;
 
 	/* init atomic */
 	atomicinit();
@@ -73,8 +72,8 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	serialinit();
 
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "START: SERIAL 1\r\nSTATUS: Starting core init...\r\n");
-	serialWriteStr(SERIAL2, "START: SERIAL 2\r\nSTATUS: Starting core init...\r\n");
+	serialWriteStr(SERIAL1, "LOG: SERIAL 1\r\nSTATUS: Starting memory init...\r\n");
+	serialWriteStr(SERIAL2, "LOG: SERIAL 2\r\nSTATUS: Starting memory init...\r\n");
 #endif /* DEBUG */
 	
 	/* init memory manager */
