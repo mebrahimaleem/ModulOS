@@ -84,7 +84,6 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	serialWriteStr(SERIAL2, "STATUS: Memory init done\r\n");
 #endif /* DEBUG */
 
-
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Core init done\r\n");
 	serialWriteStr(SERIAL2, "STATUS: Core init done\r\n");

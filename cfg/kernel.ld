@@ -51,6 +51,7 @@ SECTIONS {
 
 	.data BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + SIZEOF(.text) + 4K - (SIZEOF(.bss.boot) % 4K) + 4K - (SIZEOF(.text) % 4K)) {
 		*(.data)
+		*(.rodata)
 	}
 
 	.bss BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + SIZEOF(.text) + SIZEOF(.data) + 4K - (SIZEOF(.bss.boot) % 4K) + 4K - (SIZEOF(.text) % 4K) + 4K - (SIZEOF(.data) % 4K)) {

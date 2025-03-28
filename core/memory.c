@@ -208,12 +208,16 @@ uint64_t memfcb(uint64_t length) {
 	return 0; //No memory of length found
 }
 
+void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity) {
+	_mapv2p(pml4t, vaddr, paddr, flags, granularity, 1);
+}
+
 /*
 * maps virtual memory to physical address
 * all arguments in bytes and must be 4K page aligned
 * undefined behavior when overwriting previous entries with a different granularity
 */
-void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity) {
+void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
 	kacquireMutex(pagingGlobalMutex);
 
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
@@ -224,7 +228,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 	uint64_t t0;
 
 	if (((uint64_t)pml4t[l4] & 1) == 0) { // page not present
-		t0 = (uint64_t)kcalloc(kheap_shared, 0x1000, 1);
+		t0 = (uint64_t)_kcalloc(kheap_shared, 0x1000, 1, use_mut);
 		if (t0 == 0) {
 			panic(KPANIC_NOMEM);
 		}
@@ -241,7 +245,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 	}
 
 	if (((uint64_t)p4[l3] & 1) == 0) { // page not present
-		t0 = (uint64_t)kcalloc(kheap_shared, 0x1000, 1);
+		t0 = (uint64_t)_kcalloc(kheap_shared, 0x1000, 1, use_mut);
 		if (t0 == 0) {
 			panic(KPANIC_NOMEM);
 		}
@@ -258,7 +262,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 	}
 	
 	if (((uint64_t)p3[l2] & 1) == 0) { // page not present
-		t0 = (uint64_t)kcalloc(kheap_shared, 0x1000, 1);
+		t0 = (uint64_t)_kcalloc(kheap_shared, 0x1000, 1, use_mut);
 		if (t0 == 0) {
 			panic(KPANIC_NOMEM);
 		}
@@ -315,6 +319,10 @@ void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {
 }
 
 uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
+	return _kmmap(pml4t, addr, flags, length, 1);
+}
+
+uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
 	kacquireMutex(memoryGlobalLock);
 	uint64_t i = 0;
 	struct PagesFree* t0;
@@ -330,19 +338,19 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 			while (i < length) {
 				if (length - i >= P1GSIZE) {
 					//1G
-					mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_1G);
+					_mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_1G, use_mut);
 					i += P1GSIZE;
 					t1 += P1GSIZE;
 				}
 				else if (length - i >= P2MSIZE) {
 					//2M
-					mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_2M);
+					_mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_2M, use_mut);
 					i += P2MSIZE;
 					t1 += P2MSIZE;
 				}
 				else {
 					//4K
-					mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_4K);
+					_mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_4K, use_mut);
 					i += P4KSIZE;
 					t1 += P4KSIZE;
 				}
@@ -356,21 +364,21 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 			while (kpagesfree->length > 0) {
 				if (kpagesfree->length >= P1GSIZE) {
 					//1G
-					mapv2p(pml4t, (uint8_t*)addr + i, kpagesfree->addr, flags, PAGE_GRANULARITY_1G);
+					_mapv2p(pml4t, (uint8_t*)addr + i, kpagesfree->addr, flags, PAGE_GRANULARITY_1G, use_mut);
 					i += P1GSIZE;
 					kpagesfree->addr += P1GSIZE;
 					kpagesfree->length -= P1GSIZE;
 				}
 				else if (length - i >= P2MSIZE) {
 					//2M
-					mapv2p(pml4t, (uint8_t*)addr + i, kpagesfree->addr, flags, PAGE_GRANULARITY_2M);
+					_mapv2p(pml4t, (uint8_t*)addr + i, kpagesfree->addr, flags, PAGE_GRANULARITY_2M, use_mut);
 					i += P2MSIZE;
 					kpagesfree->addr += P2MSIZE;
 					kpagesfree->length -= P2MSIZE;
 				}
 				else {
 					//4K
-					mapv2p(pml4t, (uint8_t*)addr + i, kpagesfree->addr, flags, PAGE_GRANULARITY_4K);
+					_mapv2p(pml4t, (uint8_t*)addr + i, kpagesfree->addr, flags, PAGE_GRANULARITY_4K, use_mut);
 					i += P4KSIZE;
 					kpagesfree->addr += P4KSIZE;
 					kpagesfree->length -= P4KSIZE;
@@ -397,22 +405,25 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 		return 1;
 	}
 
+	uint64_t st = (uint64_t)t1;
+	const uint64_t en = st + length - i;
+
 	while (i < length) {
 		if (length - i >= P1GSIZE) {
 			//1G
-			mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_1G);
+			_mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_1G, use_mut);
 			i += P1GSIZE;
 			t1 += P1GSIZE;
 		}
 		else if (length - i >= P2MSIZE) {
 			//2M
-			mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_2M);
+			_mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_2M, use_mut);
 			i += P2MSIZE;
 			t1 += P2MSIZE;
 		}
 		else {
 			//4K
-			mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_4K);
+			_mapv2p(pml4t, (uint8_t*)addr + i, t1, flags, PAGE_GRANULARITY_4K, use_mut);
 			i += P4KSIZE;
 			t1 += P4KSIZE;
 		}
@@ -421,8 +432,12 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 	// all memory now allocated
 
 	//TODO: add leftover memory to kpagesfree
-	
-	//TODO: mark 32MiB block as dirty
+
+	/* mark 32MiB blocks as dirty */
+	for (; st < en; st += PMEMBITS_G) {
+		pmembitmap[st / PMEMBPERBYTE] ^= (1 << (st % PMEMBPERBYTE / PMEMBITS_G));
+	}
+
 	kreleaseMutex(memoryGlobalLock);
 	return 0;
 }
@@ -432,7 +447,12 @@ uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length) {
 }
 
 void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
-	kacquireMutex(((uint64_t*)heapbase)[2]);
+	return _kmalloc(heapbase, length, 1);
+}
+
+void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8_t use_mut) {
+	if (use_mut)
+		kacquireMutex(((uint64_t*)heapbase)[2]);
 	const uint64_t lim = heapbase[1].size - sizeof(struct BlockDescriptor);
 
 	/* adjust length to force alignment and allocate descriptor */
@@ -454,7 +474,8 @@ void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
 			block->size = 0;
 			block->flags = KMEM_BLOCK_LAST;
 
-			kreleaseMutex(((uint64_t*)heapbase)[2]);
+			if (use_mut)
+				kreleaseMutex(((uint64_t*)heapbase)[2]);
 			return ret;
 		}
 
@@ -470,7 +491,8 @@ void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
 				block->flags = KMEM_BLOCK_FREE;
 				block->size = KMEM_BLOCK_SIZEMASK & (t0 - alen);
 				
-				kreleaseMutex(((uint64_t*)heapbase)[2]);
+				if (use_mut)
+					kreleaseMutex(((uint64_t*)heapbase)[2]);
 				return ret;
 			}
 
@@ -479,28 +501,50 @@ void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
 				block->flags = KMEM_BLOCK_USED;
 				ret = (void*)((uint64_t)block + sizeof(struct BlockDescriptor));
 
-				kreleaseMutex(((uint64_t*)heapbase)[2]);
+				if (use_mut)
+					kreleaseMutex(((uint64_t*)heapbase)[2]);
 				return ret;
 			}
 		}
 
 		/* get next block */
-		block = (struct BlockDescriptor* volatile)((uint64_t)(block) + alen);
+		block = (struct BlockDescriptor* volatile)((uint64_t)(block) + block->size);
 	}
 
 	/* out of memory */
-	//TODO: attempt allocating memory
+	
+	/* attempt allocating memory */
+	const uint64_t csize = heapbase[1].size;
+	const uint64_t tsize = csize + alen + sizeof(struct BlockDescriptor) * 4; // add four for the reserved blocks
+	if (tsize < heapbase[0].size) {
+		while (heapbase[1].size < tsize) {
+			heapbase[1].size *= 2;
+		}
+
+		//TODO: sync with other cores
+		_kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize, heapbase == kheap_shared);
+		ret = _kmalloc(heapbase, length, 0);
+		if (use_mut)
+			kreleaseMutex(((uint64_t*)heapbase)[2]);
+		return ret;
+	}
+
 	//TODO: attempt memory extension
 	
 	/* TODO: implement errno */
-	kreleaseMutex(((uint64_t*)heapbase)[2]);
+	if (use_mut)
+		kreleaseMutex(((uint64_t*)heapbase)[2]);
 	return 0; /* out of virtual address space */
 }
 
 void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length) {
+	return _kcalloc(heapbase, count, length, 1);
+}
+
+void* _kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length, uint8_t use_mut) {
 	const uint64_t alen = count * length;
 
-	void* ret = kmalloc(heapbase, alen);
+	void* ret = _kmalloc(heapbase, alen, use_mut);
 	if (ret == 0) {
 		return 0;
 	}

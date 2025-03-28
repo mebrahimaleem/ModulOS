@@ -48,7 +48,7 @@ CORE_TARGETS := $(CORE_TARGETS_S) $(CORE_TARGETS_C)
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-CDEBUG := -D DEBUG -O0
+#CDEBUG := -D DEBUG -O0
 CFLAGS := $(CWARN) -O2 $(CDEBUG) -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
 	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
 
