@@ -277,45 +277,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 }
 
 void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {
-	//TODO: rewrite with masks
-	kacquireMutex(pagingGlobalMutex);
-	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
-	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
-	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
-	const uint64_t l1 = 0x1FF & ((uint64_t)vaddr / 0x1000); // identify 2GiB
-
-	if (((uint64_t)pml4t[l4] & 1) == 0) { // page not present
-		kreleaseMutex(pagingGlobalMutex);
-		return; // already unmaped
-	}
-
-	if (granularity == PAGE_GRANULARITY_1G) {
-		pml4t[l4][l3] = (PDT_t)(0);
-		tlbflush();
-		kreleaseMutex(pagingGlobalMutex);
-		return;
-	}
-
-	if (((uint64_t)pml4t[l4][l3] & 1) == 0) { // page not present
-		kreleaseMutex(pagingGlobalMutex);
-		return; // already unmaped
-	}
-
-	if (granularity == PAGE_GRANULARITY_2M) {
-		pml4t[l4][l3][l2] = (PT_t)(0);
-		tlbflush();
-		kreleaseMutex(pagingGlobalMutex);
-		return;
-	}
-	
-	if (((uint64_t)pml4t[l4][l3][l2] & 1) == 0) { // page not present
-		kreleaseMutex(pagingGlobalMutex);
-		return; // already unmaped
-	}
-
-	pml4t[l4][l3][l2][l1] = 0;
-	tlbflush_addr(vaddr);
-	kreleaseMutex(pagingGlobalMutex);
+	//TODO: implement
 }
 
 uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
@@ -429,9 +391,17 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 		}
 	}
 
-	// all memory now allocated
+	/* all memory now allocated */
 
-	//TODO: add leftover memory to kpagesfree
+	/* add leftover memory to kpagesfree */
+	const uint64_t rem = i % PMEMBITS_G;
+	if (rem != 0) {
+		t0 = (struct PagesFree*)_kmalloc(kheap_shared, sizeof(struct PagesFree), use_mut);
+		t0->length = PMEMBITS_G - rem;
+		t0->addr = t1;
+		t0->next = kpagesfree;
+		kpagesfree = t0;
+	}
 
 	/* mark 32MiB blocks as dirty */
 	for (; st < en; st += PMEMBITS_G) {
@@ -522,7 +492,7 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 		}
 
 		//TODO: sync with other cores
-		_kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize, heapbase == kheap_shared);
+		_kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize, heapbase != kheap_shared);
 		ret = _kmalloc(heapbase, length, 0);
 		if (use_mut)
 			kreleaseMutex(((uint64_t*)heapbase)[2]);
@@ -578,7 +548,7 @@ void kfree(void* ptr) {
 
 	/* check if next is last */
 	if (nblk->flags == KMEM_BLOCK_LAST) {
-		block->flags = KMEM_BLOCK_FREE;
+		block->flags = KMEM_BLOCK_LAST;
 		block->size = 0;
 	}
 	
