@@ -1,4 +1,4 @@
-/* atomic.h - atomic functions */
+/* misc.c - Miscellaneous for ACPICA */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,30 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ATOMIC_H
-#define CORE_ATOMIC_H
+#ifndef ACPICA_MISC_C
+#define ACPICA_MISC_C
 
-#include <stdint.h>
+#include "acpi.h"
 
-typedef uint64_t MutexHandle;
-typedef uint8_t spinlock_t;
-typedef uint8_t semaphore_t;
-typedef uint8_t mutex_t;
+#include <acpica/misc.h>
 
-void atomicinit(void);
+UINT64 AcpiOsGetTimer() {
+	return 0;
+}
 
-MutexHandle kcreateMutex(void);
+ACPI_STATUS AcpiOsSignal(UINT32 Function, void *Info) {
+	return AE_ERROR;
+}
 
-/* TODO: implement inter cpu locking */
+ACPI_STATUS AcpiOsGetLine(char *Buffer, UINT32 BufferLength, UINT32 *BytesRead) {
+	return AE_ERROR;
+}
 
-void kacquireMutex(MutexHandle handle);
-
-void kreleaseMutex(MutexHandle handle);
-
-void ksti(void);
-
-void kcli(void);
-
-void setInterrupts(uint8_t set);
-
-#endif /* CORE_ATOMIC_H */
+#endif /* ACPICA_MISC_C */

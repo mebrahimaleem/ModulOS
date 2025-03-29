@@ -1,4 +1,4 @@
-/* atomic.h - atomic functions */
+/* tables.c - system table access for ACPICA */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,30 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ATOMIC_H
-#define CORE_ATOMIC_H
+#ifndef ACPICA_TABLES_C
+#define ACPICA_TABLES_C
 
-#include <stdint.h>
+#include "acpi.h"
 
-typedef uint64_t MutexHandle;
-typedef uint8_t spinlock_t;
-typedef uint8_t semaphore_t;
-typedef uint8_t mutex_t;
+#include <acpica/tables.h>
 
-void atomicinit(void);
+ACPI_STATUS AcpiOsGetTableByAddress(ACPI_PHYSICAL_ADDRESS Address, ACPI_TABLE_HEADER **OutTable) {
+	return AE_ERROR;
+}
 
-MutexHandle kcreateMutex(void);
+ACPI_STATUS AcpiOsGetTableByIndex(UINT32 TableIndex, ACPI_TABLE_HEADER **OutTable, UINT32 *Instance, ACPI_PHYSICAL_ADDRESS *OutAddress) {
+	return AE_ERROR;
+}
 
-/* TODO: implement inter cpu locking */
+ACPI_STATUS AcpiOsGetTableByName(char *Signature, UINT32 Instance, ACPI_TABLE_HEADER **OutTable, ACPI_PHYSICAL_ADDRESS *OutAddress) {
+	return AE_ERROR;
+}
 
-void kacquireMutex(MutexHandle handle);
-
-void kreleaseMutex(MutexHandle handle);
-
-void ksti(void);
-
-void kcli(void);
-
-void setInterrupts(uint8_t set);
-
-#endif /* CORE_ATOMIC_H */
+#endif /* ACPICA_TABLES_C */

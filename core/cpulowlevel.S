@@ -1,4 +1,4 @@
-/* atomic.h - atomic functions */
+/* cpulowlevel.S - cpu low level assembly routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,30 +15,18 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ATOMIC_H
-#define CORE_ATOMIC_H
 
-#include <stdint.h>
+#ifndef CORE_CPULOWLEVEL_S
+#define CORE_CPULOWLEVEL_S
 
-typedef uint64_t MutexHandle;
-typedef uint8_t spinlock_t;
-typedef uint8_t semaphore_t;
-typedef uint8_t mutex_t;
+	.code64
+	.text
 
-void atomicinit(void);
+/* void wbinvd(void); */
+	.globl wbinvd
+wbinvd:
+	wbinvd
+	ret
 
-MutexHandle kcreateMutex(void);
+#endif /* CORE_CPULOWLEVEL_S */
 
-/* TODO: implement inter cpu locking */
-
-void kacquireMutex(MutexHandle handle);
-
-void kreleaseMutex(MutexHandle handle);
-
-void ksti(void);
-
-void kcli(void);
-
-void setInterrupts(uint8_t set);
-
-#endif /* CORE_ATOMIC_H */

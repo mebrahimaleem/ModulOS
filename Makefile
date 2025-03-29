@@ -24,7 +24,7 @@ incl := $(CURDIR)/include
 test := $(CURDIR)/test
 
 KERNEL_REQS_S := $(shell find multiboot2/ -type f -name "*.S") $(shell find core/ -type f -name "*.S")
-KERNEL_REQS_C := $(shell find multiboot2/ -type f -name "*.c") $(shell find core/ -type f -name "*.c")
+KERNEL_REQS_C := $(shell find multiboot2/ -type f -name "*.c") $(shell find core/ -type f -name "*.c") $(shell find acpica/ -type f -name "*.c")
 
 KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_REQS_S))
 KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_REQS_C))
@@ -46,10 +46,13 @@ CORE_TARGETS_S := $(filter $(obj)/core/%,$(ALL_TARGETS_S))
 CORE_TARGETS_C := $(filter $(obj)/core/%,$(ALL_TARGETS_C))
 CORE_TARGETS := $(CORE_TARGETS_S) $(CORE_TARGETS_C)
 
+ACPICA_TARGETS_C := $(filter $(obj)/acpica/%,$(ALL_TARGETS_C))
+ACPICA_TARGETS := $(ACPICA_TARGETS_C)
+
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-#CDEBUG := -D DEBUG -O0
-CFLAGS := $(CWARN) -O2 $(CDEBUG) -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
+CDEBUG := -D DEBUG -O0
+CFLAGS := $(CWARN) -O2 $(CDEBUG) -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
 	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
 
 export
@@ -128,3 +131,7 @@ $(CORE_TARGETS_S): $(obj)/core/%.o: core/%.S | $(obj)/core/
 
 $(CORE_TARGETS_C): $(obj)/core/%.o: core/%.c $(incl)/core/%.h | $(obj)/core/
 	$(MAKE) -C core/ $@
+
+# Acpica
+$(ACPICA_TARGETS_C): $(obj)/acpica/%.o: acpica/%.c | $(obj)/acpica/
+	$(MAKE) -C acpica/ $@

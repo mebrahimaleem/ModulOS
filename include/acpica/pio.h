@@ -1,4 +1,4 @@
-/* atomic.h - atomic functions */
+/* pio.h - port input and output for ACPICA */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,30 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ATOMIC_H
-#define CORE_ATOMIC_H
+#ifndef ACPICA_PIO_H
+#define ACPICA_PIO_H
 
-#include <stdint.h>
 
-typedef uint64_t MutexHandle;
-typedef uint8_t spinlock_t;
-typedef uint8_t semaphore_t;
-typedef uint8_t mutex_t;
-
-void atomicinit(void);
-
-MutexHandle kcreateMutex(void);
-
-/* TODO: implement inter cpu locking */
-
-void kacquireMutex(MutexHandle handle);
-
-void kreleaseMutex(MutexHandle handle);
-
-void ksti(void);
-
-void kcli(void);
-
-void setInterrupts(uint8_t set);
-
-#endif /* CORE_ATOMIC_H */
+#endif /* ACPICA_PIO_H */

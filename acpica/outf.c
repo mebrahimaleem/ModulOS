@@ -1,4 +1,4 @@
-/* atomic.h - atomic functions */
+/* outf.c - output formatting for ACPICA */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,30 +15,25 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ATOMIC_H
-#define CORE_ATOMIC_H
+#ifndef ACPICA_OUTF_C
+#define ACPICA_OUTF_C
 
-#include <stdint.h>
+#include <stdarg.h>
 
-typedef uint64_t MutexHandle;
-typedef uint8_t spinlock_t;
-typedef uint8_t semaphore_t;
-typedef uint8_t mutex_t;
+#include "acpi.h"
 
-void atomicinit(void);
+#include <acpica/outf.h>
 
-MutexHandle kcreateMutex(void);
+void ACPI_INTERNAL_XFACE AcpiOsPrintf(const char *Format, ...) {
+	return;
+}
 
-/* TODO: implement inter cpu locking */
+void AcpiOsVprintf(const char *Format, va_list Args) {
+	return;
+}
 
-void kacquireMutex(MutexHandle handle);
+void AcpiOsRedirectOutput(void *Destination) {
+	return;
+}
 
-void kreleaseMutex(MutexHandle handle);
-
-void ksti(void);
-
-void kcli(void);
-
-void setInterrupts(uint8_t set);
-
-#endif /* CORE_ATOMIC_H */
+#endif /* ACPICA_OUTF_C */
