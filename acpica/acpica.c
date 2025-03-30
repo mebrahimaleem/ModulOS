@@ -26,7 +26,19 @@ uint8_t acpiinit() {
 	ACPI_STATUS Status = AcpiInitializeSubsystem();
 
 	if (ACPI_FAILURE(Status)) {
-		return -1;
+		return 1;
+	}
+
+	Status = AcpiInitializeTables(NULL, 16, FALSE);
+
+	if (ACPI_FAILURE(Status)) {
+		return 1;
+	}
+
+	//Status = AcpiLoadTables();
+
+	if (ACPI_FAILURE(Status)) {
+		return 1;
 	}
 
 	return 0;

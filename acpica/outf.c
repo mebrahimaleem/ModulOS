@@ -34,10 +34,7 @@ void ACPI_INTERNAL_XFACE AcpiOsPrintf(const char *Format, ...) {
 }
 
 void AcpiOsVprintf(const char *Format, va_list Args) {
-	char* buf;
-	formatstr(Format, &buf, Args);
-	serialWriteStr(SERIAL1, buf);
-	return;
+	serialVprintf(SERIAL1, Format, Args);
 }
 
 void AcpiOsRedirectOutput(void *Destination) {

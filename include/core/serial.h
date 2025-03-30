@@ -19,6 +19,7 @@
 #define CORE_SERIAL_H
 
 #include <stdint.h>
+#include <stdarg.h>
 
 #define SERIAL1  1
 #define SERIAL2  2
@@ -32,6 +33,9 @@
 void serialinit(void);
 
 void serialWriteStr(uint8_t com, const char* str);
+
+void serialPrintf(uint8_t com, const char* fmt, ...);
+void serialVprintf(uint8_t com, const char* fmt, va_list va);
 
 #endif /* CORE_SERIAL_H */
 

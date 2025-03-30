@@ -20,6 +20,7 @@
 
 #include <core/atomic.h>
 #include <core/portio.h>
+#include <core/utils.h>
 #include <core/serial.h>
 
 #define COM1_BASE 0x3f8
@@ -49,7 +50,7 @@ uint16_t COM6_BASE;
 uint16_t COM7_BASE;
 uint16_t COM8_BASE;
 
-MutexHandle serialMutex[8];
+StaticMutexHandle serialMutex[8];
 
 void serialinit(void) {
   com_sts = 0;
@@ -130,7 +131,7 @@ void serialinit(void) {
 
 void serialWriteStr(uint8_t com, const char* str) {
   uint16_t addr;
-  MutexHandle handle;
+  StaticMutexHandle handle;
   switch (com) {
     case SERIAL1:
       handle = serialMutex[0];
@@ -178,6 +179,18 @@ void serialWriteStr(uint8_t com, const char* str) {
 
     kreleaseStaticMutex(handle);
   }
+}
+
+void serialPrintf(uint8_t com, const char* fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	serialVprintf(com, fmt, va);
+}
+
+void serialVprintf(uint8_t com, const char* fmt, va_list va) {
+	char* buf;
+	formatstr(fmt, &buf, va);
+	serialWriteStr(com, buf);
 }
 
 #endif /* CORE_SERIAL_C */

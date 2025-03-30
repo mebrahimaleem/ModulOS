@@ -49,7 +49,7 @@ ACPI_STATUS AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable, ACPI_TABLE_HEA
 ACPI_STATUS AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable, ACPI_PHYSICAL_ADDRESS *NewAddress, UINT32 *NewTableLength) {
 	*NewAddress = 0;
 	*NewTableLength = 0;
-	return AE_OK;
+	return AE_ERROR;
 }
 
 ACPI_STATUS AcpiOsInitializeDebugger() {

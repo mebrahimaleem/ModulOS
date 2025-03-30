@@ -22,9 +22,9 @@
 
 typedef uint64_t StaticMutexHandle;
 
-typedef uint8_t _spinlock_t;
+typedef uint64_t _spinlock_t;
 typedef uint64_t _semaphore_t;
-typedef uint8_t _mutex_t;
+typedef uint64_t _mutex_t;
 
 typedef _spinlock_t* spinlock_t;
 typedef _semaphore_t* semaphore_t;

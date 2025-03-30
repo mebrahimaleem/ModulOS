@@ -64,6 +64,17 @@ uint64_t uintToString(uint64_t num, uint8_t base, char* str, uint64_t strlen) {
 	return i;
 }
 
+uint64_t intToString(int64_t num, uint8_t base, char* str, uint64_t strlen) {
+	uint64_t abs = (uint64_t)(num < 0 ? -num : num);
+	uint64_t ret = uintToString(abs, base, str, strlen);
+
+	if (num < 0) {
+		str[strlen - ret] = '-';
+		return ret+1;
+	}
+	return ret;
+}
+
 void kstrcpy(const char* from, char* to) {
 	for (int i = 0; from[i] != 0; i++) {
 		to[i] = from[i]; //TODO: manually optimize with asm
@@ -86,9 +97,13 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 	uint64_t maxlen = 64;
 	*dest = kmalloc(kheap_private, sizeof(char) * maxlen);
 
+	char buf[66];
+	buf[65] = 0;
+
 	const char* t0;
 	int64_t t1;
 	uint64_t t2;
+	uint64_t t4;
 	char t3;
 
 	const char* append;
@@ -100,14 +115,14 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 			uint64_t precision = 0;
 
 			while (*format >= '0' && *format <= '9') {
-				width = width * 10 + (*format - '0');
+				width = width * 10 + (uint64_t)(*format - '0');
 				format++;
 			}
 
 			if (*format == '.') {
 				format++;
 				while (*format >= '0' && *format <= '9') {
-					precision = precision * 10 + (*format - '0');
+					precision = precision * 10 + (uint64_t)(*format - '0');
 					format++;
 				}
 			}
@@ -123,28 +138,39 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 				l++;
 			}
 
-			switch (*format) {
+			switch (*format) { //TODO: fix printing error here and add mmap support for acpica
 				case 's':
 					t0 = va_arg(va, char*);
 					append = t0;
 					break;
-				case 'd': //TODO: implement all
+				case 'd':
 					t1 = l > 0 ? va_arg(va, int64_t) : va_arg(va, int32_t);
+					t4 = intToString(t1, 10, &buf[0], 64);
+					append = &buf[0] + 65 - t4;
 					break;
 				case 'u':
 					t2 = l > 0 ? va_arg(va, uint64_t) : va_arg(va, uint32_t);
-					break;
+					t4 = 10;
+					goto t2ToAppend;
 				case 'x': //TODO: support lower and upper case
 				case 'X':
 					t2 = l > 0 ? va_arg(va, uint64_t) : va_arg(va, uint32_t);
-					break;
+					t4 = 16;
+					goto t2ToAppend;
 				case 'o':
 					t2 = l > 0 ? va_arg(va, uint64_t) : va_arg(va, uint32_t);
-					break;
+					t4 = 8;
+					goto t2ToAppend;
 				case 'c':
-					t3 = va_arg(va, int);
+					t3 = (char)va_arg(va, int);
+					buf[0] = t3;
+					buf[1] = 0;
+					append = &buf[0];
 					break;
 				case '%':
+					buf[0] = '%';
+					buf[1] = 0;
+					append = &buf[0];
 					break;
 				case 'f':
 				case 'e':
@@ -154,10 +180,14 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 				case 'p': //TODO: add support
 				default:
 					break;
+				t2ToAppend:
+					t4 = uintToString(t2, (uint8_t)t4, &buf[0], 64);
+					append = &buf[0] + 65 - t4;
+					break;
 			}
 
 			t2 = kstrlen(append);
-			for(uint64_t t4 = 0; t4 < t2; t4++) {
+			for(t4 = 0; t4 < t2; t4++) {
 				if (printed == maxlen) {
 					maxlen *= 2;
 					*dest = krealloc(kheap_private, *dest, sizeof(char) * maxlen);
