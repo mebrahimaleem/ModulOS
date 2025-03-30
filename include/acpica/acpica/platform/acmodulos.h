@@ -58,9 +58,9 @@
 #endif
 
 #include <core/atomic.h>
-#define ACPI_SPINLOCK spinlock_t*
-#define ACPI_SEMAPHORE semaphore_t*
-#define ACPI_MUTEX mutex_t*
+#define ACPI_SPINLOCK spinlock_t
+#define ACPI_SEMAPHORE semaphore_t
+#define ACPI_MUTEX mutex_t
 
 #include <core/cpulowlevel.h>
 #define ACPI_FLUSH_CPU_CACHE() wbinvd()

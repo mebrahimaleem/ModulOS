@@ -20,25 +20,45 @@
 
 #include <stdint.h>
 
-typedef uint64_t MutexHandle;
-typedef uint8_t spinlock_t;
-typedef uint8_t semaphore_t;
-typedef uint8_t mutex_t;
+typedef uint64_t StaticMutexHandle;
+
+typedef uint8_t _spinlock_t;
+typedef uint64_t _semaphore_t;
+typedef uint8_t _mutex_t;
+
+typedef _spinlock_t* spinlock_t;
+typedef _semaphore_t* semaphore_t;
+typedef _mutex_t* mutex_t;
 
 void atomicinit(void);
 
-MutexHandle kcreateMutex(void);
+StaticMutexHandle kcreateStaticMutex(void);
 
 /* TODO: implement inter cpu locking */
 
-void kacquireMutex(MutexHandle handle);
+void kacquireStaticMutex(StaticMutexHandle handle);
 
-void kreleaseMutex(MutexHandle handle);
+void kreleaseStaticMutex(StaticMutexHandle handle);
 
 void ksti(void);
 
 void kcli(void);
 
 void setInterrupts(uint8_t set);
+
+mutex_t kcreateMutex(void);
+void kacquireMutex(mutex_t handle);
+void kreleaseMutex(mutex_t handle);
+void kdeleteMutex(mutex_t handle);
+
+semaphore_t kcreateSemaphore(uint64_t initial, uint64_t max);
+void kacquireSemaphore(semaphore_t handle, uint64_t count);
+void kreleaseSemaphore(semaphore_t handle, uint64_t count);
+void kdeleteSemaphore(semaphore_t handle);
+
+spinlock_t kcreateSpinlock(void);
+void kacquireSpinlock(spinlock_t handle);
+void kreleaseSpinlock(spinlock_t handle);
+void kdeleteSpinlock(spinlock_t handle);
 
 #endif /* CORE_ATOMIC_H */

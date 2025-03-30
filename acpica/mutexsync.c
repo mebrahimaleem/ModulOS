@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include <core/atomic.h>
+
 #include "acpi.h"
 
 #include <acpica/mutexsync.h>
@@ -35,50 +37,64 @@ uint8_t acpi_release_global_lock(void* facsPtr) {
 }
 
 ACPI_STATUS AcpiOsCreateMutex(ACPI_MUTEX *OutHandle) {
-	return AE_ERROR;
+	*OutHandle = kcreateMutex();
+	return AE_OK;
 }
 
 void AcpiOsDeleteMutex(ACPI_MUTEX Handle) {
+	kdeleteMutex(Handle);
 	return;
 }
 
 ACPI_STATUS AcpiOsAcquireMutex(ACPI_MUTEX Handle, UINT16 Timeout) {
-	return AE_ERROR;
+	//TODO: implement timeout
+	kacquireMutex(Handle);
+	return AE_OK;
 }
 
 void AcpiOsReleaseMutex(ACPI_MUTEX Handle) {
+	kreleaseMutex(Handle);
 	return;
 }
 
 ACPI_STATUS AcpiOsCreateSemaphore(UINT32 MaxUnits, UINT32 InitialUnits, ACPI_SEMAPHORE *OutHandle) {
-	return AE_ERROR;
+	*OutHandle = kcreateSemaphore(InitialUnits, MaxUnits);
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsDeleteSemaphore(ACPI_SEMAPHORE Handle) {
-	return AE_ERROR;
+	kdeleteSemaphore(Handle);
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units, UINT16 Timeout) {
-	return AE_ERROR;
+	//TODO: implement timeout
+	kacquireSemaphore(Handle, Units);
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units) {
-	return AE_ERROR;
+	kreleaseSemaphore(Handle, Units);
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsCreateLock(ACPI_SPINLOCK *OutHandle) {
-	return AE_ERROR;
+	*OutHandle = kcreateSpinlock();
+	return AE_OK;
 }
 
 void AcpiOsDeleteLock(ACPI_SPINLOCK Handle) {
+	kdeleteSpinlock(Handle);
 	return;
 }
 
 ACPI_CPU_FLAGS AcpiOsAcquireLock(ACPI_SPINLOCK Handle) {
+	kacquireSpinlock(Handle);
 	return 0;
 }
 
 void AcpiOsReleaseLock(ACPI_SPINLOCK Handle, ACPI_CPU_FLAGS Flags) {
+	kreleaseSpinlock(Handle);
 	return;
 }
 

@@ -19,6 +19,7 @@
 #define CORE_ATOMIC_C
 
 #include <core/atomic.h>
+#include <core/memory.h>
 
 extern uint8_t disableInterrupts;
 
@@ -38,18 +39,15 @@ void atomicinit(void) {
 	disableInterrupts = 1;
 }
 
-MutexHandle kcreateMutex() {
+StaticMutexHandle kcreateStaticMutex() {
 	kcli();
 	kmutexes[knextMutex / sizeof(uint8_t)] &= (uint8_t)~(1 << (knextMutex % sizeof(uint8_t))); // clear mutex bit
 	knextMutex++;
-	if (knextMutex >= knumMutex) {
-		//TODO: allocate more mutexes
-	}
 	ksti();
 	return knextMutex - 1;
 }
 
-void kacquireMutex(MutexHandle handle) {
+void kacquireStaticMutex(StaticMutexHandle handle) {
 	const uint64_t i = handle / sizeof(uint8_t);
 	const uint8_t mask = 1 << (handle % sizeof(uint8_t));
 	
@@ -67,16 +65,107 @@ void kacquireMutex(MutexHandle handle) {
 	}
 }
 
-void kreleaseMutex(MutexHandle handle) {
+void kreleaseStaticMutex(StaticMutexHandle handle) {
 	kcli();
 	kmutexes[handle / sizeof(uint8_t)] &= (uint8_t)~(1 << (handle % sizeof(uint8_t))); // clear mutex bit
 	ksti();
 }
 
-// TODO: implement destroying mutexes by adding their handles to a list, then using the list items when a new mutex in requested
-
 void setInterrupts(uint8_t set) {
 	disableInterrupts = set;
+}
+
+mutex_t kcreateMutex() {
+	mutex_t ret = kmalloc(kheap_shared, sizeof(_mutex_t));
+	*ret = 0;
+	return ret;
+}
+
+void kacquireMutex(mutex_t handle) {
+	while (1) {
+		kcli();
+		if (*handle == 0) {
+			*handle = 1;
+			ksti();
+			return;
+		}
+		ksti();
+
+		// fast inner busy wait to avoid cli too often
+		while(*handle == 1);
+	}
+}
+
+void kreleaseMutex(mutex_t handle) {
+	kcli();
+	*handle = 0;
+	ksti();
+}
+
+void kdeleteMutex(mutex_t handle) {
+	kfree(handle);
+}
+
+semaphore_t kcreateSemaphore(uint64_t initial, uint64_t max) {
+	semaphore_t ret = kmalloc(kheap_shared, sizeof(_semaphore_t));
+	*ret = max - initial;
+	return ret;
+}
+
+void kacquireSemaphore(semaphore_t handle, uint64_t count) {
+	while (1) {
+		kcli();
+		if (*handle >= count) {
+			*handle -= count;
+			ksti();
+			return;
+		}
+		ksti();
+
+		// fast inner busy wait to avoid cli too often
+		while(*handle < count);
+	}
+}
+
+void kreleaseSemaphore(semaphore_t handle, uint64_t count) {
+	kcli();
+	*handle += count;
+	ksti();
+}
+
+void kdeleteSemaphore(semaphore_t handle) {
+	kfree(handle);
+}
+
+spinlock_t kcreateSpinlock() {
+	spinlock_t ret = kmalloc(kheap_shared, sizeof(_spinlock_t));
+	*ret = 0;
+	return ret;
+}
+
+void kacquireSpinlock(spinlock_t handle) {
+	while (1) {
+		kcli();
+		if (*handle == 0) {
+			*handle = 1;
+			ksti();
+			return;
+		}
+		ksti();
+
+		// fast inner busy wait to avoid cli too often
+		while(*handle == 1);
+	}
+}
+
+void kreleaseSpinlock(spinlock_t handle) {
+	kcli();
+	*handle = 0;
+	ksti();
+}
+
+void kdeleteSpinlock(spinlock_t handle) {
+	kfree(handle);
 }
 
 #endif /* CORE_ATOMIC_C */

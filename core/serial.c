@@ -56,7 +56,7 @@ void serialinit(void) {
 
   uint8_t i;
   for (i = 0; i < 8; i++) {
-    serialMutex[i] = kcreateMutex();
+    serialMutex[i] = kcreateStaticMutex();
   }
 
   // first setup com1
@@ -170,13 +170,13 @@ void serialWriteStr(uint8_t com, const char* str) {
   // check if serial is configured
   if ((com_sts & com) == com) {
     //TODO: implement receiving over serial
-    kacquireMutex(handle);
+    kacquireStaticMutex(handle);
 
     for (const char* c = str; *c != 0; c++) {
       outb(addr, (uint8_t)*c);
     }
 
-    kreleaseMutex(handle);
+    kreleaseStaticMutex(handle);
   }
 }
 

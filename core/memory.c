@@ -56,8 +56,8 @@ struct BlockDescriptor* volatile kheap_private;
 
 struct PagesFree* volatile kpagesfree;
 
-MutexHandle pagingGlobalMutex;
-MutexHandle memoryGlobalLock;
+StaticMutexHandle pagingGlobalMutex;
+StaticMutexHandle memoryGlobalLock;
 
 void meminit(void) {
 	uint32_t i;
@@ -68,8 +68,8 @@ void meminit(void) {
 
 	pmembitmap = &_pmembitmap;
 
-	pagingGlobalMutex = kcreateMutex();
-	memoryGlobalLock = kcreateMutex();
+	pagingGlobalMutex = kcreateStaticMutex();
+	memoryGlobalLock = kcreateStaticMutex();
 
 	kpagesfree = 0;
 
@@ -126,7 +126,7 @@ void meminit(void) {
 	kheap_shared[1].flags = KMEM_BLOCK_RESV;
 	
 	/* third block descriptor is heap mutex handle*/
-	((uint64_t*)kheap_shared)[2] = kcreateMutex();
+	((uint64_t*)kheap_shared)[2] = kcreateStaticMutex();
 
 	/* fourth is pointer to heap extension */
 	//TODO
@@ -148,7 +148,7 @@ void meminit(void) {
 	kheap_private[1].flags = KMEM_BLOCK_RESV;
 
 	/* third is mutex handle */
-	((uint64_t*)kheap_private)[2] = kcreateMutex();
+	((uint64_t*)kheap_private)[2] = kcreateStaticMutex();
 
 	/* fourth is pointer to heap extension */
 	//TODO
@@ -218,7 +218,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 * undefined behavior when overwriting previous entries with a different granularity
 */
 void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
-	kacquireMutex(pagingGlobalMutex);
+	kacquireStaticMutex(pagingGlobalMutex);
 
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
 	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
@@ -240,7 +240,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 	if (granularity == PAGE_GRANULARITY_1G) {
 		p4[l3] = (PDT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
 		tlbflush();
-		kreleaseMutex(pagingGlobalMutex);
+		kreleaseStaticMutex(pagingGlobalMutex);
 		return;
 	}
 
@@ -257,7 +257,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 	if (granularity == PAGE_GRANULARITY_2M) {
 		p3[l2] = (PT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
 		tlbflush();
-		kreleaseMutex(pagingGlobalMutex);
+		kreleaseStaticMutex(pagingGlobalMutex);
 		return;
 	}
 	
@@ -273,7 +273,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 
 	p2[l1] = (uint64_t)paddr | flags;
 	tlbflush_addr(vaddr);
-	kreleaseMutex(pagingGlobalMutex);
+	kreleaseStaticMutex(pagingGlobalMutex);
 }
 
 void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {
@@ -285,7 +285,7 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 }
 
 uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
-	kacquireMutex(memoryGlobalLock);
+	kacquireStaticMutex(memoryGlobalLock);
 	uint64_t i = 0;
 	struct PagesFree* t0;
 	uint8_t* t1;
@@ -353,7 +353,7 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 	}
 
 	if (i == length) {
-		kreleaseMutex(memoryGlobalLock);
+		kreleaseStaticMutex(memoryGlobalLock);
 		return 0; // sucesfull
 	}
 
@@ -363,7 +363,7 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 	if (t1 == 0) {
 		//TODO: errno
 		//TODO: try smaller continious block
-		kreleaseMutex(memoryGlobalLock);
+		kreleaseStaticMutex(memoryGlobalLock);
 		return 1;
 	}
 
@@ -408,7 +408,7 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 		pmembitmap[st / PMEMBPERBYTE] ^= (1 << (st % PMEMBPERBYTE / PMEMBITS_G));
 	}
 
-	kreleaseMutex(memoryGlobalLock);
+	kreleaseStaticMutex(memoryGlobalLock);
 	return 0;
 }
 
@@ -422,7 +422,7 @@ void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
 
 void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8_t use_mut) {
 	if (use_mut)
-		kacquireMutex(((uint64_t*)heapbase)[2]);
+		kacquireStaticMutex(((uint64_t*)heapbase)[2]);
 	const uint64_t lim = heapbase[1].size - sizeof(struct BlockDescriptor);
 
 	/* adjust length to force alignment and allocate descriptor */
@@ -445,7 +445,7 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 			block->flags = KMEM_BLOCK_LAST;
 
 			if (use_mut)
-				kreleaseMutex(((uint64_t*)heapbase)[2]);
+				kreleaseStaticMutex(((uint64_t*)heapbase)[2]);
 			return ret;
 		}
 
@@ -462,7 +462,7 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 				block->size = KMEM_BLOCK_SIZEMASK & (t0 - alen);
 				
 				if (use_mut)
-					kreleaseMutex(((uint64_t*)heapbase)[2]);
+					kreleaseStaticMutex(((uint64_t*)heapbase)[2]);
 				return ret;
 			}
 
@@ -472,7 +472,7 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 				ret = (void*)((uint64_t)block + sizeof(struct BlockDescriptor));
 
 				if (use_mut)
-					kreleaseMutex(((uint64_t*)heapbase)[2]);
+					kreleaseStaticMutex(((uint64_t*)heapbase)[2]);
 				return ret;
 			}
 		}
@@ -495,7 +495,7 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 		_kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize, heapbase != kheap_shared);
 		ret = _kmalloc(heapbase, length, 0);
 		if (use_mut)
-			kreleaseMutex(((uint64_t*)heapbase)[2]);
+			kreleaseStaticMutex(((uint64_t*)heapbase)[2]);
 		return ret;
 	}
 
@@ -503,7 +503,7 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 	
 	/* TODO: implement errno */
 	if (use_mut)
-		kreleaseMutex(((uint64_t*)heapbase)[2]);
+		kreleaseStaticMutex(((uint64_t*)heapbase)[2]);
 	return 0; /* out of virtual address space */
 }
 
