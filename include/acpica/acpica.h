@@ -1,4 +1,4 @@
-/* panic.h - kernel panic functions */
+/* acpica.h - acpica exposed functions */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,18 +15,14 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
+#ifndef ACPICA_ACPICA_H
+#define ACPICA_ACPICA_H
 
-#include <stdint.h>
+#ifndef ACPICA_EXPOSE
+#define ACPICA_EXPOSE
 
-#define KPANIC_UNK		0x0
-#define KPANIC_NOMEM	0x1
-#define KPANIC_ACPI		0x2
-#define KPANIC_MAX		0x2
+uint8_t acpiinit(void);
 
-__attribute__((noreturn)) void panic_hlt(void);
+#endif /* ACPICA_EXPOSE */
 
-__attribute__((noreturn)) void panic(uint64_t err);
-
-#endif /* CORE_PANIC_H */
+#endif /* ACPICA_ACPICA_H */

@@ -20,6 +20,8 @@
 
 #include "acpi.h"
 
+#include <core/memory.h>
+
 #include <acpica/mem.h>
 
 /*
@@ -65,7 +67,7 @@ ACPI_STATUS AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS
 }
 
 void* AcpiOsAllocate(ACPI_SIZE Size) {
-	return NULL;
+	return kmalloc(kheap_private, Size);
 }
 
 void AcpiOsFree(void *Memory) {

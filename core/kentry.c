@@ -27,6 +27,8 @@
 #include <core/panic.h>
 #include <core/memory.h>
 
+#include <acpi/acpica.h>
+
 struct avail_memory_t kavail_memory;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
@@ -82,6 +84,20 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Memory init done\r\n");
 	serialWriteStr(SERIAL2, "STATUS: Memory init done\r\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Starting ACPICA subsystem init...\r\n");
+	serialWriteStr(SERIAL2, "STATUS: Starting ACPICA subsystem init...\r\n");
+#endif /* DEBUG */
+
+	if(acpiinit() != 0) {
+		panic(KPANIC_ACPI);
+	}
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: ACPICA subsystem init done\r\n");
+	serialWriteStr(SERIAL2, "STATUS: ACPICA subsystem init done\r\n");
 #endif /* DEBUG */
 
 #ifdef DEBUG

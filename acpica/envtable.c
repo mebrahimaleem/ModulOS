@@ -23,7 +23,7 @@
 #include <acpica/envtable.h>
 
 ACPI_STATUS AcpiOsInitialize() {
-	return AE_ERROR;
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsTerminate() {

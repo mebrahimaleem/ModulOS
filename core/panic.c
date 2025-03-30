@@ -27,10 +27,11 @@ static char panicstr[sizeof(panicstr_st) + 256 + 2]; //no crlf, just 0
 
 static const char* panicmsgs[] = {
 	": UNKOWN\r\n",
-	": OUT OF MEMORY\r\n"};
+	": OUT OF MEMORY\r\n",
+	": ACPI ERROR\r\n"};
 
 __attribute__((noreturn)) void panic(uint64_t err) {
-	uint64_t offset = 255 - intToString(err, 16, panicstr + sizeof(panicstr_st) - 1, 256);
+	uint64_t offset = 255 - uintToString(err, 16, panicstr + sizeof(panicstr_st) - 1, 256);
 	kstrcpy(panicstr_st, panicstr + offset);
 	panicstr[sizeof(panicstr_st) + 256 + 0] = 0;
 

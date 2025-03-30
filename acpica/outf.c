@@ -20,15 +20,23 @@
 
 #include <stdarg.h>
 
+#include <core/utils.h>
+#include <core/serial.h>
+
 #include "acpi.h"
 
 #include <acpica/outf.h>
 
 void ACPI_INTERNAL_XFACE AcpiOsPrintf(const char *Format, ...) {
-	return;
+	va_list va;
+	va_start(va, Format);
+	AcpiOsVprintf(Format, va);
 }
 
 void AcpiOsVprintf(const char *Format, va_list Args) {
+	char* buf;
+	formatstr(Format, &buf, Args);
+	serialWriteStr(SERIAL1, buf);
 	return;
 }
 

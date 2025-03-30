@@ -19,17 +19,22 @@
 #define CORE_UTILS_H
 
 #include <stdint.h>
+#include <stdarg.h>
 
 void kcopy(void* src, void* dst, uint64_t len);
 
 void kfill(void* dst, uint64_t len, uint8_t val);
 
+void kstrcpy(const char* from, char* to);
+
+uint64_t kstrlen(const char* str);
+
 /*
  * Converts num to base string and stores it into str of length strlen (excluding null terminating byte)
  */
-uint64_t intToString(uint64_t num, uint8_t base, char* str, uint64_t strlen);
+uint64_t uintToString(uint64_t num, uint8_t base, char* str, uint64_t strlen);
 
-void kstrcpy(const char* from, char* to);
+uint64_t formatstr(const char* str, char** dest, va_list va);
 
 #endif /* CORE_UTILS_H */
 

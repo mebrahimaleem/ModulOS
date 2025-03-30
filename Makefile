@@ -23,8 +23,14 @@ obj := $(CURDIR)/build
 incl := $(CURDIR)/include
 test := $(CURDIR)/test
 
-KERNEL_REQS_S := $(shell find multiboot2/ -type f -name "*.S") $(shell find core/ -type f -name "*.S")
-KERNEL_REQS_C := $(shell find multiboot2/ -type f -name "*.c") $(shell find core/ -type f -name "*.c") $(shell find acpica/ -type f -name "*.c")
+KERNEL_REQS_S := \
+									$(shell find multiboot2/ -type f -name "*.S") \
+									$(shell find core/ -type f -name "*.S")
+KERNEL_REQS_C := \
+									$(shell find multiboot2/ -type f -name "*.c") \
+									$(shell find core/ -type f -name "*.c") \
+									$(shell find acpica/ -type f -name "*.c") \
+									$(shell find acpi/ -type f -name "*.c")
 
 KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_REQS_S))
 KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_REQS_C))
@@ -48,6 +54,9 @@ CORE_TARGETS := $(CORE_TARGETS_S) $(CORE_TARGETS_C)
 
 ACPICA_TARGETS_C := $(filter $(obj)/acpica/%,$(ALL_TARGETS_C))
 ACPICA_TARGETS := $(ACPICA_TARGETS_C)
+
+ACPI_TARGETS_C := $(filter $(obj)/acpi/%,$(ALL_TARGETS_C))
+ACPI_TARGETS := $(ACPI_TARGETS_C)
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
@@ -104,11 +113,11 @@ rootfs: | $(obj)/iso/
 %/:
 	-mkdir -p $@
 
-$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg LICENSE | rootfs
+$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
 	mkdir -p $(obj)/iso/boot/grub/ $(obj)/iso/usr/share/doc/ModulOS/
 	cp $< $(obj)/iso/boot/
 	cp cfg/grub.cfg $(obj)/iso/boot/grub/
-	cp LICENSE $(obj)/iso/usr/share/doc/ModulOS/
+	cp COPYING COPYING.LESSER $(obj)/iso/usr/share/doc/ModulOS/
 
 	grub-mkrescue -o $@ $(obj)/iso/
 
@@ -132,6 +141,10 @@ $(CORE_TARGETS_S): $(obj)/core/%.o: core/%.S | $(obj)/core/
 $(CORE_TARGETS_C): $(obj)/core/%.o: core/%.c $(incl)/core/%.h | $(obj)/core/
 	$(MAKE) -C core/ $@
 
-# Acpica
+# ACPICA
 $(ACPICA_TARGETS_C): $(obj)/acpica/%.o: acpica/%.c | $(obj)/acpica/
 	$(MAKE) -C acpica/ $@
+
+# ACPI
+$(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c | $(obj)/acpi/
+	$(MAKE) -C acpi/ $@
