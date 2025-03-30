@@ -27,27 +27,33 @@ ACPI_STATUS AcpiOsInitialize() {
 }
 
 ACPI_STATUS AcpiOsTerminate() {
-	return AE_ERROR;
+	return AE_OK;
 }
 
 ACPI_PHYSICAL_ADDRESS AcpiOsGetRootPointer() {
-	return 0;
+	ACPI_PHYSICAL_ADDRESS Ret = 0;
+	AcpiFindRootPointer(&Ret);
+	return Ret;
 }
 
 ACPI_STATUS AcpiOsPredefinedOverride(const ACPI_PREDEFINED_NAMES *PredefinedObject, ACPI_STRING *NewValue) {
-	return AE_ERROR;
+	*NewValue = NULL;
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable, ACPI_TABLE_HEADER **NewTable) {
-	return AE_ERROR;
+	*NewTable = NULL;
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable, ACPI_PHYSICAL_ADDRESS *NewAddress, UINT32 *NewTableLength) {
-	return AE_ERROR;
+	*NewAddress = 0;
+	*NewTableLength = 0;
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsInitializeDebugger() {
-	return AE_ERROR;
+	return AE_OK;
 }
 
 void AcpiOsTerminateDebugger() {
