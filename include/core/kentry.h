@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include <core/memory.h>
+
 #include <multiboot2/tags.h>
 
 struct avail_memory_t {
@@ -27,7 +29,9 @@ struct avail_memory_t {
 	uint32_t length;
 };
 
-struct avail_memory_t kavail_memory;
+extern struct avail_memory_t kavail_memory;
+
+extern volatile uint64_t k0PML4T;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic);
 

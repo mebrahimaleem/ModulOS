@@ -16,6 +16,9 @@
 */
 
 
+#ifndef CORE_KTRANSFER_S
+#define CORE_KTRANSFER_S
+
 	.code64
 	.text
 
@@ -44,3 +47,5 @@ fallback_loop:
 gdt_ptr_high:
 	.short	0x3F
 	.quad		-0x80000000 + 0x7000
+
+#endif /* CORE_KTRANSFER_S */

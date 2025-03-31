@@ -21,9 +21,16 @@ KERNEL_STRIP := x86_64-elf-strip
 
 obj := $(CURDIR)/build
 incl := $(CURDIR)/include
+test := $(CURDIR)/test
 
-KERNEL_REQS_S := $(shell find multiboot2/ -type f -name "*.S") $(shell find core/ -type f -name "*.S")
-KERNEL_REQS_C := $(shell find multiboot2/ -type f -name "*.c") $(shell find core/ -type f -name "*.c")
+KERNEL_REQS_S := \
+									$(shell find multiboot2/ -type f -name "*.S") \
+									$(shell find core/ -type f -name "*.S")
+KERNEL_REQS_C := \
+									$(shell find multiboot2/ -type f -name "*.c") \
+									$(shell find core/ -type f -name "*.c") \
+									$(shell find acpica/ -type f -name "*.c") \
+									$(shell find acpi/ -type f -name "*.c")
 
 KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_REQS_S))
 KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_REQS_C))
@@ -45,9 +52,17 @@ CORE_TARGETS_S := $(filter $(obj)/core/%,$(ALL_TARGETS_S))
 CORE_TARGETS_C := $(filter $(obj)/core/%,$(ALL_TARGETS_C))
 CORE_TARGETS := $(CORE_TARGETS_S) $(CORE_TARGETS_C)
 
+ACPICA_TARGETS_C := $(filter $(obj)/acpica/%,$(ALL_TARGETS_C))
+ACPICA_TARGETS := $(ACPICA_TARGETS_C)
+
+ACPI_TARGETS_C := $(filter $(obj)/acpi/%,$(ALL_TARGETS_C))
+ACPI_TARGETS := $(ACPI_TARGETS_C)
+
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-CFLAGS := $(CWARN) -O2 -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
+#CDEBUG := -D DEBUG -O0
+CFLAGS := $(CWARN) -O2 $(CDEBUG) -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
+	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
 
 export
 
@@ -55,19 +70,55 @@ export
 all: build
 
 .PHONY: build
-build: $(obj)/modulos.iso
+build: $(obj)/modulos.img
 
 .PHONY: clean
 clean:
-	-rm -rd build/*
+	-rm -rd build/* test/*
+
+.PHONY: simulateqemu
+simulateqemu: $(obj)/modulos.img | $(test)/
+	qemu-system-x86_64 -s -S -smp sockets=1,cores=2,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
+
+.PHONY: debuggdb
+debuggdb: $(obj)/modulos-dbg
+	-gdb -q -tui \
+		--init-eval-command="tar rem localhost:1234" \
+		--init-eval-command="la sp" \
+		--init-eval-command="sy $<" \
+		--init-eval-command="c"
+
+
+.PHONY: rootfs
+rootfs: | $(obj)/iso/
+	mkdir -p \
+		$|bin/ \
+		$|boot/ \
+		$|dev/ \
+		$|etc/ \
+		$|home/ \
+		$|lib/ \
+		$|media/ \
+		$|mnt/ \
+		$|opt/ \
+		$|proc/ \
+		$|root/ \
+		$|sbin/ \
+		$|srv/ \
+		$|sys/ \
+		$|tmp/ \
+		$|usr/ $|usr/include/ $|usr/lib/ $|usr/libexec/ $|usr/local/ $|usr/share/ \
+		$|var/ $|var/log/ $|var/mail/ $|var/spool/ $|var/src/ $|var/tmp/
 
 %/:
 	-mkdir -p $@
 
-$(obj)/modulos.iso: cfg/grub.cfg $(obj)/modulos LICENSE | $(obj)/iso/boot/grub/
-	cp $(obj)/modulos $(obj)/iso/boot/
-	cp $< $(obj)/iso/boot/grub/
-	cp LICENSE $(obj)/iso/
+$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
+	mkdir -p $(obj)/iso/boot/grub/ $(obj)/iso/usr/share/doc/ModulOS/
+	cp $< $(obj)/iso/boot/
+	cp cfg/grub.cfg $(obj)/iso/boot/grub/
+	cp COPYING COPYING.LESSER $(obj)/iso/usr/share/doc/ModulOS/
+
 	grub-mkrescue -o $@ $(obj)/iso/
 
 $(obj)/modulos: $(obj)/modulos-dbg | $(obj)/
@@ -89,3 +140,11 @@ $(CORE_TARGETS_S): $(obj)/core/%.o: core/%.S | $(obj)/core/
 
 $(CORE_TARGETS_C): $(obj)/core/%.o: core/%.c $(incl)/core/%.h | $(obj)/core/
 	$(MAKE) -C core/ $@
+
+# ACPICA
+$(ACPICA_TARGETS_C): $(obj)/acpica/%.o: acpica/%.c | $(obj)/acpica/
+	$(MAKE) -C acpica/ $@
+
+# ACPI
+$(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c | $(obj)/acpi/
+	$(MAKE) -C acpi/ $@

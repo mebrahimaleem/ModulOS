@@ -20,7 +20,16 @@
 
 #include <multiboot2/multiboot2.h>
 #include <multiboot2/tags.h>
+
 #include <core/kentry.h>
+#include <core/atomic.h>
+#include <core/serial.h>
+#include <core/panic.h>
+#include <core/memory.h>
+
+#include <acpi/acpica.h>
+
+struct avail_memory_t kavail_memory;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	if (mb2magic != MULTIBOOT2_MAGIC) {
@@ -55,6 +64,48 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 		}
 	}
 
+	/* set kernel instance to 0 */
+	kPML4T = (PML4T_t volatile)&k0PML4T;
+
+	/* init atomic */
+	atomicinit();
+
+	/* init serial */
+	serialinit();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "LOG: SERIAL 1\r\nSTATUS: Starting memory init...\r\n");
+	serialWriteStr(SERIAL2, "LOG: SERIAL 2\r\nSTATUS: Starting memory init...\r\n");
+#endif /* DEBUG */
+	
+	/* init memory manager */
+	meminit();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Memory init done\r\n");
+	serialWriteStr(SERIAL2, "STATUS: Memory init done\r\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Starting ACPICA subsystem init...\r\n");
+	serialWriteStr(SERIAL2, "STATUS: Starting ACPICA subsystem init...\r\n");
+#endif /* DEBUG */
+
+	if(acpiinit() != 0) {
+		panic(KPANIC_ACPI);
+	}
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: ACPICA subsystem init done\r\n");
+	serialWriteStr(SERIAL2, "STATUS: ACPICA subsystem init done\r\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Core init done\r\n");
+	serialWriteStr(SERIAL2, "STATUS: Core init done\r\n");
+#endif /* DEBUG */
+
+	panic(KPANIC_UNK);
 	return;
 }
 
