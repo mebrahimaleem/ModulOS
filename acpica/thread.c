@@ -23,7 +23,7 @@
 #include <acpica/thread.h>
 
 ACPI_THREAD_ID AcpiOsGetThreadId() {
-	return 0;
+	return 1; //TODO: implement
 }
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {

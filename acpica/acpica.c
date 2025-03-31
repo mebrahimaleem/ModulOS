@@ -35,7 +35,7 @@ uint8_t acpiinit() {
 		return 1;
 	}
 
-	//Status = AcpiLoadTables();
+	Status = AcpiLoadTables();
 
 	if (ACPI_FAILURE(Status)) {
 		return 1;

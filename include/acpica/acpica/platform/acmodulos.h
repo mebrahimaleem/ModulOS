@@ -23,7 +23,7 @@
 #define ACPI_DEBUGGER
 
 #ifdef DEBUG
-#define ACPI_DEBUG_OUTPUT
+#define ACPI_DEBUG_OUTPUT 1
 #endif
 
 #define ACPI_USE_LOCAL_CACHE
