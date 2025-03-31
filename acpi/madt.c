@@ -1,4 +1,4 @@
-/* acpica.c - acpica exposed functions */
+/* madt.c - ACPI MADT Structure */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,44 +15,25 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef ACPICA_ACPICA_C
-#define ACPICA_ACPICA_C
+#ifndef ACPI_MADT_C
+#define ACPI_MADT_C
 
-#include "acpi.h"
+#include <stdint.h>
 
-#include <acpica/acpica.h>
+#include <core/panic.h>
 
-uint8_t acpiinit() {
-	ACPI_STATUS Status = AcpiInitializeSubsystem();
+#include <acpi/acpica.h>
+#include <acpi/madt.h>
 
-	if (ACPI_FAILURE(Status)) {
-		return 1;
+#define PCAT_COMPAT	1
+
+uint8_t acpi_needDisable8259() {
+	struct acpi_madt* madt = acpi_getMadt();
+	if (madt == 0) {
+		panic(KPANIC_ACPI);
 	}
 
-	Status = AcpiInitializeTables(NULL, 16, FALSE);
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	Status = AcpiLoadTables();
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	return 0;
+	return (madt->flg & PCAT_COMPAT) == PCAT_COMPAT;
 }
 
-void* acpi_getMadt() {
-	ACPI_TABLE_HEADER* Table;
-	ACPI_STATUS Status = AcpiGetTable(ACPI_SIG_MADT, 1, &Table);
-
-	if (ACPI_FAILURE(Status)) {
-		return (void*)0;
-	}
-
-	return (void*)Table;
-}
-
-#endif /* ACPICA_ACPICA_C */
+#endif /* ACPI_MADT_C */

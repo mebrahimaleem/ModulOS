@@ -29,6 +29,8 @@
 
 #include <acpi/acpica.h>
 
+#include <apic/lapic.h>
+
 struct avail_memory_t kavail_memory;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
@@ -74,21 +76,21 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	serialinit();
 
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "LOG: SERIAL 1\r\nSTATUS: Starting memory init...\r\n");
-	serialWriteStr(SERIAL2, "LOG: SERIAL 2\r\nSTATUS: Starting memory init...\r\n");
+	serialWriteStr(SERIAL1, "LOG: SERIAL 1\nSTATUS: Starting memory init...\n");
+	serialWriteStr(SERIAL2, "LOG: SERIAL 2\nSTATUS: Starting memory init...\n");
 #endif /* DEBUG */
 	
 	/* init memory manager */
 	meminit();
 
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Memory init done\r\n");
-	serialWriteStr(SERIAL2, "STATUS: Memory init done\r\n");
+	serialWriteStr(SERIAL1, "STATUS: Memory init done\n");
+	serialWriteStr(SERIAL2, "STATUS: Memory init done\n");
 #endif /* DEBUG */
 
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting ACPICA subsystem init...\r\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting ACPICA subsystem init...\r\n");
+	serialWriteStr(SERIAL1, "STATUS: Starting ACPICA subsystem init...\n");
+	serialWriteStr(SERIAL2, "STATUS: Starting ACPICA subsystem init...\n");
 #endif /* DEBUG */
 
 	if(acpiinit() != 0) {
@@ -96,13 +98,25 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	}
 
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: ACPICA subsystem init done\r\n");
-	serialWriteStr(SERIAL2, "STATUS: ACPICA subsystem init done\r\n");
+	serialWriteStr(SERIAL1, "STATUS: ACPICA subsystem init done\n");
+	serialWriteStr(SERIAL2, "STATUS: ACPICA subsystem init done\n");
 #endif /* DEBUG */
 
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Core init done\r\n");
-	serialWriteStr(SERIAL2, "STATUS: Core init done\r\n");
+	serialWriteStr(SERIAL1, "STATUS: Starting local APIC init...\n");
+	serialWriteStr(SERIAL2, "STATUS: Starting local APIC init...\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
+	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
+#endif /* DEBUG */
+
+	apic_initlocal();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Core init done\n");
+	serialWriteStr(SERIAL2, "STATUS: Core init done\n");
 #endif /* DEBUG */
 
 	panic(KPANIC_UNK);

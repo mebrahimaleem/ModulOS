@@ -23,9 +23,11 @@
 #include <core/panic.h>
 
 static const char* panicmsgs[] = {
-	": UNKOWN\r\n",
-	": OUT OF MEMORY\r\n",
-	": ACPI ERROR\r\n"};
+	": UNKOWN\n",
+	": OUT OF MEMORY\n",
+	": ACPI ERROR\n",
+	": APIC ERROR\n"
+};
 
 __attribute__((noreturn)) void panic(uint64_t err) {
 	if (err > KPANIC_MAX) {

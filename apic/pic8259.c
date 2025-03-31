@@ -1,4 +1,4 @@
-/* acpica.c - acpica exposed functions */
+/* pic8259.c - 8259 PIC routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,44 +15,22 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef ACPICA_ACPICA_C
-#define ACPICA_ACPICA_C
+#ifndef APIC_PIC8259_C
+#define APIC_PIC8259_C
 
-#include "acpi.h"
+#include <apic/pic8259.h>
 
-#include <acpica/acpica.h>
+#include <core/portio.h>
 
-uint8_t acpiinit() {
-	ACPI_STATUS Status = AcpiInitializeSubsystem();
+#define PIC1_DATA	0x20 + 1
+#define PIC2_DATA	0xA0 + 1
 
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
+#define PIC_MASK	0xFF
 
-	Status = AcpiInitializeTables(NULL, 16, FALSE);
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	Status = AcpiLoadTables();
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	return 0;
+void pic_mask8259(void) {
+	outb(PIC1_DATA, PIC_MASK);
+	outb(PIC2_DATA, PIC_MASK);
+	iowait();
 }
 
-void* acpi_getMadt() {
-	ACPI_TABLE_HEADER* Table;
-	ACPI_STATUS Status = AcpiGetTable(ACPI_SIG_MADT, 1, &Table);
-
-	if (ACPI_FAILURE(Status)) {
-		return (void*)0;
-	}
-
-	return (void*)Table;
-}
-
-#endif /* ACPICA_ACPICA_C */
+#endif /* APIC_PIC8259_C */

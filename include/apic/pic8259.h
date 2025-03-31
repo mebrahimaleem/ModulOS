@@ -1,4 +1,4 @@
-/* acpica.c - acpica exposed functions */
+/* pic8259.h - 8259 PIC routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,44 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef ACPICA_ACPICA_C
-#define ACPICA_ACPICA_C
+#ifndef APIC_PIC8259_H
+#define APIC_PIC8259_H
 
-#include "acpi.h"
+void pic_mask8259(void);
 
-#include <acpica/acpica.h>
-
-uint8_t acpiinit() {
-	ACPI_STATUS Status = AcpiInitializeSubsystem();
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	Status = AcpiInitializeTables(NULL, 16, FALSE);
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	Status = AcpiLoadTables();
-
-	if (ACPI_FAILURE(Status)) {
-		return 1;
-	}
-
-	return 0;
-}
-
-void* acpi_getMadt() {
-	ACPI_TABLE_HEADER* Table;
-	ACPI_STATUS Status = AcpiGetTable(ACPI_SIG_MADT, 1, &Table);
-
-	if (ACPI_FAILURE(Status)) {
-		return (void*)0;
-	}
-
-	return (void*)Table;
-}
-
-#endif /* ACPICA_ACPICA_C */
+#endif /* APIC_PIC8259_H */

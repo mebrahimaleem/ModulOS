@@ -23,7 +23,8 @@
 #define KPANIC_UNK		0x0
 #define KPANIC_NOMEM	0x1
 #define KPANIC_ACPI		0x2
-#define KPANIC_MAX		0x2
+#define KPANIC_APIC		0x3
+#define KPANIC_MAX		0x3
 
 __attribute__((noreturn)) void panic_hlt(void);
 
