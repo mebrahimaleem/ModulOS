@@ -33,6 +33,8 @@
 #define KMEM_PAGE_PRESENT		0x1
 #define KMEM_PAGE_WRITE			0x2
 
+#define KMEM_ID_OFF					0x0
+
 typedef uint64_t**** PML4T_t;
 typedef uint64_t*** PDPT_t;
 typedef uint64_t** PDT_t;

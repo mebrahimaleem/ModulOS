@@ -55,15 +55,18 @@ ACPI_STATUS AcpiOsReleaseObject(ACPI_CACHE_T *Cache, void *Object) {
 */
 
 void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
-	return NULL;
+	return (void*)((uint64_t)PhysicalAddress + KMEM_ID_OFF);
 }
 
 void AcpiOsUnmapMemory(void *LogicalAddress, ACPI_SIZE Length) {
+	// no need to do anything
 	return;
 }
 
 ACPI_STATUS AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS *PhysicalAddress) {
-	return AE_ERROR;
+	uint64_t maskedaddr = (uint64_t)LogicalAddress & 0xFFFFFFFFFFFFF000;
+	*PhysicalAddress = calculatePaddr(kPML4T, maskedaddr) + (uint64_t)LogicalAddress - maskedaddr;
+	return AE_OK;
 }
 
 void* AcpiOsAllocate(ACPI_SIZE Size) {
@@ -71,7 +74,7 @@ void* AcpiOsAllocate(ACPI_SIZE Size) {
 }
 
 void AcpiOsFree(void *Memory) {
-	return;
+	kfree(Memory);
 }
 
 BOOLEAN AcpiOsReadable(void *Memory, ACPI_SIZE Length) {

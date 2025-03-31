@@ -174,6 +174,9 @@ void serialWriteStr(uint8_t com, const char* str) {
     kacquireStaticMutex(handle);
 
     for (const char* c = str; *c != 0; c++) {
+			if (*c == '\n') {
+				outb(addr, (uint8_t)'\r');
+			}
       outb(addr, (uint8_t)*c);
     }
 

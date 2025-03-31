@@ -32,8 +32,8 @@ __attribute__((noreturn)) void panic(uint64_t err) {
 		err = KPANIC_UNK;
 	}
 
-	serialPrintf(SERIAL1, "PANIC: 0lx%X: %s\r\n", (uint64_t)err, panicmsgs[err]);
-	serialPrintf(SERIAL2, "PANIC: 0lx%X: %s\r\n", (uint64_t)err, panicmsgs[err]);
+	serialPrintf(SERIAL1, "PANIC: 0x%lX: %s\r\n", (uint64_t)err, panicmsgs[err]);
+	serialPrintf(SERIAL2, "PANIC: 0x%lX: %s\r\n", (uint64_t)err, panicmsgs[err]);
 	
 	panic_hlt();
 }

@@ -112,7 +112,13 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 		if (*format == '%') {
 			format++;
 			uint64_t width = 0;
-			uint64_t precision = 0;
+			uint64_t precision = (uint64_t)-1;
+			uint64_t justify = 0;
+
+			if (*format == '-') {
+				justify = 1;
+				format++;
+			}
 
 			while (*format >= '0' && *format <= '9') {
 				width = width * 10 + (uint64_t)(*format - '0');
@@ -121,6 +127,7 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 
 			if (*format == '.') {
 				format++;
+				precision = 0;
 				while (*format >= '0' && *format <= '9') {
 					precision = precision * 10 + (uint64_t)(*format - '0');
 					format++;
@@ -187,14 +194,18 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 			}
 
 			t2 = kstrlen(append);
-			for(t4 = 0; t4 < t2; t4++) {
+			for(t4 = 0; t4 < t2 && precision > 0; t4++) {
 				if (printed == maxlen) {
 					maxlen *= 2;
 					*dest = krealloc(kheap_private, *dest, sizeof(char) * maxlen);
 				}
 				(*dest)[printed] = append[t4];
 				printed++;
+				precision--;
 			}
+
+			//TODO: implement justification
+			//TODO: implement width
 		}
 
 		else {

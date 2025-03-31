@@ -76,7 +76,7 @@ pm2long:
 
 	.code32
 enter32:
-	/* Identity map first four mibibytes*/
+	/* Identity map first 512 gebibytes*/
 	
 	movl $PML4T, %edi
 	movl %edi, %cr3
@@ -86,15 +86,6 @@ enter32:
 	movl $(PML4T + 0x1000 - 8), %edi
 	movl $(PDPT1 + 3), (%edi)
 	
-	movl $PDPT0, %edi
-	movl $(PDT0 + 3), (%edi)
-
-	movl $(PDT0), %edi
-	movl $(0x83), (%edi) /* First two mibibytes */
-
-	movl $(PDT0 + 8), %edi
-	movl $(0x200000 + 0x83), (%edi) /* Second two mibibytes */
-
 	/* Map high memory 6MiB (last two for static shared kernel heap) */
 
 	movl $(PDPT1 + 0x1000 - 16), %edi
@@ -208,6 +199,17 @@ gdt_ptr32:
 	.short 0x3F
 	.long 0x7000
 
+.align 0x1000
+
+ /* map first 512GiB */
+
+PDPT0:
+.equ _i, 0
+.rept 0x200
+	.quad (_i * 0x40000000) + 0x83
+	.equ _i, _i+1
+.endr
+
 	.section .bss.boot
 
 /* Paging Structures */
@@ -221,17 +223,7 @@ PML4T:
 	.quad 0
 .endr
 
-PDPT0:
-.rept 0x200
-	.quad 0
-.endr
-
 PDPT1:
-.rept 0x200
-	.quad 0
-.endr
-
-PDT0:
 .rept 0x200
 	.quad 0
 .endr

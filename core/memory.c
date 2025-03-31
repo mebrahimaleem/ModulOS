@@ -235,7 +235,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 		pml4t[l4] = (PDPT_t)(calculatePaddr(pml4t, t0) | flags);
 	}
 
-	const PDPT_t volatile p4 = (PDPT_t volatile)((uint64_t)pml4t[l4] & PS_ADDR_MASK);
+	const PDPT_t volatile p4 = (PDPT_t volatile)(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (granularity == PAGE_GRANULARITY_1G) {
 		p4[l3] = (PDT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
@@ -252,7 +252,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 		p4[l3] = (PDT_t)(calculatePaddr(pml4t, t0) | flags);
 	}
 
-	const PDT_t p3 = (PDT_t volatile)((uint64_t)p4[l3] & PS_ADDR_MASK);
+	const PDT_t p3 = (PDT_t volatile)(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (granularity == PAGE_GRANULARITY_2M) {
 		p3[l2] = (PT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
@@ -269,7 +269,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 		p3[l2] = (PT_t)(calculatePaddr(pml4t, t0) | flags);
 	}
 
-	const PT_t volatile p2 = (PT_t volatile)((uint64_t)p3[l2] & PS_ADDR_MASK);
+	const PT_t volatile p2 = (PT_t volatile)(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	p2[l1] = (uint64_t)paddr | flags;
 	tlbflush_addr(vaddr);
@@ -564,24 +564,25 @@ void kfree(void* ptr) {
 }
 
 uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr) {
+	//TODO: check for no page
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
 	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
 	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
 	const uint64_t l1 = 0x1FF & ((uint64_t)vaddr / 0x1000); // identify 2GiB
 
-	const PDPT_t volatile p4 = (PDPT_t volatile)((uint64_t)pml4t[l4] & PS_ADDR_MASK);
+	const PDPT_t volatile p4 = (PDPT_t volatile)(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) {
 		return (uint64_t)p4[l3] & PS_ADDR_MASK;
 	}
 
-	const PDT_t p3 = (PDT_t volatile)((uint64_t)p4[l3] & PS_ADDR_MASK);
+	const PDT_t p3 = (PDT_t volatile)(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (((uint64_t)p3[l2] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) {
 		return (uint64_t)p3[l2] & PS_ADDR_MASK;
 	}
 
-	const PT_t volatile p2 = (PT_t volatile)((uint64_t)p3[l2] & PS_ADDR_MASK);
+	const PT_t volatile p2 = (PT_t volatile)(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	return p2[l1] & PS_ADDR_MASK;
 }
