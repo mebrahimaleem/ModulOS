@@ -107,12 +107,12 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	serialWriteStr(SERIAL2, "STATUS: Starting local APIC init...\n");
 #endif /* DEBUG */
 
+	apic_initlocal();
+
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
 	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
 #endif /* DEBUG */
-
-	apic_initlocal();
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Core init done\n");

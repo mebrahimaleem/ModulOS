@@ -21,6 +21,12 @@
 
 void wbinvd(void);
 
+void cpuGetMSR(uint32_t msr, uint32_t* lo, uint32_t* hi);
+
+void cpuSetMSR(uint32_t msr, uint32_t lo, uint32_t hi);
+
+void cpuid(uint32_t ieax, uint32_t iecx, uint32_t* oeax, uint32_t* oebx, uint32_t* oecx, uint32_t* oedx);
+
 #endif /* CORE_CPULOWLEVEL_H */
 
 
