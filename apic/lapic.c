@@ -43,10 +43,11 @@
 
 #define MAXLA_LEAF						0x80000000
 #define MAXPA_LEAF						0x80000008
+#define CLOCK_LEAF						0x15
 
 #define DLVRY_FIXED						0x0
 #define NOMASK								0x0
-#define PERIODIC_TIMER				0x1
+#define ONESHOT_TIMER					0x0
 #define IIPP_HIGH							0x0
 #define TRIGMODE_EDGE					0x0
 #define TRIGMODE_LVL					0x1
@@ -92,7 +93,7 @@ void apic_initlocal(void) {
 	lvt.zero = 0;
 	lvt.timer.vector = LAPIC_TIMR_V;
 	lvt.timer.mask = NOMASK;
-	lvt.timer.timr_mode = PERIODIC_TIMER;
+	lvt.timer.timr_mode = ONESHOT_TIMER;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_TIMR_OFF) = lvt;
 
 	lvt.zero = 0;
@@ -127,6 +128,9 @@ void apic_initlocal(void) {
 	lvt.error.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_EROR_OFF) = lvt;
 
+	/* setup timer */
+	//TODO: callibrate clock
+	
 	/* enable */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
 
