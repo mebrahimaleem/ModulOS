@@ -33,8 +33,23 @@
 
 #define LAPIC_SVR_OFF					0xF0
 
+#define LAPIC_LVT_CMCI_OFF		0x2F0
+#define LAPIC_LVT_TIMR_OFF		0x320
+#define LAPIC_LVT_THRM_OFF		0x330
+#define LAPIC_LVT_PRCR_OFF		0x340
+#define LAPIC_LVT_LNT0_OFF		0x350
+#define LAPIC_LVT_LNT1_OFF		0x360
+#define LAPIC_LVT_EROR_OFF		0x370
+
 #define MAXLA_LEAF						0x80000000
 #define MAXPA_LEAF						0x80000008
+
+#define DLVRY_FIXED						0x0
+#define NOMASK								0x0
+#define PERIODIC_TIMER				0x1
+#define IIPP_HIGH							0x0
+#define TRIGMODE_EDGE					0x0
+#define TRIGMODE_LVL					0x1
 
 uint64_t lapic_base;
 uint8_t lapic_spur_vector;
@@ -63,7 +78,56 @@ void apic_initlocal(void) {
 
 	cpuSetMSR(LAPIC_MSR_BASE, (uint32_t)lapic_base | LAPIC_MSR_ENABLE, (uint32_t)(lapic_base >> 32));
 
-	/* set spurious interrupt register */
+	/* disable while being set up */
+	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR;
+
+	/* set LVTs */
+	union LAPIC_LVT lvt;	
+	lvt.zero = 0;
+	lvt.cmci.vector = LAPIC_CMCI_V;
+	lvt.cmci.dlvry_mode = DLVRY_FIXED;
+	lvt.cmci.mask = NOMASK;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_CMCI_OFF) = lvt;
+
+	lvt.zero = 0;
+	lvt.timer.vector = LAPIC_TIMR_V;
+	lvt.timer.mask = NOMASK;
+	lvt.timer.timr_mode = PERIODIC_TIMER;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_TIMR_OFF) = lvt;
+
+	lvt.zero = 0;
+	lvt.thrm.vector = LAPIC_THRM_V;
+	lvt.thrm.dlvry_mode = DLVRY_FIXED;
+	lvt.thrm.mask = NOMASK;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_THRM_OFF) = lvt;
+
+	lvt.zero = 0;
+	lvt.perfcm.vector = LAPIC_PRCR_V;
+	lvt.perfcm.dlvry_mode = DLVRY_FIXED;
+	lvt.perfcm.mask = NOMASK;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF) = lvt;
+
+	lvt.zero = 0;
+	lvt.lint0.vector = LAPIC_LNT0_V;
+	lvt.lint0.dlvry_mode = DLVRY_FIXED;
+	lvt.lint0.iipp = IIPP_HIGH;
+	lvt.lint0.trig_mode = TRIGMODE_EDGE; // LINT0 for edge
+	lvt.lint0.mask = NOMASK;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF) = lvt;
+
+	lvt.zero = 0;
+	lvt.lint1.vector = LAPIC_LNT1_V;
+	lvt.lint1.dlvry_mode = DLVRY_FIXED;
+	lvt.lint1.iipp = IIPP_HIGH;
+	lvt.lint1.trig_mode = TRIGMODE_LVL; // LINT1 for level
+	lvt.lint1.mask = NOMASK;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF) = lvt;
+
+	lvt.error.vector = LAPIC_EROR_V;
+	lvt.error.mask = NOMASK;
+	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_EROR_OFF) = lvt;
+
+	/* enable */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
 
 	lapic_spur_vector = 0xFF & *(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF);
