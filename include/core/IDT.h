@@ -23,6 +23,26 @@ extern uint64_t IDT_BASE;
 extern uint64_t TSS_SEG;
 
 extern uint64_t ISR_DE;
+extern uint64_t ISR_DB;	
+extern uint64_t ISR_BP;	
+extern uint64_t ISR_OF;	
+extern uint64_t ISR_BR;	
+extern uint64_t ISR_UD; 
+extern uint64_t ISR_NM; 
+extern uint64_t ISR_TS; 
+extern uint64_t ISR_NP;	
+extern uint64_t ISR_SS;	
+extern uint64_t ISR_GP;	
+extern uint64_t ISR_PF;	
+extern uint64_t ISR_MF;	
+extern uint64_t ISR_AC;	
+extern uint64_t ISR_XM;	
+extern uint64_t ISR_VE;	
+extern uint64_t ISR_CP;	
+
+extern uint64_t ISR_NMI;
+extern uint64_t ISR_DF;
+extern uint64_t ISR_MC;
 
 extern uint64_t rsp0;
 extern uint64_t rsp1;

@@ -39,6 +39,10 @@
 #define EX_VE	$0x14
 #define EX_CP	$0x15
 
+#define EX_NMI	$0x02
+#define EX_DF		$0x08
+#define EX_MC		$0x12
+
 	.code64
 	.text
 /* void loadidt(void); */
@@ -79,10 +83,102 @@ ISR_EX_G:
 ISR_DE:
 	movq EX_DE, %rdi
 	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_DB
+ISR_DB:
+	movq EX_DB, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_BP
+ISR_BP:
+	movq EX_BP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_OF
+ISR_OF:
+	movq EX_OF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_BR
+ISR_BR:
+	movq EX_BR, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_UD
+ISR_UD:
+	movq EX_UD, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_NM
+ISR_NM:
+	movq EX_NM, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_TS
+ISR_TS:
+	movq EX_TS, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_NP
+ISR_NP:
+	movq EX_NP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_SS
+ISR_SS:
+	movq EX_SS, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_GP
+ISR_GP:
+	movq EX_GP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_PF
+ISR_PF:
+	movq EX_PF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_MF
+ISR_MF:
+	movq EX_MF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_AC
+ISR_AC:
+	movq EX_AC, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_XM
+ISR_XM:
+	movq EX_XM, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_VE
+ISR_VE:
+	movq EX_VE, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_CP
+ISR_CP:
+	movq EX_CP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
 
-	mov $0x10, %ax
-	mov %ax, %ss
-	
+	.globl ISR_NMI
+ISR_NMI:
+	movq EX_NMI, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_DF
+ISR_DF:
+	movq EX_DF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_MC
+ISR_MC:
+	movq EX_MC, %rdi
+	movq %rsp, %rsi
 	jmp ISR_EX_G
 
 	.data

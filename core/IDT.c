@@ -38,6 +38,28 @@
 
 #define GRAN_BYTE		0x0
 
+#define IDTDE(base, i) \
+	off = (uint64_t)&base; \
+	idt[i].off0 = off & 0xFFFF; \
+	idt[i].segsel = KCODESEG; \
+	idt[i].ist = 0; \
+	idt[i].type = TYPE_INT; \
+	idt[i].dpl = KDPL; \
+	idt[i].present = PRESENT; \
+	idt[i].off1 = (off >> 16) & 0xFFFF; \
+	idt[i].off2 = (uint32_t)(off >> 32);
+
+#define IDTDE2(base, i, is) \
+	off = (uint64_t)&base; \
+	idt[i].off0 = off & 0xFFFF; \
+	idt[i].segsel = KCODESEG; \
+	idt[i].ist = is; \
+	idt[i].type = TYPE_INT; \
+	idt[i].dpl = KDPL; \
+	idt[i].present = PRESENT; \
+	idt[i].off1 = (off >> 16) & 0xFFFF; \
+	idt[i].off2 = (uint32_t)(off >> 32);
+
 void idt_installisrs() {
 	/* first create TSS so that ISTs work */
 	struct TSS* volatile tss  = (struct TSS* volatile)kmalloc(kheap_shared, sizeof(struct TSS));
@@ -87,16 +109,28 @@ void idt_installisrs() {
 
 	struct IDTD* volatile idt = (struct IDTD* volatile)&IDT_BASE;
 
-	uint64_t off = (uint64_t)&ISR_DE;
-	//DE
-	idt[0].off0 = off & 0xFFFF;
-	idt[0].segsel = KCODESEG;
-	idt[0].ist = 0;
-	idt[0].type = TYPE_INT;
-	idt[0].dpl = KDPL;
-	idt[0].present = PRESENT;
-	idt[0].off1 = (off >> 16) & 0xFFFF;
-	idt[0].off2 = (uint32_t)(off >> 32);
+	uint64_t off;
+	IDTDE(ISR_DE, 0x00);
+	IDTDE(ISR_DB, 0x01);	
+	IDTDE(ISR_BP, 0x03);	
+	IDTDE(ISR_OF, 0x04);	
+	IDTDE(ISR_BR, 0x05);	
+	IDTDE(ISR_UD, 0x06); 
+	IDTDE(ISR_NM, 0x07); 
+	IDTDE(ISR_TS, 0x0A); 
+	IDTDE(ISR_NP, 0x0B);	
+	IDTDE(ISR_SS, 0x0C);	
+	IDTDE(ISR_GP, 0x0D);	
+	IDTDE(ISR_PF, 0x0E);	
+	IDTDE(ISR_MF, 0x10);	
+	IDTDE(ISR_AC, 0x11);	
+	IDTDE(ISR_XM, 0x13);	
+	IDTDE(ISR_VE, 0x14);	
+	IDTDE(ISR_CP, 0x15);	
+
+	IDTDE2(ISR_NMI, 0x02, 1);	
+	IDTDE2(ISR_DF, 0x08, 2);	
+	IDTDE2(ISR_MC, 0x12, 3);	
 }
 
 #endif /* CORE_IDT_C */
