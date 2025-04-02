@@ -63,5 +63,12 @@ cpuid:
 	popq %rbx
 	ret
 
+/* void ltr(void); */
+	.globl ltr
+ltr:
+	movl $0x40, %eax
+	ltr %ax
+	ret
+
 #endif /* CORE_CPULOWLEVEL_S */
 

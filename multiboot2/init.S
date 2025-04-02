@@ -192,11 +192,11 @@ vga_offset:
 /* GDT */
 
 gdt_ptr:
-	.short 0x3F
+	.short 0x7F
 	.quad 0x7000
 
 gdt_ptr32:
-	.short 0x3F
+	.short 0x7F
 	.long 0x7000
 
 .align 0x1000

@@ -229,4 +229,10 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 	return printed;
 }
 
+uint64_t formatstr2(const char* str, char** dest, ...) {
+	va_list va;
+	va_start(va, dest);
+	return formatstr(str, dest, va);
+}
+
 #endif /* CORE_UTILS_C */

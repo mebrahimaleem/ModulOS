@@ -25,8 +25,8 @@ gdt:
 		.quad 0x00a09a000000ffff
 	gdt.dataseg:
 		.quad 0x00a092000000ffff
-	gdt.tssseg:
-		.quad 0 /* TODO */
+	gdt.nullseg2:
+		.quad 0
 	gdt.code32seg:
 		.quad 0xCF9A000000FFFF
 	gdt.data32seg:
@@ -35,6 +35,20 @@ gdt:
 		.quad 0x9A000000FFFF
 	gdt.data16seg:
 		.quad 0x92000000FFFF
+	.globl TSS_SEG
+TSS_SEG:
+	gdt.tssseg:
+		.quad 0
+		.quad 0
+	gdt.usercodeseg:
+		.quad 0 //TODO
+	gdt.userdataseg:
+		.quad 0 //TODO
+	gdt.nullseg3:
+		.quad 0
+		.quad 0
+		.quad 0
+		.quad 0
 	gdt.end:
 
 /* . = 0x7040 */
@@ -45,9 +59,10 @@ gdt:
 	mov %ax, %fs
 	mov %ax, %gs
 	mov %ax, %ss
-	
-	lidt idt_ptr
 
+	// set idt to bios ivt
+	lidt idt_ptr
+	
 	movl %cr0, %eax
 	xorb $1, %al /* toggle (clear) PE */
 	movl %eax, %cr0
@@ -95,6 +110,6 @@ enterpm:
 
 idt_ptr:
 	.short 0x2FF
-	.long 0x0
+	.long 0
 
 #endif /* MULTIBOOT_REALMODE_S */

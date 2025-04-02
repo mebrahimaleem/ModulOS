@@ -23,10 +23,10 @@
 #include <core/panic.h>
 
 static const char* panicmsgs[] = {
-	": UNKOWN\n",
-	": OUT OF MEMORY\n",
-	": ACPI ERROR\n",
-	": APIC ERROR\n"
+	"UNKOWN\n",
+	"OUT OF MEMORY\n",
+	"ACPI ERROR\n",
+	"APIC ERROR\n"
 };
 
 __attribute__((noreturn)) void panic(uint64_t err) {
@@ -37,6 +37,13 @@ __attribute__((noreturn)) void panic(uint64_t err) {
 	serialPrintf(SERIAL1, "PANIC: 0x%lX: %s\r\n", (uint64_t)err, panicmsgs[err]);
 	serialPrintf(SERIAL2, "PANIC: 0x%lX: %s\r\n", (uint64_t)err, panicmsgs[err]);
 	
+	panic_hlt();
+}
+
+__attribute__((noreturn)) void panicmsg(const char* msg) {
+	serialPrintf(SERIAL1, "PANIC: %s\r\n", msg);
+	serialPrintf(SERIAL2, "PANIC: %s\r\n", msg);
+
 	panic_hlt();
 }
 

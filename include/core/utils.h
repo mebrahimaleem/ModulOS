@@ -38,5 +38,7 @@ uint64_t intToString(int64_t num, uint8_t base, char* str, uint64_t strlen);
 
 uint64_t formatstr(const char* str, char** dest, va_list va);
 
+uint64_t formatstr2(const char* str, char** dest, ...);
+
 #endif /* CORE_UTILS_H */
 
