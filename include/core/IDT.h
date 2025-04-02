@@ -19,6 +19,15 @@
 #ifndef CORE_IDT_H
 #define CORE_IDT_H
 
+#define IDT_TYPE_INT		0xE
+#define IDT_TYPE_TRAP		0xF
+
+#define IDT_KCODESEG		0x8
+#define IDT_KDPL				0x0
+#define IDT_UDPL				0x3
+
+#define IDT_PRESENT			0x1
+
 extern uint64_t IDT_BASE;
 extern uint64_t TSS_SEG;
 
@@ -122,6 +131,8 @@ struct TSSD {
 void loadidt(void);
 
 void idt_installisrs(void);
+
+void idt_installisr(uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v);
 
 #endif /* CORE_IDT_H */
 

@@ -20,6 +20,8 @@
 
 #include <core/panic.h>
 #include <core/cpulowlevel.h>
+#include <core/IDT.h>
+#include <core/serial.h>
 
 #include <apic/lapic.h>
 #include <apic/pic8259.h>
@@ -31,7 +33,13 @@
 #define LAPIC_SPURIOUS_VECTOR	0xF0
 #define LAPIC_INT_ENABLE			0x100
 
+#define LAPIC_EOI							0x0
+
 #define LAPIC_SVR_OFF					0xF0
+#define LAPIC_EOI_OFF					0xB0
+
+#define LAPIC_ICR0_OFF				0x300
+#define LAPIC_ICR1_OFF				0x310
 
 #define LAPIC_LVT_CMCI_OFF		0x2F0
 #define LAPIC_LVT_TIMR_OFF		0x320
@@ -45,12 +53,10 @@
 #define MAXPA_LEAF						0x80000008
 #define CLOCK_LEAF						0x15
 
-#define DLVRY_FIXED						0x0
 #define NOMASK								0x0
 #define ONESHOT_TIMER					0x0
 #define IIPP_HIGH							0x0
-#define TRIGMODE_EDGE					0x0
-#define TRIGMODE_LVL					0x1
+
 
 uint64_t lapic_base;
 uint8_t lapic_spur_vector;
@@ -81,12 +87,13 @@ void apic_initlocal(void) {
 
 	/* disable while being set up */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR;
+	lapic_spur_vector = 0xFF & *(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF);
 
 	/* set LVTs */
 	union LAPIC_LVT lvt;	
 	lvt.zero = 0;
 	lvt.cmci.vector = LAPIC_CMCI_V;
-	lvt.cmci.dlvry_mode = DLVRY_FIXED;
+	lvt.cmci.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.cmci.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_CMCI_OFF) = lvt;
 
@@ -98,29 +105,29 @@ void apic_initlocal(void) {
 
 	lvt.zero = 0;
 	lvt.thrm.vector = LAPIC_THRM_V;
-	lvt.thrm.dlvry_mode = DLVRY_FIXED;
+	lvt.thrm.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.thrm.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_THRM_OFF) = lvt;
 
 	lvt.zero = 0;
 	lvt.perfcm.vector = LAPIC_PRCR_V;
-	lvt.perfcm.dlvry_mode = DLVRY_FIXED;
+	lvt.perfcm.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.perfcm.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF) = lvt;
 
 	lvt.zero = 0;
 	lvt.lint0.vector = LAPIC_LNT0_V;
-	lvt.lint0.dlvry_mode = DLVRY_FIXED;
+	lvt.lint0.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.lint0.iipp = IIPP_HIGH;
-	lvt.lint0.trig_mode = TRIGMODE_EDGE; // LINT0 for edge
+	lvt.lint0.trig_mode = LAPIC_TRIGMODE_EDGE; // LINT0 for edge
 	lvt.lint0.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF) = lvt;
 
 	lvt.zero = 0;
 	lvt.lint1.vector = LAPIC_LNT1_V;
-	lvt.lint1.dlvry_mode = DLVRY_FIXED;
+	lvt.lint1.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.lint1.iipp = IIPP_HIGH;
-	lvt.lint1.trig_mode = TRIGMODE_LVL; // LINT1 for level
+	lvt.lint1.trig_mode = LAPIC_TRIGMODE_LVL; // LINT1 for level
 	lvt.lint1.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF) = lvt;
 
@@ -130,11 +137,72 @@ void apic_initlocal(void) {
 
 	/* setup timer */
 	//TODO: callibrate clock
+
+	/* install ISRs */
+	idt_installisr((uint64_t)&ISR_CMCI, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_CMCI_V);
+	idt_installisr((uint64_t)&ISR_TIMR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_TIMR_V);
+	idt_installisr((uint64_t)&ISR_THRM, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_THRM_V);
+	idt_installisr((uint64_t)&ISR_PRCR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_PRCR_V);
+	idt_installisr((uint64_t)&ISR_LNT0, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT0_V);
+	idt_installisr((uint64_t)&ISR_LNT1, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT1_V);
+	idt_installisr((uint64_t)&ISR_EROR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_EROR_V);
+	idt_installisr((uint64_t)&ISR_SPUR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, lapic_spur_vector);
 	
 	/* enable */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
 
-	lapic_spur_vector = 0xFF & *(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF);
+}
+
+void apic_lapic_ISRHandler(uint64_t code) {
+	serialPrintf(SERIAL1, "GOT 0x%x\n", code);
+	
+	union LAPIC_LVT lvt;
+	switch (code) {
+		case LAPIC_CMCI_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_CMCI_OFF);
+			break;
+		case LAPIC_TIMR_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_TIMR_OFF);
+			break;
+		case LAPIC_THRM_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_THRM_OFF);
+			break;
+		case LAPIC_PRCR_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF);
+			break;
+		case LAPIC_LNT0_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF);
+			break;
+		case LAPIC_LNT1_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF);
+			break;
+		case LAPIC_EROR_V:
+			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_EROR_OFF);
+			break;
+		case LAPIC_SPUR_V:
+			return;
+		default:
+			panic(KPANIC_APIC);
+	}
+	
+	// check if no eoi
+	if (code != LAPIC_TIMR_V && (
+		lvt.cmci.dlvry_mode == LAPIC_DLVRY_NMI ||
+		lvt.cmci.dlvry_mode == LAPIC_DLVRY_SMI ||
+		lvt.cmci.dlvry_mode == LAPIC_DLVRY_INIT ||
+		lvt.cmci.dlvry_mode == LAPIC_DLVRY_EXTINIT ||
+		lvt.cmci.dlvry_mode == LAPIC_DLVRY_STARTUP
+	)) {
+		return;
+	}
+
+	/* send eoi */
+	*(uint32_t* volatile)(lapic_base + LAPIC_EOI_OFF) = LAPIC_EOI;
+}
+
+void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest) {
+	*(uint32_t* volatile)(lapic_base + LAPIC_ICR1_OFF) = dest << 24;
+	*(uint32_t* volatile)(lapic_base + LAPIC_ICR0_OFF) = v | flg;
 }
 
 #endif /* APIC_LAPIC_C */

@@ -43,6 +43,15 @@
 #define EX_DF		$0x08
 #define EX_MC		$0x12
 
+#define LAPIC_CMCI_V					$0x20
+#define LAPIC_TIMR_V					$0x21
+#define LAPIC_THRM_V					$0x22
+#define LAPIC_PRCR_V					$0x23
+#define LAPIC_LNT0_V					$0x24
+#define LAPIC_LNT1_V					$0x25
+#define LAPIC_EROR_V					$0x26
+#define LAPIC_SPUR_V					$0xF0
+
 	.code64
 	.text
 /* void loadidt(void); */
@@ -180,6 +189,112 @@ ISR_MC:
 	movq EX_MC, %rdi
 	movq %rsp, %rsi
 	jmp ISR_EX_G
+
+ISR_LAPIC_G:
+	// save registers
+	pushq %rsi
+	pushq %rax
+	pushq %rcx
+	pushq %rdx
+	pushq %r8
+	pushq %r9
+	pushq %r10
+	pushq %r11
+	// kernel does not use floating point, so no need to save them
+
+	// save cr3
+	movq %cr3, %rsi
+	pushq %rsi //cr3
+
+	// save data segment selectors
+	mov %ds, %ax
+	pushq %rax
+
+	// setup for kernel
+	mov $0x10, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	movq $k0PML4T, %rax
+	movq %rax, %cr3
+	
+	call apic_lapic_ISRHandler
+
+	// eoi sent by handler
+	// restore data segment selectors
+	popq %rax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	// restore paging
+	popq %rsi
+	movq %rsi, %cr3
+
+	// restore registers
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rdx
+	popq %rcx
+	popq %rax
+	popq %rsi
+	popq %rdi
+	iretq
+
+	.globl ISR_CMCI
+ISR_CMCI:
+	pushq %rdi
+	movq LAPIC_CMCI_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_TIMR
+ISR_TIMR:
+	pushq %rdi
+	movq LAPIC_TIMR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_THRM
+ISR_THRM:
+	pushq %rdi
+	movq LAPIC_THRM_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_PRCR
+ISR_PRCR:
+	pushq %rdi
+	movq LAPIC_PRCR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_LNT0
+ISR_LNT0:
+	pushq %rdi
+	movq LAPIC_LNT0_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_LNT1
+ISR_LNT1:
+	pushq %rdi
+	movq LAPIC_LNT1_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_EROR
+ISR_EROR:
+	pushq %rdi
+	movq LAPIC_EROR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_SPUR
+ISR_SPUR:
+	pushq %rdi
+	movq LAPIC_SPUR_V, %rdi
+	jmp ISR_LAPIC_G
 
 	.data
 

@@ -90,6 +90,19 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 #ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Initializing interrupts...\n");
+	serialWriteStr(SERIAL2, "STATUS: Initializing interrupts...\n");
+#endif /* DEBUG */
+
+	idt_installisrs();
+	loadidt();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Interrupts done\n");
+	serialWriteStr(SERIAL2, "STATUS: Interrupts done\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Starting ACPICA subsystem init...\n");
 	serialWriteStr(SERIAL2, "STATUS: Starting ACPICA subsystem init...\n");
 #endif /* DEBUG */
@@ -109,23 +122,13 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 	apic_initlocal();
+	// clear interrupt mask
+	setInterrupts(0);
+	ksti();
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
 	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
-#endif /* DEBUG */
-
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Initializing interrupts...\n");
-	serialWriteStr(SERIAL2, "STATUS: Initializing interrupts...\n");
-#endif /* DEBUG */
-
-	idt_installisrs();
-	loadidt();
-
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Interrupts done\n");
-	serialWriteStr(SERIAL2, "STATUS: Interrupts done\n");
 #endif /* DEBUG */
 
 #ifdef DEBUG

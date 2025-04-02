@@ -25,40 +25,29 @@
 #include <core/cpulowlevel.h>
 #include <core/IDT.h>
 
-#define KCODESEG		0x8
-#define KDPL				0x0
-#define UDPL				0x3
-
-#define PRESENT			0x1
-#define INVALID			0x0
-
-#define TYPE_INT		0xE
-#define TYPE_TRAP		0xF
 #define TYPE_TSS		0x9
 
 #define GRAN_BYTE		0x0
 
 #define IDTDE(base, i) \
-	off = (uint64_t)&base; \
-	idt[i].off0 = off & 0xFFFF; \
-	idt[i].segsel = KCODESEG; \
+	idt[i].off0 = ((uint64_t)&base) & 0xFFFF; \
+	idt[i].segsel = IDT_KCODESEG; \
 	idt[i].ist = 0; \
-	idt[i].type = TYPE_INT; \
-	idt[i].dpl = KDPL; \
-	idt[i].present = PRESENT; \
-	idt[i].off1 = (off >> 16) & 0xFFFF; \
-	idt[i].off2 = (uint32_t)(off >> 32);
+	idt[i].type = IDT_TYPE_INT; \
+	idt[i].dpl = IDT_KDPL; \
+	idt[i].present = IDT_PRESENT; \
+	idt[i].off1 = (((uint64_t)&base) >> 16) & 0xFFFF; \
+	idt[i].off2 = (uint32_t)(((uint64_t)&base) >> 32);
 
 #define IDTDE2(base, i, is) \
-	off = (uint64_t)&base; \
-	idt[i].off0 = off & 0xFFFF; \
-	idt[i].segsel = KCODESEG; \
+	idt[i].off0 = ((uint64_t)&base) & 0xFFFF; \
+	idt[i].segsel = IDT_KCODESEG; \
 	idt[i].ist = is; \
-	idt[i].type = TYPE_INT; \
-	idt[i].dpl = KDPL; \
-	idt[i].present = PRESENT; \
-	idt[i].off1 = (off >> 16) & 0xFFFF; \
-	idt[i].off2 = (uint32_t)(off >> 32);
+	idt[i].type = IDT_TYPE_INT; \
+	idt[i].dpl = IDT_KDPL; \
+	idt[i].present = IDT_PRESENT; \
+	idt[i].off1 = (((uint64_t)&base) >> 16) & 0xFFFF; \
+	idt[i].off2 = (uint32_t)(((uint64_t)&base) >> 32);
 
 void idt_installisrs() {
 	/* first create TSS so that ISTs work */
@@ -69,8 +58,8 @@ void idt_installisrs() {
 	tssd->base0 = (uint64_t)tss & 0xFFFF;
 	tssd->base1 = ((uint64_t)tss >> 16) & 0xFF;
 	tssd->type = TYPE_TSS;
-	tssd->dpl = UDPL;
-	tssd->present = PRESENT;
+	tssd->dpl = IDT_UDPL;
+	tssd->present = IDT_PRESENT;
 	tssd->lim1 = ((sizeof(struct TSS) - 1) >> 16) & 0xF;
 	tssd->gran = GRAN_BYTE;
 	tssd->base2 = ((uint64_t)tss >> 24) & 0xFF;
@@ -109,7 +98,6 @@ void idt_installisrs() {
 
 	struct IDTD* volatile idt = (struct IDTD* volatile)&IDT_BASE;
 
-	uint64_t off;
 	IDTDE(ISR_DE, 0x00);
 	IDTDE(ISR_DB, 0x01);	
 	IDTDE(ISR_BP, 0x03);	
@@ -131,6 +119,19 @@ void idt_installisrs() {
 	IDTDE2(ISR_NMI, 0x02, 1);	
 	IDTDE2(ISR_DF, 0x08, 2);	
 	IDTDE2(ISR_MC, 0x12, 3);	
+}
+
+void idt_installisr(uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
+	struct IDTD* volatile idt = (struct IDTD* volatile)&IDT_BASE;
+	
+	idt[v].off0 = offsymb & 0xFFFF;
+	idt[v].segsel = IDT_KCODESEG;
+	idt[v].ist = (uint8_t)(ist & 0x7);
+	idt[v].type = (uint8_t)(type & 0xF);
+	idt[v].dpl = (uint8_t)(dpl & 0x3);
+	idt[v].present = (uint8_t)(present & 0x1);
+	idt[v].off1 = (offsymb >> 16) & 0xFFFF;
+	idt[v].off2 = (uint32_t)(offsymb >> 32);
 }
 
 #endif /* CORE_IDT_C */
