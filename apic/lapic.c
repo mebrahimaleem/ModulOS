@@ -115,11 +115,12 @@ void apic_initlocal(void) {
 	lvt.perfcm.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF) = lvt;
 
+	//TODO: parse ACPI to determine whether should be LVL or EDGE triggered
 	lvt.zero = 0;
 	lvt.lint0.vector = LAPIC_LNT0_V;
 	lvt.lint0.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.lint0.iipp = IIPP_HIGH;
-	lvt.lint0.trig_mode = LAPIC_TRIGMODE_EDGE; // LINT0 for edge
+	lvt.lint0.trig_mode = LAPIC_TRIGMODE_LVL;
 	lvt.lint0.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF) = lvt;
 
@@ -127,7 +128,7 @@ void apic_initlocal(void) {
 	lvt.lint1.vector = LAPIC_LNT1_V;
 	lvt.lint1.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.lint1.iipp = IIPP_HIGH;
-	lvt.lint1.trig_mode = LAPIC_TRIGMODE_LVL; // LINT1 for level
+	lvt.lint1.trig_mode = LAPIC_TRIGMODE_LVL;
 	lvt.lint1.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF) = lvt;
 

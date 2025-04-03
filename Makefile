@@ -82,7 +82,7 @@ clean:
 
 .PHONY: simulateqemu
 simulateqemu: $(obj)/modulos.img | $(test)/
-	qemu-system-x86_64 -s -S -smp sockets=1,cores=2,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
+	qemu-system-x86_64 -s -S -smp sockets=1,cores=4,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
 
 .PHONY: debuggdb
 debuggdb: $(obj)/modulos-dbg

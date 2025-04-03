@@ -123,7 +123,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 
 	apic_initlocal();
 	// clear interrupt mask
-	setInterrupts(0);
+	//setInterrupts(0);
 	ksti();
 
 #ifdef DEBUG
