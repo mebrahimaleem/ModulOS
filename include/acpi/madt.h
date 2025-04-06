@@ -23,24 +23,35 @@
 struct acpi_madt_ic {
 	uint8_t type;
 	uint8_t len;
-	void* unspec[1];
+} __attribute__((packed));
+
+struct acpi_lapic {
+	uint8_t type;
+	uint8_t len;
+	uint8_t acpiId;
+	uint8_t apicId;
+	uint32_t enabled : 1;
+	uint32_t capable : 1;
+	uint32_t resv : 30;
 } __attribute__((packed));
 
 struct acpi_madt {
 	uint8_t sig[4];
-	uint64_t len;
+	uint32_t len;
 	uint8_t rev;
 	uint8_t sum;
 	uint8_t oemid[6];
 	uint8_t oemtblid[8];
-	uint64_t oemrev;
-	uint64_t creatorid;
-	uint64_t creatorrev;
-	uint64_t lapicaddr;
-	uint64_t flg;
+	uint32_t oemrev;
+	uint32_t creatorid;
+	uint32_t creatorrev;
+	uint32_t lapicaddr;
+	uint32_t flg;
 	struct acpi_madt_ic structs[1];
 } __attribute__((packed));
 
 uint8_t acpi_needDisable8259(void);
+
+uint64_t acpi_nextAPIC(uint64_t hint, struct acpi_lapic** apicIDPtr);
 
 #endif /* ACPI_MADT_H */

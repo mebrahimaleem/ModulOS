@@ -26,6 +26,11 @@ SECTIONS {
 		*(.text.real)
 	}
 
+	. = 0x1000;
+	.text.mpboot BLOCK(4K) : {
+		*(.text.mpboot)
+	}
+
 	ASSERT(. <= KERNEL_VMA + 0x80000, "Error: Core kernel has overlap with EBDA")
 
 	. = 1M;

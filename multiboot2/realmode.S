@@ -51,7 +51,8 @@ TSS_SEG:
 		.quad 0
 	gdt.end:
 
-/* . = 0x7040 */
+	.globl lowmementer
+lowmementer:
 	.code16
 	mov $0x38, %ax
 	mov %ax, %ds
@@ -111,5 +112,18 @@ enterpm:
 idt_ptr:
 	.short 0x2FF
 	.long 0
+
+	.code16
+.section .text.mpboot
+	.global mp_bootstrap
+mp_bootstrap:
+	jmp $0x0, $(bootstrap)
+
+//TODO: store bootstrap info here
+bootstrap:
+	mov $0, %ax
+	mov %ax, %ds
+bootstrap.hang:
+	jmp bootstrap.hang
 
 #endif /* MULTIBOOT_REALMODE_S */

@@ -27,6 +27,8 @@
 
 #define PCAT_COMPAT	1
 
+#define MADT_LAPIC_TYPE	0x0
+
 uint8_t acpi_needDisable8259() {
 	struct acpi_madt* madt = acpi_getMadt();
 	if (madt == 0) {
@@ -34,6 +36,24 @@ uint8_t acpi_needDisable8259() {
 	}
 
 	return (madt->flg & PCAT_COMPAT) == PCAT_COMPAT;
+}
+
+uint64_t acpi_nextAPIC(uint64_t hint, struct acpi_lapic** apicIDPtr) {
+	struct acpi_madt* madt = acpi_getMadt();
+
+	struct acpi_madt_ic* ics = (struct acpi_madt_ic*)((uint64_t)&madt->structs[0] + hint);
+
+	while ((uint64_t)ics < (uint64_t)madt + madt->len) {
+		if (ics->type == MADT_LAPIC_TYPE) {
+			*apicIDPtr = (struct acpi_lapic*)ics;
+
+			return (uint64_t)ics - (uint64_t)&madt->structs[0] + ics->len;
+		}
+		
+		ics = (struct acpi_madt_ic*)((uint64_t)ics + ics->len);
+	}
+
+	return 0;
 }
 
 #endif /* ACPI_MADT_C */

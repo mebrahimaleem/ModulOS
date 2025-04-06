@@ -19,6 +19,7 @@
 #define APIC_LAPIC_C
 
 #include <core/panic.h>
+#include <core/atomic.h>
 #include <core/cpulowlevel.h>
 #include <core/IDT.h>
 #include <core/serial.h>
@@ -35,6 +36,7 @@
 
 #define LAPIC_EOI							0x0
 
+#define LAPIC_IDR_OFF					0x20
 #define LAPIC_SVR_OFF					0xF0
 #define LAPIC_EOI_OFF					0xB0
 
@@ -57,11 +59,15 @@
 #define ONESHOT_TIMER					0x0
 #define IIPP_HIGH							0x0
 
+#define IPI_DLVRY_PENDING			0x1000
 
 uint64_t lapic_base;
 uint8_t lapic_spur_vector;
+mutex_t ipi_mutex;
 
 void apic_initlocal(void) {
+	ipi_mutex = kcreateMutex();
+
 	if(acpi_needDisable8259()) {
 		pic_mask8259();
 	}
@@ -202,8 +208,19 @@ void apic_lapic_ISRHandler(uint64_t code) {
 }
 
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest) {
+	kacquireMutex(ipi_mutex);
+	apic_lapic_waitForIpi();
 	*(uint32_t* volatile)(lapic_base + LAPIC_ICR1_OFF) = dest << 24;
 	*(uint32_t* volatile)(lapic_base + LAPIC_ICR0_OFF) = v | flg;
+	kreleaseMutex(ipi_mutex);
+}
+
+void apic_lapic_waitForIpi(void) {
+	while ((*(uint32_t* volatile)(lapic_base + LAPIC_ICR0_OFF) & IPI_DLVRY_PENDING) == IPI_DLVRY_PENDING);
+}
+
+uint8_t apic_getId() {
+	return (uint8_t)(*(uint32_t* volatile)(lapic_base + LAPIC_IDR_OFF) >> 24);
 }
 
 #endif /* APIC_LAPIC_C */

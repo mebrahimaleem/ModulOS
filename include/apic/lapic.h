@@ -150,6 +150,10 @@ void apic_initlocal(void);
 
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest);
 
+void apic_lapic_waitForIpi(void);
+
 void apic_lapic_ISRHandler(uint64_t code);
+
+uint8_t apic_getId(void);
 
 #endif /* APIC_LAPIC_H */

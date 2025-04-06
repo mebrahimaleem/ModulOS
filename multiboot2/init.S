@@ -18,6 +18,9 @@
 #ifndef MULTIBOOT2_INIT_S
 #define MULTIBOOT2_INIT_S
 
+#define CMOS_NMI		$0x70
+#define NMI_DISABLE	$0x80
+
 	.code32
 	.section .text.boot
 
@@ -30,6 +33,10 @@ pm2long:
 
 	movl $msg_loading, %esi
 	call pm_print
+
+	/* disable NMIs */
+	movb NMI_DISABLE, %al
+	outb %al, CMOS_NMI
 
 	/* Check if hardware is supported by OS */
 
@@ -71,7 +78,7 @@ pm2long:
 
 	/* setup stackframe for realmode */
 	push $0x30
-	push $0x7040
+	push $lowmementer
 	retfl
 
 	.code32

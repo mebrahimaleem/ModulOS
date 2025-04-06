@@ -82,7 +82,7 @@ clean:
 
 .PHONY: simulateqemu
 simulateqemu: $(obj)/modulos.img | $(test)/
-	qemu-system-x86_64 -s -S -smp sockets=1,cores=4,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
+	qemu-system-x86_64 -s -S -smp sockets=1,cores=4,threads=1 -serial vc -serial file:$(test)/serial -d cpu_reset,int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
 
 .PHONY: debuggdb
 debuggdb: $(obj)/modulos-dbg
@@ -123,6 +123,7 @@ $(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
 	cp cfg/grub.cfg $(obj)/iso/boot/grub/
 	cp COPYING COPYING.LESSER $(obj)/iso/usr/share/doc/ModulOS/
 
+# It is very important that grub-pc (and related) packages are installed on the build platform for this to work right
 	grub-mkrescue -o $@ $(obj)/iso/
 
 $(obj)/modulos: $(obj)/modulos-dbg | $(obj)/

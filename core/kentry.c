@@ -27,6 +27,7 @@
 #include <core/panic.h>
 #include <core/memory.h>
 #include <core/IDT.h>
+#include <core/mp.h>
 
 #include <acpi/acpica.h>
 
@@ -129,6 +130,18 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
 	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Starting MP init...\n");
+	serialWriteStr(SERIAL2, "STATUS: Starting MP init...\n");
+#endif /* DEBUG */
+
+	mp_initall();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: All processors initialized\n");
+	serialWriteStr(SERIAL2, "STATUS: All processors initialized\n");
 #endif /* DEBUG */
 
 #ifdef DEBUG
