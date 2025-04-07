@@ -21,11 +21,12 @@
 #include <stdint.h>
 
 #include <core/IDT.h>
-#include <core/serial.h>
+#include <core/panic.h>
 #include <core/memory.h>
 
 #include <acpi/madt.h>
 
+#include <apic/isr.h>
 #include <apic/lapic.h>
 #include <apic/ioapic.h>
 
@@ -46,15 +47,19 @@
 #define OVER_LOA			0x3
 #define OVER_TRL			0x3
 
-uint8_t irq_remaps[240];
+uint8_t irq_remaps[255];
 
 void apic_initio() {
 	uint64_t hint = 0;
 	uint8_t i;
 
 	/* first iterate through source overrides to find correct config */
-	uint32_t* flags = kcalloc(240, 4);
-	for (i = 16; i < 240; i++) {
+	uint32_t* flags = kmalloc(256 * 4);
+	for (i = 0; i < 16; i++) {
+		flags[i] = 0;
+		irq_remaps[i] = i; //default to identity
+	}
+	for (i = 16; i < 255; i++) {
 		flags[i] = INTOL_LOWA | TRIG_LEVEL;
 		irq_remaps[i] = i; //default to identity
 	}
@@ -85,9 +90,8 @@ void apic_initio() {
 
 	uint32_t lo;
 	uint32_t hi;
-	uint16_t isr;
+	uint8_t isr;
 
-	const uint64_t irq_size = (uint64_t)&irq_dummy_end - (uint64_t)&irq_dummy_end;
 	while (1) {
 		hint = acpi_nextMADT(MADT_IOAPIC_TYPE, hint, (struct acpi_madt_ic**)&ioapic);
 		
@@ -99,7 +103,12 @@ void apic_initio() {
 		const uint8_t maxreds = (uint8_t)(*(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) >> 16);
 		
 		for (i = 0; i <= maxreds; i++) {
-			isr = idt_getIsrVector();
+			isr = idt_claimIsrVector(irq_remaps[i + ioapic->intstart] + ISR_IOAPIC_START);
+
+			if (isr == 0) {
+				/* out of ISRs */
+				panic(KPANIC_APIC);
+			}
 
 			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i;
 			lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) & LO_MASK;
@@ -111,16 +120,10 @@ void apic_initio() {
 			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i + 1;
 			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apic_getId() << 24);
 
-			idt_installisr((struct IDTD* volatile)&IDT_BASE, (uint64_t)&irq_handlers + irq_size * (isr - 0x27), 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, (uint8_t)isr);
+			idt_installisr((struct IDTD* volatile)&IDT_BASE, isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 		}
 	}
 
 	kfree(flags);
-}
-
-void apic_ioapic_ISRHandler(uint64_t code) {
-	//TODO: implement	
-
-	apic_lapic_sendeoi();
 }
 #endif /* APIC_IOAPIC_C */

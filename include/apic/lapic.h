@@ -18,25 +18,17 @@
 #ifndef APIC_LAPIC_H
 #define APIC_LAPIC_H
 
-#define LAPIC_CMCI_V					0x20
-#define LAPIC_TIMR_V					0x21
-#define LAPIC_THRM_V					0x22
-#define LAPIC_PRCR_V					0x23
-#define LAPIC_LNT0_V					0x24
-#define LAPIC_LNT1_V					0x25
-#define LAPIC_EROR_V					0x26
-
 #define LAPIC_DLVRY_FIXED			0x0
 #define LAPIC_DLVRY_NMI				0x4
 #define LAPIC_DLVRY_SMI				0x2
 #define LAPIC_DLVRY_INIT			0x5
-#define LAPIC_DLVRY_EXTINIT		0x7
+#define LAPIC_DLVRY_EXTINT		0x7
 #define LAPIC_DLVRY_STARTUP		0x6
 
 #define LAPIC_TRIGMODE_EDGE		0x0
 #define LAPIC_TRIGMODE_LVL		0x1
 
-#define LAPIC_SPUR_V					0xF0
+#define LAPIC_SPUR_V					0xFF
 
 #define LAPIC_IPI_FIXED				0x000
 #define LAPIC_IPI_LP					0x100
@@ -58,6 +50,14 @@
 #define LAPIC_IPI_SELF				0x40000
 #define LAPIC_IPI_ALL					0x80000
 #define LAPIC_IPI_ALLEX				0xC0000
+
+#define LAPIC_CMCI_CODE		0x0
+#define LAPIC_TIMR_CODE		0x1
+#define LAPIC_THRM_CODE		0x2
+#define LAPIC_PRCR_CODE		0x3
+#define LAPIC_LNT0_CODE		0x4
+#define LAPIC_EROR_CODE		0x6
+#define LAPIC_SPURIOUS_VECTOR	0xFF
 
 extern uint64_t ISR_CMCI;
 extern uint64_t ISR_TIMR;
@@ -153,8 +153,6 @@ void apic_initlocalap(uint64_t* idt);
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest);
 
 void apic_lapic_waitForIpi(void);
-
-void apic_lapic_ISRHandler(uint64_t code);
 
 uint8_t apic_getId(void);
 

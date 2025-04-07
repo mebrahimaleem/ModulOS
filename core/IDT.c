@@ -49,15 +49,47 @@
 	idt[i].off1 = (((uint64_t)&base) >> 16) & 0xFFFF; \
 	idt[i].off2 = (uint32_t)(((uint64_t)&base) >> 32);
 
+#define FREE_ISRS_START 	0x20
+#define FREE_ISRS_COUNT		0xDF
 
-uint16_t nextIsr;
+struct ISR* idt_isrs;
+uint8_t next_isr_hint;
 
 void idt_init() {
-	nextIsr = 0x26;
+	idt_isrs = kcalloc(sizeof(struct ISR), FREE_ISRS_COUNT);
+	/* offset for easy indexing, code will never access invalid index */
+
+	/* mark 0x80 as used for syscalls*/
+	idt_isrs[0x80 - FREE_ISRS_START].used = 1;
+
+	next_isr_hint = 0;
 }
 
-uint16_t idt_getIsrVector() {
-	return ++nextIsr;
+uint8_t idt_claimIsrVector(uint64_t code) {
+	const uint8_t start = next_isr_hint;
+	do {
+		if (idt_isrs[next_isr_hint].used == 0) {
+			idt_isrs[next_isr_hint].used = 1;
+			idt_isrs[next_isr_hint].code = code;
+			return next_isr_hint + FREE_ISRS_START;
+		}
+
+		next_isr_hint++;
+		if (next_isr_hint > FREE_ISRS_COUNT) {
+			next_isr_hint = 0;
+		}
+	} while (start != next_isr_hint);
+
+	/* out of ISRs */
+	return 0;
+}
+
+void idt_freeIsrVector(uint8_t isr) {
+	idt_isrs[isr - FREE_ISRS_START].used = 0;
+}
+
+uint64_t idt_translateCode(uint64_t code) {
+	return idt_isrs[(uint8_t)code].code;
 }
 
 void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp) {
@@ -130,15 +162,17 @@ void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp) {
 	IDTDE2(ISR_MC, 0x12, 3);	
 }
 
-void idt_installisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
-	idt[v].off0 = offsymb & 0xFFFF;
-	idt[v].segsel = IDT_KCODESEG;
-	idt[v].ist = (uint8_t)(ist & 0x7);
-	idt[v].type = (uint8_t)(type & 0xF);
-	idt[v].dpl = (uint8_t)(dpl & 0x3);
-	idt[v].present = (uint8_t)(present & 0x1);
-	idt[v].off1 = (offsymb >> 16) & 0xFFFF;
-	idt[v].off2 = (uint32_t)(offsymb >> 32);
+void idt_installisr(struct IDTD* volatile idt, uint8_t index, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present) {
+	const uint64_t irq_size = (uint64_t)&irq_dummy_end - (uint64_t)&irq_dummy_start;
+	const uint64_t offsymb = (uint64_t)&irq_handlers + irq_size * ((uint64_t)index - FREE_ISRS_START);
+	idt[index].off0 = offsymb & 0xFFFF;
+	idt[index].segsel = IDT_KCODESEG;
+	idt[index].ist = (uint8_t)(ist & 0x7);
+	idt[index].type = (uint8_t)(type & 0xF);
+	idt[index].dpl = (uint8_t)(dpl & 0x3);
+	idt[index].present = (uint8_t)(present & 0x1);
+	idt[index].off1 = (offsymb >> 16) & 0xFFFF;
+	idt[index].off2 = (uint32_t)(offsymb >> 32);
 }
 
 #endif /* CORE_IDT_C */

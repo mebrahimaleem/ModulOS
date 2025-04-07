@@ -62,6 +62,10 @@ extern uint64_t rsp5;
 extern uint64_t rsp6;
 extern uint64_t rsp7;
 
+extern uint64_t irq_dummy_start;
+extern uint64_t irq_dummy_end;
+extern uint64_t irq_handlers;
+
 struct IDTD {
 	uint16_t off0;
 	uint16_t segsel;
@@ -128,15 +132,25 @@ struct TSSD {
 	uint32_t resv2;
 } __attribute__((packed));
 
+struct ISR {
+	uint8_t used : 1;
+	uint8_t resv : 7;
+	uint64_t code;
+};
+
 void idt_init(void);
 
-uint16_t idt_getIsrVector(void);
+uint8_t idt_claimIsrVector(uint64_t code);
+
+uint64_t idt_translateCode(uint64_t code);
+
+void idt_freeIsrVector(uint8_t isr);
 
 void loadidt(void);
 
 void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp);
 
-void idt_installisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v);
+void idt_installisr(struct IDTD* volatile idt, uint8_t index, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present);
 
 #endif /* CORE_IDT_H */
 

@@ -24,6 +24,7 @@
 #include <core/IDT.h>
 #include <core/serial.h>
 
+#include <apic/isr.h>
 #include <apic/lapic.h>
 #include <apic/pic8259.h>
 #include <acpi/madt.h>
@@ -31,7 +32,6 @@
 #define LAPIC_MSR_BASE				0x1B
 #define LAPIC_MSR_ENABLE			0x800
 
-#define LAPIC_SPURIOUS_VECTOR	0xF0
 #define LAPIC_INT_ENABLE			0x100
 
 #define LAPIC_EOI							0x0
@@ -62,7 +62,6 @@
 #define IPI_DLVRY_PENDING			0x1000
 
 uint64_t lapic_base;
-uint8_t lapic_spur_vector;
 mutex_t ipi_mutex;
 
 void apic_initlocal() {
@@ -96,117 +95,70 @@ void apic_initlocalap(uint64_t* idt) {
 
 	/* disable while being set up */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR;
-	lapic_spur_vector = 0xFF & *(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF);
+
+	struct IDTD* volatile idtd = (struct IDTD* volatile)idt;
 
 	/* set LVTs */
 	union LAPIC_LVT lvt;	
 	lvt.zero = 0;
-	lvt.cmci.vector = LAPIC_CMCI_V;
+	lvt.cmci.vector = idt_claimIsrVector(LAPIC_CMCI_CODE + ISR_LAPIC_START);
 	lvt.cmci.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.cmci.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_CMCI_OFF) = lvt;
+	idt_installisr(idtd, lvt.cmci.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
 	lvt.zero = 0;
-	lvt.timer.vector = LAPIC_TIMR_V;
+	lvt.timer.vector = idt_claimIsrVector(LAPIC_TIMR_CODE + ISR_LAPIC_START);
 	lvt.timer.mask = NOMASK;
 	lvt.timer.timr_mode = ONESHOT_TIMER;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_TIMR_OFF) = lvt;
+	idt_installisr(idtd, lvt.timer.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
 	lvt.zero = 0;
-	lvt.thrm.vector = LAPIC_THRM_V;
+	lvt.thrm.vector = idt_claimIsrVector(LAPIC_THRM_CODE + ISR_LAPIC_START);
 	lvt.thrm.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.thrm.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_THRM_OFF) = lvt;
+	idt_installisr(idtd, lvt.thrm.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
 	lvt.zero = 0;
-	lvt.perfcm.vector = LAPIC_PRCR_V;
+	lvt.perfcm.vector = idt_claimIsrVector(LAPIC_PRCR_CODE + ISR_LAPIC_START);
 	lvt.perfcm.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.perfcm.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF) = lvt;
+	idt_installisr(idtd, lvt.perfcm.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
-	//TODO: parse ACPI to determine whether should be LVL or EDGE triggered
+	/* ExtINT */
 	lvt.zero = 0;
-	lvt.lint0.vector = LAPIC_LNT0_V;
-	lvt.lint0.dlvry_mode = LAPIC_DLVRY_FIXED;
+	lvt.lint0.vector = idt_claimIsrVector(LAPIC_LNT0_CODE + ISR_LAPIC_START);
+	lvt.lint0.dlvry_mode = LAPIC_DLVRY_EXTINT;
 	lvt.lint0.iipp = IIPP_HIGH;
-	lvt.lint0.trig_mode = LAPIC_TRIGMODE_LVL;
+	lvt.lint0.trig_mode = LAPIC_TRIGMODE_EDGE;
 	lvt.lint0.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF) = lvt;
+	idt_installisr(idtd, lvt.lint0.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
+	/* NMI */
 	lvt.zero = 0;
-	lvt.lint1.vector = LAPIC_LNT1_V;
-	lvt.lint1.dlvry_mode = LAPIC_DLVRY_FIXED;
+	lvt.lint1.vector = 0x2; // vector 2 for NMIs
+	lvt.lint1.dlvry_mode = LAPIC_DLVRY_NMI;
 	lvt.lint1.iipp = IIPP_HIGH;
-	lvt.lint1.trig_mode = LAPIC_TRIGMODE_LVL;
+	lvt.lint1.trig_mode = LAPIC_TRIGMODE_EDGE;
 	lvt.lint1.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF) = lvt;
+	/* NMI handler already installed */
 
-	lvt.error.vector = LAPIC_EROR_V;
+	lvt.error.vector = idt_claimIsrVector(LAPIC_EROR_CODE + ISR_LAPIC_START);
 	lvt.error.mask = NOMASK;
 	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_EROR_OFF) = lvt;
+	idt_installisr(idtd, lvt.error.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
+	idt_installisr(idtd, LAPIC_SPURIOUS_VECTOR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 	/* setup timer */
 	//TODO: callibrate clock
-
-	struct IDTD* volatile idtd = (struct IDTD* volatile)idt;
-	/* install ISRs */
-	idt_installisr(idtd, (uint64_t)&ISR_CMCI, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_CMCI_V);
-	idt_installisr(idtd, (uint64_t)&ISR_TIMR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_TIMR_V);
-	idt_installisr(idtd, (uint64_t)&ISR_THRM, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_THRM_V);
-	idt_installisr(idtd, (uint64_t)&ISR_PRCR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_PRCR_V);
-	idt_installisr(idtd, (uint64_t)&ISR_LNT0, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT0_V);
-	idt_installisr(idtd, (uint64_t)&ISR_LNT1, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT1_V);
-	idt_installisr(idtd, (uint64_t)&ISR_EROR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_EROR_V);
-	idt_installisr(idtd, (uint64_t)&ISR_SPUR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, lapic_spur_vector);
 	
 	/* enable */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
-
-}
-
-void apic_lapic_ISRHandler(uint64_t code) {
-	union LAPIC_LVT lvt;
-	switch (code) {
-		case LAPIC_CMCI_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_CMCI_OFF);
-			break;
-		case LAPIC_TIMR_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_TIMR_OFF);
-			break;
-		case LAPIC_THRM_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_THRM_OFF);
-			break;
-		case LAPIC_PRCR_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF);
-			break;
-		case LAPIC_LNT0_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF);
-			break;
-		case LAPIC_LNT1_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF);
-			break;
-		case LAPIC_EROR_V:
-			lvt = *(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_EROR_OFF);
-			break;
-		case LAPIC_SPUR_V:
-			return;
-		default:
-			panic(KPANIC_APIC);
-	}
-	
-	// check if no eoi
-	if (code != LAPIC_TIMR_V && (
-		lvt.cmci.dlvry_mode == LAPIC_DLVRY_NMI ||
-		lvt.cmci.dlvry_mode == LAPIC_DLVRY_SMI ||
-		lvt.cmci.dlvry_mode == LAPIC_DLVRY_INIT ||
-		lvt.cmci.dlvry_mode == LAPIC_DLVRY_EXTINIT ||
-		lvt.cmci.dlvry_mode == LAPIC_DLVRY_STARTUP
-	)) {
-		return;
-	}
-
-	/* send eoi */
-	apic_lapic_sendeoi();
 }
 
 void apic_lapic_sendeoi() {

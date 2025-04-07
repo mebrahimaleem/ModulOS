@@ -1,4 +1,4 @@
-/* ioapic.h - IO APIC routines */
+/* isr.g - interrupt service routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,9 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef APIC_IOAPIC_H
-#define APIC_IOAPIC_H
+#ifndef APIC_ISR_H
+#define APIC_ISR_H
 
-void apic_initio(void);
+#define ISR_LAPIC_START		0x1000
+#define ISR_IOAPIC_START	0x2000
 
-#endif /* APIC_IOAPIC_H */
+void isr_handler(uint64_t code);
+
+#endif /* APIC_ISR_H */
