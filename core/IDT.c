@@ -51,7 +51,7 @@
 
 void idt_installisrs() {
 	/* first create TSS so that ISTs work */
-	struct TSS* volatile tss  = (struct TSS* volatile)kmalloc(kheap_shared, sizeof(struct TSS));
+	struct TSS* volatile tss  = (struct TSS* volatile)kmalloc(sizeof(struct TSS));
 	struct TSSD* volatile tssd = (struct TSSD* volatile)&TSS_SEG;
 
 	tssd->lim0 = (sizeof(struct TSS) - 1) & 0xFFFF;

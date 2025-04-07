@@ -76,7 +76,7 @@ void setInterrupts(uint8_t set) {
 }
 
 mutex_t kcreateMutex() {
-	mutex_t ret = kmalloc(kheap_shared, sizeof(_mutex_t));
+	mutex_t ret = kmalloc(sizeof(_mutex_t));
 	*ret = 0;
 	return ret;
 }
@@ -107,7 +107,7 @@ void kdeleteMutex(mutex_t handle) {
 }
 
 semaphore_t kcreateSemaphore(uint64_t initial, uint64_t max) {
-	semaphore_t ret = kmalloc(kheap_shared, sizeof(_semaphore_t));
+	semaphore_t ret = kmalloc(sizeof(_semaphore_t));
 	*ret = max - initial;
 	return ret;
 }
@@ -138,7 +138,7 @@ void kdeleteSemaphore(semaphore_t handle) {
 }
 
 spinlock_t kcreateSpinlock() {
-	spinlock_t ret = kmalloc(kheap_shared, sizeof(_spinlock_t));
+	spinlock_t ret = kmalloc(sizeof(_spinlock_t));
 	*ret = 0;
 	return ret;
 }

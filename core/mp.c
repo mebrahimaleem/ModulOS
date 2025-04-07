@@ -96,12 +96,12 @@ void mp_initall() {
 		}
 
 		/* setup trampoline */
-		uint64_t* gdt = kcalloc(kheap_shared, sizeof(uint64_t) * 16, 1);
+		uint64_t* gdt = kcalloc(sizeof(uint64_t) * 16, 1);
 		gdt[1] = 0x00a09a000000ffff;
 		gdt[2] = 0x00a092000000ffff;
 		
 		mp_loading = LOADING_WAITSIPI;
-		mp_rsp = (uint64_t)kmalloc(kheap_shared, 0x4000) + 0x4000;
+		mp_rsp = (uint64_t)kmalloc(0x4000) + 0x4000;
 		mp_gdtptr.off = calculatePaddr(kPML4T, (uint64_t)gdt);
 
 		/* send init sipi sipi */

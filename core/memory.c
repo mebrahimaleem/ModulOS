@@ -51,8 +51,7 @@ uint8_t* volatile pmembitmap;
 
 struct Blocks32M* kmemblocks32M;
 
-struct BlockDescriptor* volatile kheap_shared;
-struct BlockDescriptor* volatile kheap_private;
+struct BlockDescriptor* volatile heapbase;
 
 struct PagesFree* volatile kpagesfree;
 
@@ -113,49 +112,25 @@ void meminit(void) {
 	}
 
 	/* setup memory */
-	kheap_shared = (struct BlockDescriptor* volatile)&_kheap_shared;
-	kheap_private = (struct BlockDescriptor* volatile)&_kheap_private;
+	heapbase = (struct BlockDescriptor* volatile)&_kheap_shared;
 	
 	/* shared memory block descriptors */
 	/* first block descriptor is reserved and has the maximum size of the heap (half of remaining memory) */
-	kheap_shared[0].size = KMEM_BLOCK_SIZEMASK & ((uint64_t)kheap_private - (uint64_t)kheap_shared);
-	kheap_shared[0].flags = KMEM_BLOCK_RESV;
+	heapbase[0].size = KMEM_BLOCK_SIZEMASK & ((uint64_t)&_kheap_end - (uint64_t)heapbase);
+	heapbase[0].flags = KMEM_BLOCK_RESV;
 
 	/* second block descriptor has current size of the heap (starting at 2MiB) */
-	kheap_shared[1].size = P2MSIZE;
-	kheap_shared[1].flags = KMEM_BLOCK_RESV;
+	heapbase[1].size = P2MSIZE;
+	heapbase[1].flags = KMEM_BLOCK_RESV;
 	
 	/* third block descriptor is heap mutex handle*/
-	((uint64_t*)kheap_shared)[2] = kcreateStaticMutex();
+	((uint64_t*)heapbase)[2] = kcreateStaticMutex();
 
-	/* fourth is pointer to heap extension */
-	//TODO
+	/* fourth is reserved for future use */
 
 	/* fifth block descriptor is free (last) */
-	kheap_shared[4].size = 0;
-	kheap_shared[4].flags = KMEM_BLOCK_LAST;
-
-	/* now init the private heap */
-	if (kmmap(kPML4T, (uint8_t*)kheap_private, KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, P2MSIZE) == 1)
-		panic(KPANIC_NOMEM);
-
-	/* first is max size */
-	kheap_private[0].size = kheap_shared->size;
-	kheap_private[0].flags = KMEM_BLOCK_RESV;
-
-	/* second is current size */
-	kheap_private[1].size = P2MSIZE;
-	kheap_private[1].flags = KMEM_BLOCK_RESV;
-
-	/* third is mutex handle */
-	((uint64_t*)kheap_private)[2] = kcreateStaticMutex();
-
-	/* fourth is pointer to heap extension */
-	//TODO
-
-	/* fifth is last */
-	kheap_private[4].size = 0;
-	kheap_private[4].flags = KMEM_BLOCK_LAST;
+	heapbase[4].size = 0;
+	heapbase[4].flags = KMEM_BLOCK_LAST;
 }
 
 /*
@@ -217,7 +192,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 * all arguments in bytes and must be 4K page aligned
 * undefined behavior when overwriting previous entries with a different granularity
 */
-void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
+static void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
 	kacquireStaticMutex(pagingGlobalMutex);
 
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
@@ -284,7 +259,7 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 	return _kmmap(pml4t, addr, flags, length, 1);
 }
 
-uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
+static uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
 	kacquireStaticMutex(memoryGlobalLock);
 	uint64_t i = 0;
 	struct PagesFree* t0;
@@ -396,7 +371,7 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 	/* add leftover memory to kpagesfree */
 	const uint64_t rem = i % PMEMBITS_G;
 	if (rem != 0) {
-		t0 = (struct PagesFree*)_kmalloc(kheap_shared, sizeof(struct PagesFree), use_mut);
+		t0 = (struct PagesFree*)_kmalloc(sizeof(struct PagesFree), use_mut);
 		t0->length = PMEMBITS_G - rem;
 		t0->addr = t1;
 		t0->next = kpagesfree;
@@ -416,11 +391,11 @@ uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length) {
 	//TODO: implement
 }
 
-void* kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length) {
-	return _kmalloc(heapbase, length, 1);
+void* kmalloc(uint64_t length) {
+	return _kmalloc(length, 1);
 }
 
-void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8_t use_mut) {
+static void* _kmalloc(uint64_t length, uint8_t use_mut) {
 	if (use_mut)
 		kacquireStaticMutex(((uint64_t*)heapbase)[2]);
 	const uint64_t lim = heapbase[1].size - sizeof(struct BlockDescriptor);
@@ -492,8 +467,8 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 		}
 
 		//TODO: sync with other cores
-		_kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize, heapbase != kheap_shared);
-		ret = _kmalloc(heapbase, length, 0);
+		_kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize, 0);
+		ret = _kmalloc(length, 0);
 		if (use_mut)
 			kreleaseStaticMutex(((uint64_t*)heapbase)[2]);
 		return ret;
@@ -507,14 +482,14 @@ void* _kmalloc(struct BlockDescriptor* volatile heapbase, uint64_t length, uint8
 	return 0; /* out of virtual address space */
 }
 
-void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length) {
-	return _kcalloc(heapbase, count, length, 1);
+void* kcalloc(uint64_t count, uint64_t length) {
+	return _kcalloc(count, length, 1);
 }
 
-void* _kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length, uint8_t use_mut) {
+static void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut) {
 	const uint64_t alen = count * length;
 
-	void* ret = _kmalloc(heapbase, alen, use_mut);
+	void* ret = _kmalloc(alen, use_mut);
 	if (ret == 0) {
 		return 0;
 	}
@@ -526,16 +501,16 @@ void* allocpaging() {
 	return _allocpaging(1);	
 }
 
-void* _allocpaging(uint8_t use_mut) {
+static void* _allocpaging(uint8_t use_mut) {
 	//TODO: more memory efficient algorithm (maybe modify malloc)
-	uint64_t ret = (uint64_t)_kcalloc(kheap_shared, 0x2000, 1, use_mut);
+	uint64_t ret = (uint64_t)_kcalloc(0x2000, 1, use_mut);
 	if (ret == 0) {
 		return 0;
 	}
 	return (void*)(ret + 0x1000 - (ret % 0x1000));
 }
 
-void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length) {
+void* krealloc(void* ptr, uint64_t length) {
 	struct BlockDescriptor* volatile block = (struct BlockDescriptor* volatile)((uint64_t)ptr - sizeof(struct BlockDescriptor));
 	void* ret;
 
@@ -544,7 +519,7 @@ void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length) {
 		return ptr;
 	}
 	else {
-		ret = kmalloc(heapbase, length);
+		ret = kmalloc(length);
 		if (ret == 0) {
 			return 0;
 		}
