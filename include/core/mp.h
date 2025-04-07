@@ -18,6 +18,8 @@
 #ifndef CORE_MP_H
 #define CORE_MP_H
 
+#define MP_LOADING_IDLE	0x2
+
 extern uint64_t mp_bootstrap;
 extern uint64_t mp_pdpt0;
 

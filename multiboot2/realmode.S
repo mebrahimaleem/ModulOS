@@ -203,11 +203,6 @@ mp_enter64:
 	pushq $0
 	popfq
 
-	//TODO: jump to another bootstrap routine in high memory
-
-	movb LOADING_IDLE, %al
-	movb %al, mp_loading
-bootstrap.hang:
-	jmp bootstrap.hang
+	call kapentry;
 
 #endif /* MULTIBOOT_REALMODE_S */

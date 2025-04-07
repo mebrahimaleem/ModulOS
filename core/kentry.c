@@ -150,7 +150,13 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 	panic(KPANIC_UNK);
-	return;
+}
+
+void kapentry() {
+	
+	/* let bsp know that ap is done initializing and ready to receive tasks */
+	mp_loading = MP_LOADING_IDLE;
+	panic(KPANIC_UNK);
 }
 
 #endif /* CORE_KENTRY_C */

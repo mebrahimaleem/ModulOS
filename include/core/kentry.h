@@ -37,6 +37,7 @@ extern volatile uint64_t k0PML4T;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic);
 
+void kapentry(void);
 
 #endif /* CORE_KENTRY_H */
 

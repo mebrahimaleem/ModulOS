@@ -64,7 +64,7 @@ APIC_TARGETS := $(APIC_TARGETS_C)
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-#CDEBUG := -D DEBUG -O0
+CDEBUG := -D DEBUG -O0
 CFLAGS := $(CWARN) -O2 $(CDEBUG) -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
 	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g3 -F dwarf -I $(CURDIR)/include/
 

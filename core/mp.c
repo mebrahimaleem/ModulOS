@@ -35,7 +35,8 @@
 
 #define NMI_DISABLE					0x80
 
-#define WARM_RESET_VECTOR		0x467
+#define WARM_RESET_VOFF			0x467
+#define WARM_RESET_VSEG			0x469
 
 #define LOADING_WAITSIPI		0x0
 #define LOADING_BOOTSTRAP		0x1
@@ -59,8 +60,8 @@ void mp_initall() {
 	outb(CMOS_DATA, SHUTDOWN_AP_STARTUP);
 
 	/* set warm reset vector */
-	*(uint16_t* volatile)(WARM_RESET_VECTOR + 0) = (uint16_t)((uint64_t)&mp_bootstrap >> 4);
-	*(uint16_t* volatile)(WARM_RESET_VECTOR + 2) = (uint16_t)0; // since ap startup routine is 4K aligned
+	*(uint16_t* volatile)(WARM_RESET_VSEG) = (uint16_t)((uint64_t)&mp_bootstrap >> 4);
+	*(uint16_t* volatile)(WARM_RESET_VOFF) = (uint16_t)0; // since ap startup routine is 4K aligned
 
 	uint8_t reg;
 	/* temporarly program RTC timer for polling 1024Hz */
@@ -100,7 +101,7 @@ void mp_initall() {
 		gdt[2] = 0x00a092000000ffff;
 		
 		mp_loading = LOADING_WAITSIPI;
-		mp_rsp = (uint64_t)kmalloc(kheap_shared, 0x4000);
+		mp_rsp = (uint64_t)kmalloc(kheap_shared, 0x4000) + 0x4000;
 		mp_gdtptr.off = calculatePaddr(kPML4T, (uint64_t)gdt);
 
 		/* send init sipi sipi */
