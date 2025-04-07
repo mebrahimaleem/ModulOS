@@ -67,9 +67,7 @@ extern PML4T_t volatile kPML4T;
 
 extern uint8_t _pmembitmap;
 extern const void _kheap_shared;
-extern const void _kheap_private;
-extern struct BlockDescriptor* volatile kheap_shared;
-extern struct BlockDescriptor* volatile kheap_private;
+extern const void _kheap_end;
 
 void meminit(void);
 
@@ -103,13 +101,16 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 
 uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length);
 
-void* kmalloc(struct BlockDescriptor* heapbase, uint64_t length);
-void* _kmalloc(struct BlockDescriptor* heapbase, uint64_t length, uint8_t use_mut);
+void* kmalloc(uint64_t length);
+void* _kmalloc(uint64_t length, uint8_t use_mut);
 
-void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length);
-void* _kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length, uint8_t use_mut);
+void* kcalloc(uint64_t count, uint64_t length);
+void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut);
 
-void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length);
+void* allocpaging(void);
+void* _allocpaging(uint8_t use_mut);
+
+void* krealloc(void* ptr, uint64_t length);
 
 void kfree(void* ptr);
 

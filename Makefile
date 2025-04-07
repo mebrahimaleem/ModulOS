@@ -30,7 +30,8 @@ KERNEL_REQS_C := \
 									$(shell find multiboot2/ -type f -name "*.c") \
 									$(shell find core/ -type f -name "*.c") \
 									$(shell find acpica/ -type f -name "*.c") \
-									$(shell find acpi/ -type f -name "*.c")
+									$(shell find acpi/ -type f -name "*.c") \
+									$(shell find apic/ -type f -name "*.c")
 
 KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_REQS_S))
 KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_REQS_C))
@@ -58,11 +59,14 @@ ACPICA_TARGETS := $(ACPICA_TARGETS_C)
 ACPI_TARGETS_C := $(filter $(obj)/acpi/%,$(ALL_TARGETS_C))
 ACPI_TARGETS := $(ACPI_TARGETS_C)
 
+APIC_TARGETS_C := $(filter $(obj)/apic/%,$(ALL_TARGETS_C))
+APIC_TARGETS := $(APIC_TARGETS_C)
+
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-#CDEBUG := -D DEBUG -O0
+CDEBUG := -D DEBUG -O0
 CFLAGS := $(CWARN) -O2 $(CDEBUG) -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
-	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g -F dwarf -I $(CURDIR)/include/
+	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g3 -F dwarf -I $(CURDIR)/include/
 
 export
 
@@ -78,7 +82,7 @@ clean:
 
 .PHONY: simulateqemu
 simulateqemu: $(obj)/modulos.img | $(test)/
-	qemu-system-x86_64 -s -S -smp sockets=1,cores=2,threads=1 -serial vc -serial file:$(test)/serial -d int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
+	qemu-system-x86_64 -s -S -smp sockets=1,cores=4,threads=1 -serial vc -serial file:$(test)/serial -d cpu_reset,int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
 
 .PHONY: debuggdb
 debuggdb: $(obj)/modulos-dbg
@@ -119,6 +123,7 @@ $(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
 	cp cfg/grub.cfg $(obj)/iso/boot/grub/
 	cp COPYING COPYING.LESSER $(obj)/iso/usr/share/doc/ModulOS/
 
+# It is very important that grub-pc (and related) packages are installed on the build platform for this to work right
 	grub-mkrescue -o $@ $(obj)/iso/
 
 $(obj)/modulos: $(obj)/modulos-dbg | $(obj)/
@@ -148,3 +153,7 @@ $(ACPICA_TARGETS_C): $(obj)/acpica/%.o: acpica/%.c | $(obj)/acpica/
 # ACPI
 $(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c | $(obj)/acpi/
 	$(MAKE) -C acpi/ $@
+
+# APIC
+$(APIC_TARGETS_C): $(obj)/apic/%.o: apic/%.c | $(obj)/apic/
+	$(MAKE) -C apic/ $@

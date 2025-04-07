@@ -29,12 +29,15 @@ struct avail_memory_t {
 	uint32_t length;
 };
 
+extern uint64_t KERNEL_START;
+
 extern struct avail_memory_t kavail_memory;
 
 extern volatile uint64_t k0PML4T;
 
 void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic);
 
+void kapentry(void);
 
 #endif /* CORE_KENTRY_H */
 

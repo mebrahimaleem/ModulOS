@@ -1,4 +1,4 @@
-/* ktransfer.S - transfer from low memory to high kernel */
+/* exceptions.c - kernel exception handler */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,36 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_EXCEPTIONS_C
+#define CORE_EXCEPTIONS_C
 
-#ifndef CORE_KTRANSFER_S
-#define CORE_KTRANSFER_S
+#include <stdint.h>
 
-	.code64
-	.text
+#include <core/utils.h>
+#include <core/panic.h>
 
-	.globl ktransfer
-ktransfer:
-	/* prepare for changing stack */
-	popq %rsi
-	popq %rdi
+#include <core/exceptions.h>
 
-	/* set gdt to high memory */
-	lgdt gdt_ptr_high
+void exception_handler(uint64_t code, uint64_t frameptr, uint64_t cr3) {
+	//TODO: handle exception
+	char* msg;
+	formatstr2("Exception: 0x%X", &msg, code);
+	panicmsg(msg);
 
-	/* load new rsp */
-	movq $rsp0, %rsp
+}
 
-	call kentry
+#endif /* CORE_EXCEPTIONS_C */
 
-	/* fallback halt */
-fallback_loop:
-	hlt
-	jmp fallback_loop
-
-	.data
-
-gdt_ptr_high:
-	.short	0x7F
-	.quad		-0x80000000 + 0x7000
-
-#endif /* CORE_KTRANSFER_S */

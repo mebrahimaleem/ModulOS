@@ -1,4 +1,4 @@
-/* ktransfer.S - transfer from low memory to high kernel */
+/* pic8259.c - 8259 PIC routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,36 +15,22 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef APIC_PIC8259_C
+#define APIC_PIC8259_C
 
-#ifndef CORE_KTRANSFER_S
-#define CORE_KTRANSFER_S
+#include <apic/pic8259.h>
 
-	.code64
-	.text
+#include <core/portio.h>
 
-	.globl ktransfer
-ktransfer:
-	/* prepare for changing stack */
-	popq %rsi
-	popq %rdi
+#define PIC1_DATA	0x20 + 1
+#define PIC2_DATA	0xA0 + 1
 
-	/* set gdt to high memory */
-	lgdt gdt_ptr_high
+#define PIC_MASK	0xFF
 
-	/* load new rsp */
-	movq $rsp0, %rsp
+void pic_mask8259(void) {
+	outb(PIC1_DATA, PIC_MASK);
+	outb(PIC2_DATA, PIC_MASK);
+	iowait();
+}
 
-	call kentry
-
-	/* fallback halt */
-fallback_loop:
-	hlt
-	jmp fallback_loop
-
-	.data
-
-gdt_ptr_high:
-	.short	0x7F
-	.quad		-0x80000000 + 0x7000
-
-#endif /* CORE_KTRANSFER_S */
+#endif /* APIC_PIC8259_C */

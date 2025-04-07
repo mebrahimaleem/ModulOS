@@ -64,13 +64,12 @@ void AcpiOsUnmapMemory(void *LogicalAddress, ACPI_SIZE Length) {
 }
 
 ACPI_STATUS AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS *PhysicalAddress) {
-	uint64_t maskedaddr = (uint64_t)LogicalAddress & 0xFFFFFFFFFFFFF000;
-	*PhysicalAddress = calculatePaddr(kPML4T, maskedaddr) + (uint64_t)LogicalAddress - maskedaddr;
+	*PhysicalAddress = calculatePaddr(kPML4T, (uint64_t)LogicalAddress);
 	return AE_OK;
 }
 
 void* AcpiOsAllocate(ACPI_SIZE Size) {
-	return kmalloc(kheap_private, Size);
+	return kmalloc(Size);
 }
 
 void AcpiOsFree(void *Memory) {

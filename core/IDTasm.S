@@ -1,0 +1,363 @@
+/* IDTasm.S - IDT structure */
+/* Copyright (C) 2025  Ebrahim Aleem
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <https://www.gnu.org/licenses/>
+*/
+
+
+#ifndef CORE_IDTasm_S
+#define CORE_IDTasm_S
+
+#define ISR_MSR			$0x6A8
+
+#define EX_DE	$0x00
+#define EX_DB	$0x01
+#define EX_BP	$0x03
+#define EX_OF	$0x04
+#define EX_BR	$0x05
+#define EX_UD $0x06
+#define EX_NM $0x07
+#define EX_TS $0x0A
+#define EX_NP	$0x0B
+#define EX_SS	$0x0C
+#define EX_GP	$0x0D
+#define EX_PF	$0x0E
+#define EX_MF	$0x10
+#define EX_AC	$0x11
+#define EX_XM	$0x13
+#define EX_VE	$0x14
+#define EX_CP	$0x15
+
+#define EX_NMI	$0x02
+#define EX_DF		$0x08
+#define EX_MC		$0x12
+
+#define LAPIC_CMCI_V					$0x20
+#define LAPIC_TIMR_V					$0x21
+#define LAPIC_THRM_V					$0x22
+#define LAPIC_PRCR_V					$0x23
+#define LAPIC_LNT0_V					$0x24
+#define LAPIC_LNT1_V					$0x25
+#define LAPIC_EROR_V					$0x26
+#define LAPIC_SPUR_V					$0xF0
+
+	.code64
+	.text
+/* void loadidt(void); */
+	.globl loadidt
+loadidt:
+	lidt idt_ptr
+		
+	ret
+
+// ISRs
+
+ISR_EX_G:
+	// pass error code
+	movq %cr3, %rdx
+
+	// setup for kernel
+	mov $0x10, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	movq $k0PML4T, %rax
+	movq %rax, %cr3
+	
+	call exception_handler
+	// iret will occur elsewhere
+
+	.globl ISR_DE
+ISR_DE:
+	movq EX_DE, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_DB
+ISR_DB:
+	movq EX_DB, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_BP
+ISR_BP:
+	movq EX_BP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_OF
+ISR_OF:
+	movq EX_OF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_BR
+ISR_BR:
+	movq EX_BR, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_UD
+ISR_UD:
+	movq EX_UD, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_NM
+ISR_NM:
+	movq EX_NM, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_TS
+ISR_TS:
+	movq EX_TS, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_NP
+ISR_NP:
+	movq EX_NP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_SS
+ISR_SS:
+	movq EX_SS, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_GP
+ISR_GP:
+	movq EX_GP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_PF
+ISR_PF:
+	movq EX_PF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_MF
+ISR_MF:
+	movq EX_MF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_AC
+ISR_AC:
+	movq EX_AC, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_XM
+ISR_XM:
+	movq EX_XM, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_VE
+ISR_VE:
+	movq EX_VE, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_CP
+ISR_CP:
+	movq EX_CP, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+
+	.globl ISR_NMI
+ISR_NMI:
+	movq EX_NMI, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_DF
+ISR_DF:
+	movq EX_DF, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+	.globl ISR_MC
+ISR_MC:
+	movq EX_MC, %rdi
+	movq %rsp, %rsi
+	jmp ISR_EX_G
+
+ISR_LAPIC_G:
+	// save registers
+	pushq %rsi
+	pushq %rax
+	pushq %rcx
+	pushq %rdx
+	pushq %r8
+	pushq %r9
+	pushq %r10
+	pushq %r11
+	// kernel does not use floating point, so no need to save them
+
+	// save cr3
+	movq %cr3, %rsi
+	pushq %rsi //cr3
+
+	// save data segment selectors
+	mov %ds, %ax
+	pushq %rax
+
+	// setup for kernel
+	mov $0x10, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	movq $k0PML4T, %rax
+	movq %rax, %cr3
+	
+	call apic_lapic_ISRHandler
+
+	// eoi sent by handler
+	// restore data segment selectors
+	popq %rax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	// restore paging
+	popq %rsi
+	movq %rsi, %cr3
+
+	// restore registers
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rdx
+	popq %rcx
+	popq %rax
+	popq %rsi
+	popq %rdi
+	iretq
+
+	.globl ISR_CMCI
+ISR_CMCI:
+	pushq %rdi
+	movq LAPIC_CMCI_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_TIMR
+ISR_TIMR:
+	pushq %rdi
+	movq LAPIC_TIMR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_THRM
+ISR_THRM:
+	pushq %rdi
+	movq LAPIC_THRM_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_PRCR
+ISR_PRCR:
+	pushq %rdi
+	movq LAPIC_PRCR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_LNT0
+ISR_LNT0:
+	pushq %rdi
+	movq LAPIC_LNT0_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_LNT1
+ISR_LNT1:
+	pushq %rdi
+	movq LAPIC_LNT1_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_EROR
+ISR_EROR:
+	pushq %rdi
+	movq LAPIC_EROR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.globl ISR_SPUR
+ISR_SPUR:
+	pushq %rdi
+	movq LAPIC_SPUR_V, %rdi
+	jmp ISR_LAPIC_G
+
+	.data
+
+idt_ptr:
+	.short IDT_END - IDT_BASE - 1
+	.quad IDT_BASE
+
+	.bss
+	
+.align 8
+	.globl IDT_BASE
+IDT_BASE:
+.rept 0x1000 // wil be populated at runtime
+	.quad 0
+.endr
+IDT_END:
+
+// stacks
+
+// default kernel
+.align 0x1000
+	.globl rsp0
+.rept 0x800
+	.quad 0
+.endr
+rsp0:
+
+// smaller ones for NMI, MC, and DF
+	.globl rsp1
+.rept 0x200
+	.quad 0
+.endr
+rsp1:
+
+	.globl rsp2
+.rept 0x200
+	.quad 0
+.endr
+rsp2:
+
+	.globl rsp3
+.rept 0x200
+	.quad 0
+.endr
+rsp3:
+
+// really small ones, probably not every needed
+	.globl rsp4
+.rept 0x10
+	.quad 0
+.endr
+rsp4:
+
+	.globl rsp5
+.rept 0x10
+	.quad 0
+.endr
+rsp5:
+
+	.globl rsp6
+.rept 0x10
+	.quad 0
+.endr
+rsp6:
+
+	.globl rsp7
+.rept 0x10
+	.quad 0
+.endr
+rsp7:
+
+#endif /* CORE_IDTasm_S */
+

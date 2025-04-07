@@ -23,6 +23,8 @@
 
 uint8_t acpiinit(void);
 
+void* acpi_getMadt(void);
+
 #endif /* ACPICA_EXPOSE */
 
 #endif /* ACPI_ACPICA_H */

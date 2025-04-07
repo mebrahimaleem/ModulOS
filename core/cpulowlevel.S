@@ -28,5 +28,47 @@ wbinvd:
 	wbinvd
 	ret
 
+/* void cpuGetMSR(uint32_t msr, uint32_t* lo, uint32_t* hi); */
+	.globl cpuGetMSR
+cpuGetMSR:
+	movl %edi, %ecx
+	movq %rdx, %r10
+	rdmsr
+	movl %eax, (%rsi)
+	movl %edx, (%r10)
+	ret
+
+/* void cpuSetMSR(uint32_t msr, uint32_t lo, uint32_t hi); */
+	.globl cpuSetMSR
+cpuSetMSR:
+	movl %edi, %ecx
+	movl %esi, %eax
+	/* edx already set */
+	wrmsr
+	ret
+
+/* void cpuid(uint32_t ieax, uint32_t iecx, uint32_t* oeax, uint32_t* oebx, uint32_t* oecx, uint32_t* oedx); */
+	.globl cpuid
+cpuid:
+	pushq %rbx
+	movl %edi, %eax
+	movl %esi, %ecx
+	movq %rdx, %r10
+	movq %rcx, %r11
+	cpuid
+	movl %eax, (%r10)
+	movl %ebx, (%r11)
+	movl %ecx, (%r8)
+	movl %edx, (%r9)
+	popq %rbx
+	ret
+
+/* void ltr(void); */
+	.globl ltr
+ltr:
+	movl $0x40, %eax
+	ltr %ax
+	ret
+
 #endif /* CORE_CPULOWLEVEL_S */
 

@@ -44,4 +44,15 @@ uint8_t acpiinit() {
 	return 0;
 }
 
+void* acpi_getMadt() {
+	ACPI_TABLE_HEADER* Table;
+	ACPI_STATUS Status = AcpiGetTable(ACPI_SIG_MADT, 1, &Table);
+
+	if (ACPI_FAILURE(Status)) {
+		return (void*)0;
+	}
+
+	return (void*)Table;
+}
+
 #endif /* ACPICA_ACPICA_C */

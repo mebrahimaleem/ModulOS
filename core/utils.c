@@ -95,7 +95,7 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 	uint64_t printed = 0;
 	const char* format = str;
 	uint64_t maxlen = 64;
-	*dest = kmalloc(kheap_private, sizeof(char) * maxlen);
+	*dest = kmalloc(sizeof(char) * maxlen);
 
 	char buf[66];
 	buf[65] = 0;
@@ -197,7 +197,7 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 			for(t4 = 0; t4 < t2 && precision > 0; t4++) {
 				if (printed == maxlen) {
 					maxlen *= 2;
-					*dest = krealloc(kheap_private, *dest, sizeof(char) * maxlen);
+					*dest = krealloc(*dest, sizeof(char) * maxlen);
 				}
 				(*dest)[printed] = append[t4];
 				printed++;
@@ -211,7 +211,7 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 		else {
 			if (printed == maxlen) {
 				maxlen *= 2;
-				*dest = krealloc(kheap_private, *dest, sizeof(char) * maxlen);
+				*dest = krealloc(*dest, sizeof(char) * maxlen);
 			}
 			(*dest)[printed] = *format;
 			printed++;
@@ -221,12 +221,18 @@ uint64_t formatstr(const char* str, char** dest, va_list va) {
 	}
 
 	if (printed == maxlen) {
-		*dest = krealloc(kheap_private, *dest, sizeof(char) * maxlen + 1);
+		*dest = krealloc(*dest, sizeof(char) * maxlen + 1);
 	}
 
 	(*dest)[printed] = 0;
 
 	return printed;
+}
+
+uint64_t formatstr2(const char* str, char** dest, ...) {
+	va_list va;
+	va_start(va, dest);
+	return formatstr(str, dest, va);
 }
 
 #endif /* CORE_UTILS_C */

@@ -14,7 +14,7 @@ jobs:
       - name: Install apt packages
         run: |
           sudo apt update
-          sudo apt install build-essential bison flex texinfo xorriso mtools
+          sudo apt install build-essential bison flex texinfo xorriso mtools grub-pc grub-pc-bin grub-gfxpayload-lists
 
       - name: Export variables
         run: |

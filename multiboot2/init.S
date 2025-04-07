@@ -18,6 +18,9 @@
 #ifndef MULTIBOOT2_INIT_S
 #define MULTIBOOT2_INIT_S
 
+#define CMOS_NMI		$0x70
+#define NMI_DISABLE	$0x80
+
 	.code32
 	.section .text.boot
 
@@ -30,6 +33,10 @@ pm2long:
 
 	movl $msg_loading, %esi
 	call pm_print
+
+	/* disable NMIs */
+	movb NMI_DISABLE, %al
+	outb %al, CMOS_NMI
 
 	/* Check if hardware is supported by OS */
 
@@ -71,7 +78,7 @@ pm2long:
 
 	/* setup stackframe for realmode */
 	push $0x30
-	push $0x7040
+	push $lowmementer
 	retfl
 
 	.code32
@@ -86,7 +93,7 @@ enter32:
 	movl $(PML4T + 0x1000 - 8), %edi
 	movl $(PDPT1 + 3), (%edi)
 	
-	/* Map high memory 6MiB (last two for static shared kernel heap) */
+	/* Map high memory */
 
 	movl $(PDPT1 + 0x1000 - 16), %edi
 	movl $(PDT1 + 3), (%edi) /* First gibibytes */
@@ -192,17 +199,19 @@ vga_offset:
 /* GDT */
 
 gdt_ptr:
-	.short 0x3F
+	.short 0x7F
 	.quad 0x7000
 
 gdt_ptr32:
-	.short 0x3F
+	.short 0x7F
 	.long 0x7000
 
 .align 0x1000
 
  /* map first 512GiB */
 
+	.globl mp_pdpt0
+mp_pdpt0:
 PDPT0:
 .equ _i, 0
 .rept 0x200
@@ -218,6 +227,7 @@ PDPT0:
 
 	.globl k0PML4T
 k0PML4T:
+	.globl PML4T
 PML4T:
 .rept 0x200
 	.quad 0

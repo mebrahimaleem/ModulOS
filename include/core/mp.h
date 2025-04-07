@@ -1,4 +1,4 @@
-/* ktransfer.S - transfer from low memory to high kernel */
+/* mp.h - multiple processor management */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,36 +15,22 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_MP_H
+#define CORE_MP_H
 
-#ifndef CORE_KTRANSFER_S
-#define CORE_KTRANSFER_S
+#define MP_LOADING_IDLE	0x2
 
-	.code64
-	.text
+extern uint64_t mp_bootstrap;
+extern uint64_t mp_pdpt0;
 
-	.globl ktransfer
-ktransfer:
-	/* prepare for changing stack */
-	popq %rsi
-	popq %rdi
+extern uint8_t mp_loading;
+extern uint64_t mp_rsp;
+extern struct {
+	uint16_t len;
+	uint64_t off;
+} __attribute__((packed)) mp_gdtptr;
 
-	/* set gdt to high memory */
-	lgdt gdt_ptr_high
+void mp_initall(void);
 
-	/* load new rsp */
-	movq $rsp0, %rsp
+#endif /* CORE_MP_H */
 
-	call kentry
-
-	/* fallback halt */
-fallback_loop:
-	hlt
-	jmp fallback_loop
-
-	.data
-
-gdt_ptr_high:
-	.short	0x7F
-	.quad		-0x80000000 + 0x7000
-
-#endif /* CORE_KTRANSFER_S */
