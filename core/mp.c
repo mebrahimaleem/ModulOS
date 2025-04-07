@@ -81,11 +81,7 @@ void mp_initall() {
 	uint8_t i;
 	struct acpi_lapic* lapic;
 
-	uint64_t sharedstart;
-	const uint64_t sharedend = (uint64_t)&_kheap_shared + kheap_shared[1].size;
-
 	while (1) {
-		sharedstart = (uint64_t)&KERNEL_START;
 		hint = acpi_nextAPIC(hint, &lapic);
 
 		/* check if end of MADT */
@@ -103,18 +99,8 @@ void mp_initall() {
 		gdt[1] = 0x00a09a000000ffff;
 		gdt[2] = 0x00a092000000ffff;
 		
-		PML4T_t pml4t = allocpaging();
-		pml4t[0] = (PDPT_t)((uint64_t)&mp_pdpt0 | 3);
-
-		/* copy paging structures for everything from start of kernel to end of shared heap */
-		//TODO: use more optimized mapping (better granularity)
-		for (; sharedstart < sharedend; sharedstart++) {
-			mapv2p(pml4t, (void*)sharedstart, (void*)calculatePaddr(kPML4T, sharedstart), 3, PAGE_GRANULARITY_4K);
-		}
-
 		mp_loading = LOADING_WAITSIPI;
 		mp_rsp = (uint64_t)kmalloc(kheap_shared, 0x4000);
-		mp_cr3 = calculatePaddr(kPML4T, (uint64_t)pml4t);
 		mp_gdtptr.off = calculatePaddr(kPML4T, (uint64_t)gdt);
 
 		/* send init sipi sipi */

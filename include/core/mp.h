@@ -23,7 +23,6 @@ extern uint64_t mp_pdpt0;
 
 extern uint8_t mp_loading;
 extern uint64_t mp_rsp;
-extern uint64_t mp_cr3;
 extern struct {
 	uint8_t len;
 	uint64_t off;

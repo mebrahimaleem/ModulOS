@@ -134,10 +134,6 @@ mp_loading:
 mp_rsp:
 	.quad 0
 
-	.globl mp_cr3
-mp_cr3:
-	.quad 0
-
 mp_gdtptr0:
 	.short 0x7F
 	.long 0x7000
@@ -165,7 +161,7 @@ bootstrap:
 	orl $0x30, %eax
 	mov %eax, %cr4
 
-	/* First use old PML4T for bootstrapping */
+	/* Use preexisting paging structures */
 	movl $PML4T, %edi
 	movl %edi, %cr3
 
@@ -196,10 +192,6 @@ mp_enter64:
 	mov %ax, %fs
 	mov %ax, %gs
 	mov %ax, %ss
-
-	/* now switch to the correct pml4t */
-	movq mp_cr3, %rax
-	movq %rax, %cr3
 
 	/* now switch to correct gdt */
 	lgdt mp_gdtptr
