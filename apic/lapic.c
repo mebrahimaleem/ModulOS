@@ -65,14 +65,17 @@ uint64_t lapic_base;
 uint8_t lapic_spur_vector;
 mutex_t ipi_mutex;
 
-void apic_initlocal(void) {
+void apic_initlocal() {
 	ipi_mutex = kcreateMutex();
 
 	if(acpi_needDisable8259()) {
 		pic_mask8259();
 	}
 
+	apic_initlocalap(&IDT_BASE);
+}
 
+void apic_initlocalap(uint64_t* idt) {
 	uint32_t t0 = 0, t1 = 0;
 	uint64_t maxpab = 36;
 	/* check for max address bits */
@@ -145,15 +148,16 @@ void apic_initlocal(void) {
 	/* setup timer */
 	//TODO: callibrate clock
 
+	struct IDTD* volatile idtd = (struct IDTD* volatile)idt;
 	/* install ISRs */
-	idt_installisr((uint64_t)&ISR_CMCI, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_CMCI_V);
-	idt_installisr((uint64_t)&ISR_TIMR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_TIMR_V);
-	idt_installisr((uint64_t)&ISR_THRM, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_THRM_V);
-	idt_installisr((uint64_t)&ISR_PRCR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_PRCR_V);
-	idt_installisr((uint64_t)&ISR_LNT0, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT0_V);
-	idt_installisr((uint64_t)&ISR_LNT1, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT1_V);
-	idt_installisr((uint64_t)&ISR_EROR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_EROR_V);
-	idt_installisr((uint64_t)&ISR_SPUR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, lapic_spur_vector);
+	idt_installisr(idtd, (uint64_t)&ISR_CMCI, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_CMCI_V);
+	idt_installisr(idtd, (uint64_t)&ISR_TIMR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_TIMR_V);
+	idt_installisr(idtd, (uint64_t)&ISR_THRM, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_THRM_V);
+	idt_installisr(idtd, (uint64_t)&ISR_PRCR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_PRCR_V);
+	idt_installisr(idtd, (uint64_t)&ISR_LNT0, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT0_V);
+	idt_installisr(idtd, (uint64_t)&ISR_LNT1, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_LNT1_V);
+	idt_installisr(idtd, (uint64_t)&ISR_EROR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, LAPIC_EROR_V);
+	idt_installisr(idtd, (uint64_t)&ISR_SPUR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, lapic_spur_vector);
 	
 	/* enable */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;

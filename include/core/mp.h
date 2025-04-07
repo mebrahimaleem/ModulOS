@@ -26,7 +26,7 @@ extern uint64_t mp_pdpt0;
 extern uint8_t mp_loading;
 extern uint64_t mp_rsp;
 extern struct {
-	uint8_t len;
+	uint16_t len;
 	uint64_t off;
 } __attribute__((packed)) mp_gdtptr;
 

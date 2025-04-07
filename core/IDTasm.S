@@ -57,13 +57,6 @@
 /* void loadidt(void); */
 	.globl loadidt
 loadidt:
-	// set ist msr
-	movq $SSP_table, %rdx
-	movl %edx, %eax
-	shrq $32, %rdx
-	movl ISR_MSR, %ecx
-	wrmsr
-
 	lidt idt_ptr
 		
 	ret
@@ -298,17 +291,6 @@ ISR_SPUR:
 
 	.data
 
-.align 8
-SSP_table:
-	.quad 0 // 0
-	.quad rsp1 // IST1
-	.quad rsp2
-	.quad rsp3
-	.quad rsp4
-	.quad rsp5
-	.quad rsp6
-	.quad rsp7 // IST7
-
 idt_ptr:
 	.short IDT_END - IDT_BASE - 1
 	.quad IDT_BASE
@@ -347,7 +329,7 @@ rsp1:
 rsp2:
 
 	.globl rsp3
-.rept 0x10
+.rept 0x200
 	.quad 0
 .endr
 rsp3:

@@ -130,9 +130,9 @@ struct TSSD {
 
 void loadidt(void);
 
-void idt_installisrs(void);
+void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp);
 
-void idt_installisr(uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v);
+void idt_installisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v);
 
 #endif /* CORE_IDT_H */
 

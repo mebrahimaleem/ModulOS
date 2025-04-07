@@ -203,6 +203,8 @@ mp_enter64:
 	pushq $0
 	popfq
 
-	call kapentry;
+	pushq $0x8
+	pushq $kapentry;
+	retfq
 
 #endif /* MULTIBOOT_REALMODE_S */

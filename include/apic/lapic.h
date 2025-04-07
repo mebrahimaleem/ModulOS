@@ -148,6 +148,8 @@ union LAPIC_LVT {
 
 void apic_initlocal(void);
 
+void apic_initlocalap(uint64_t* idt);
+
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest);
 
 void apic_lapic_waitForIpi(void);

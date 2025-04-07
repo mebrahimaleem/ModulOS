@@ -192,7 +192,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 * all arguments in bytes and must be 4K page aligned
 * undefined behavior when overwriting previous entries with a different granularity
 */
-static void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
+void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
 	kacquireStaticMutex(pagingGlobalMutex);
 
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
@@ -259,7 +259,7 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 	return _kmmap(pml4t, addr, flags, length, 1);
 }
 
-static uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
+uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
 	kacquireStaticMutex(memoryGlobalLock);
 	uint64_t i = 0;
 	struct PagesFree* t0;
@@ -395,7 +395,7 @@ void* kmalloc(uint64_t length) {
 	return _kmalloc(length, 1);
 }
 
-static void* _kmalloc(uint64_t length, uint8_t use_mut) {
+void* _kmalloc(uint64_t length, uint8_t use_mut) {
 	if (use_mut)
 		kacquireStaticMutex(((uint64_t*)heapbase)[2]);
 	const uint64_t lim = heapbase[1].size - sizeof(struct BlockDescriptor);
@@ -486,7 +486,7 @@ void* kcalloc(uint64_t count, uint64_t length) {
 	return _kcalloc(count, length, 1);
 }
 
-static void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut) {
+void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut) {
 	const uint64_t alen = count * length;
 
 	void* ret = _kmalloc(alen, use_mut);
@@ -501,7 +501,7 @@ void* allocpaging() {
 	return _allocpaging(1);	
 }
 
-static void* _allocpaging(uint8_t use_mut) {
+void* _allocpaging(uint8_t use_mut) {
 	//TODO: more memory efficient algorithm (maybe modify malloc)
 	uint64_t ret = (uint64_t)_kcalloc(0x2000, 1, use_mut);
 	if (ret == 0) {

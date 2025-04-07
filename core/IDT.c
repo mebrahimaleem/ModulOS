@@ -49,10 +49,10 @@
 	idt[i].off1 = (((uint64_t)&base) >> 16) & 0xFFFF; \
 	idt[i].off2 = (uint32_t)(((uint64_t)&base) >> 32);
 
-void idt_installisrs() {
+void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp) {
 	/* first create TSS so that ISTs work */
 	struct TSS* volatile tss  = (struct TSS* volatile)kmalloc(sizeof(struct TSS));
-	struct TSSD* volatile tssd = (struct TSSD* volatile)&TSS_SEG;
+	struct TSSD* volatile tssd = (struct TSSD* volatile)&gdt[8];
 
 	tssd->lim0 = (sizeof(struct TSS) - 1) & 0xFFFF;
 	tssd->base0 = (uint64_t)tss & 0xFFFF;
@@ -65,38 +65,36 @@ void idt_installisrs() {
 	tssd->base2 = ((uint64_t)tss >> 24) & 0xFF;
 	tssd->base3 = (uint32_t)((uint64_t)tss >> 32);
 
-	tss->rsp00 = (uint32_t)((uint64_t)&rsp0) & 0xFFFFFFFF;
-	tss->rsp01 = (uint32_t)((uint64_t)&rsp0 >> 32) & 0xFFFFFFFF;
+	tss->rsp00 = (uint32_t)(rsp[0]) & 0xFFFFFFFF;
+	tss->rsp01 = (uint32_t)(rsp[0] >> 32) & 0xFFFFFFFF;
 
 	// TODO: add rings 1 and 2
 
-	tss->ist10 = (uint32_t)((uint64_t)&rsp1) & 0xFFFFFFFF;
-	tss->ist11 = (uint32_t)((uint64_t)&rsp1 >> 32) & 0xFFFFFFFF;
+	tss->ist10 = (uint32_t)(rsp[1]) & 0xFFFFFFFF;
+	tss->ist11 = (uint32_t)(rsp[1] >> 32) & 0xFFFFFFFF;
 
-	tss->ist20 = (uint32_t)((uint64_t)&rsp2) & 0xFFFFFFFF;
-	tss->ist21 = (uint32_t)((uint64_t)&rsp2 >> 32) & 0xFFFFFFFF;
+	tss->ist20 = (uint32_t)(rsp[2]) & 0xFFFFFFFF;
+	tss->ist21 = (uint32_t)(rsp[2]> 32) & 0xFFFFFFFF;
 
-	tss->ist30 = (uint32_t)((uint64_t)&rsp3) & 0xFFFFFFFF;
-	tss->ist31 = (uint32_t)((uint64_t)&rsp3 >> 32) & 0xFFFFFFFF;
+	tss->ist30 = (uint32_t)(rsp[3]) & 0xFFFFFFFF;
+	tss->ist31 = (uint32_t)(rsp[3]> 32) & 0xFFFFFFFF;
 
-	tss->ist40 = (uint32_t)((uint64_t)&rsp4) & 0xFFFFFFFF;
-	tss->ist41 = (uint32_t)((uint64_t)&rsp4 >> 32) & 0xFFFFFFFF;
+	tss->ist40 = (uint32_t)(rsp[4]) & 0xFFFFFFFF;
+	tss->ist41 = (uint32_t)(rsp[4]> 32) & 0xFFFFFFFF;
 
-	tss->ist50 = (uint32_t)((uint64_t)&rsp5) & 0xFFFFFFFF;
-	tss->ist51 = (uint32_t)((uint64_t)&rsp5 >> 32) & 0xFFFFFFFF;
+	tss->ist50 = (uint32_t)(rsp[5]) & 0xFFFFFFFF;
+	tss->ist51 = (uint32_t)(rsp[5]> 32) & 0xFFFFFFFF;
 
-	tss->ist60 = (uint32_t)((uint64_t)&rsp6) & 0xFFFFFFFF;
-	tss->ist61 = (uint32_t)((uint64_t)&rsp6 >> 32) & 0xFFFFFFFF;
+	tss->ist60 = (uint32_t)(rsp[6]) & 0xFFFFFFFF;
+	tss->ist61 = (uint32_t)(rsp[6]> 32) & 0xFFFFFFFF;
 
-	tss->ist70 = (uint32_t)((uint64_t)&rsp7) & 0xFFFFFFFF;
-	tss->ist71 = (uint32_t)((uint64_t)&rsp7 >> 32) & 0xFFFFFFFF;
+	tss->ist70 = (uint32_t)(rsp[7]) & 0xFFFFFFFF;
+	tss->ist71 = (uint32_t)(rsp[7]> 32) & 0xFFFFFFFF;
 
 	// don't use iomap
 	tss->iomap_addr = sizeof(struct TSS);
 
 	ltr();
-
-	struct IDTD* volatile idt = (struct IDTD* volatile)&IDT_BASE;
 
 	IDTDE(ISR_DE, 0x00);
 	IDTDE(ISR_DB, 0x01);	
@@ -121,9 +119,7 @@ void idt_installisrs() {
 	IDTDE2(ISR_MC, 0x12, 3);	
 }
 
-void idt_installisr(uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
-	struct IDTD* volatile idt = (struct IDTD* volatile)&IDT_BASE;
-	
+void idt_installisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
 	idt[v].off0 = offsymb & 0xFFFF;
 	idt[v].segsel = IDT_KCODESEG;
 	idt[v].ist = (uint8_t)(ist & 0x7);

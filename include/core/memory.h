@@ -92,23 +92,23 @@ void tlbflush(void);
 * all arguments in bytes and must be 4K page aligned
 */
 void mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity);
-static void _mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut);
+void _mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut);
 
 void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity);
 
 uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length);
-static uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut);
+uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut);
 
 uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length);
 
 void* kmalloc(uint64_t length);
-static void* _kmalloc(uint64_t length, uint8_t use_mut);
+void* _kmalloc(uint64_t length, uint8_t use_mut);
 
 void* kcalloc(uint64_t count, uint64_t length);
-static void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut);
+void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut);
 
 void* allocpaging(void);
-static void* _allocpaging(uint8_t use_mut);
+void* _allocpaging(uint8_t use_mut);
 
 void* krealloc(void* ptr, uint64_t length);
 
