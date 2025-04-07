@@ -109,6 +109,9 @@ void* _kmalloc(struct BlockDescriptor* heapbase, uint64_t length, uint8_t use_mu
 void* kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length);
 void* _kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length, uint8_t use_mut);
 
+void* allocpaging(void);
+void* _allocpaging(uint8_t use_mut);
+
 void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length);
 
 void kfree(void* ptr);

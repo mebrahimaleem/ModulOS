@@ -37,10 +37,15 @@
 
 #define WARM_RESET_VECTOR		0x467
 
-#include <core/serial.h>
+#define LOADING_WAITSIPI		0x0
+#define LOADING_BOOTSTRAP		0x1
+#define LOADING_IDLE				0x2
+
 #include <core/atomic.h>
 #include <core/portio.h>
+#include <core/memory.h>
 #include <core/mp.h>
+#include <core/kentry.h>
 
 #include <acpi/madt.h>
 
@@ -76,7 +81,11 @@ void mp_initall() {
 	uint8_t i;
 	struct acpi_lapic* lapic;
 
+	uint64_t sharedstart;
+	const uint64_t sharedend = (uint64_t)&_kheap_shared + kheap_shared[1].size;
+
 	while (1) {
+		sharedstart = (uint64_t)&KERNEL_START;
 		hint = acpi_nextAPIC(hint, &lapic);
 
 		/* check if end of MADT */
@@ -89,10 +98,27 @@ void mp_initall() {
 			continue;
 		}
 
-		serialPrintf(SERIAL1, "FOUND CPU. Local APIC ID: %u\n", lapic->apicId);
+		/* setup trampoline */
+		uint64_t* gdt = kcalloc(kheap_shared, sizeof(uint64_t) * 16, 1);
+		gdt[1] = 0x00a09a000000ffff;
+		gdt[2] = 0x00a092000000ffff;
+		
+		PML4T_t pml4t = allocpaging();
+		pml4t[0] = (PDPT_t)((uint64_t)&mp_pdpt0 | 3);
+
+		/* copy paging structures for everything from start of kernel to end of shared heap */
+		//TODO: use more optimized mapping (better granularity)
+		for (; sharedstart < sharedend; sharedstart++) {
+			mapv2p(pml4t, (void*)sharedstart, (void*)calculatePaddr(kPML4T, sharedstart), 3, PAGE_GRANULARITY_4K);
+		}
+
+		mp_loading = LOADING_WAITSIPI;
+		mp_rsp = (uint64_t)kmalloc(kheap_shared, 0x4000);
+		mp_cr3 = calculatePaddr(kPML4T, (uint64_t)pml4t);
+		mp_gdtptr.off = calculatePaddr(kPML4T, (uint64_t)gdt);
 
 		/* send init sipi sipi */
-		for (i = 0; i < 100; ) {
+		for (i = 0; i < 20; ) {
 			/* poll until PF is set */
 			outb(CMOS_ADDR, REG_STS_C | NMI_DISABLE);
 			reg = inb(CMOS_DATA);
@@ -116,16 +142,24 @@ void mp_initall() {
 					break;
 				case 12:
 					/* wait ~2ms, then send another sipi */
-					apic_lapic_sendipi((uint8_t)((uint64_t)&mp_bootstrap >> 12), LAPIC_IPI_STARTUP | LAPIC_IPI_PHYSC | LAPIC_IPI_ASSERT | LAPIC_IPI_EDGE | LAPIC_IPI_NOSHORT, lapic->apicId);
-					apic_lapic_waitForIpi();
+					if (mp_loading == LOADING_WAITSIPI) {
+						apic_lapic_sendipi((uint8_t)((uint64_t)&mp_bootstrap >> 12), LAPIC_IPI_STARTUP | LAPIC_IPI_PHYSC | LAPIC_IPI_ASSERT | LAPIC_IPI_EDGE | LAPIC_IPI_NOSHORT, lapic->apicId);
+						apic_lapic_waitForIpi();
+					}
 					break;
 				default:
 					break;
 			}
 			i++;
 		}
+		/* check for failure */
+		if (mp_loading == LOADING_WAITSIPI) {
+			//TODO: handle error, maybe retry
+			continue;
+		}
 
-		//TODO: sync before continuing
+		/* wait for AP to finish bootstrapping */
+		while (mp_loading == LOADING_BOOTSTRAP);
 	}
 
 	ksti();

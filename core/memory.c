@@ -228,11 +228,11 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 	uint64_t t0;
 
 	if (((uint64_t)pml4t[l4] & 1) == 0) { // page not present
-		t0 = (uint64_t)_kcalloc(kheap_shared, 0x1000, 1, use_mut);
+		t0 = (uint64_t)_allocpaging(use_mut);
 		if (t0 == 0) {
 			panic(KPANIC_NOMEM);
 		}
-		pml4t[l4] = (PDPT_t)(calculatePaddr(pml4t, t0) | flags);
+		pml4t[l4] = (PDPT_t)(calculatePaddr(kPML4T, t0) | flags);
 	}
 
 	const PDPT_t volatile p4 = (PDPT_t volatile)(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
@@ -245,11 +245,11 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 	}
 
 	if (((uint64_t)p4[l3] & 1) == 0) { // page not present
-		t0 = (uint64_t)_kcalloc(kheap_shared, 0x1000, 1, use_mut);
+		t0 = (uint64_t)_allocpaging(use_mut);
 		if (t0 == 0) {
 			panic(KPANIC_NOMEM);
 		}
-		p4[l3] = (PDT_t)(calculatePaddr(pml4t, t0) | flags);
+		p4[l3] = (PDT_t)(calculatePaddr(kPML4T, t0) | flags);
 	}
 
 	const PDT_t p3 = (PDT_t volatile)(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
@@ -262,11 +262,11 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 	}
 	
 	if (((uint64_t)p3[l2] & 1) == 0) { // page not present
-		t0 = (uint64_t)_kcalloc(kheap_shared, 0x1000, 1, use_mut);
+		t0 = (uint64_t)_allocpaging(use_mut);
 		if (t0 == 0) {
 			panic(KPANIC_NOMEM);
 		}
-		p3[l2] = (PT_t)(calculatePaddr(pml4t, t0) | flags);
+		p3[l2] = (PT_t)(calculatePaddr(kPML4T, t0) | flags);
 	}
 
 	const PT_t volatile p2 = (PT_t volatile)(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
@@ -522,6 +522,19 @@ void* _kcalloc(struct BlockDescriptor* heapbase, uint64_t count, uint64_t length
 	return ret;
 }
 
+void* allocpaging() {
+	return _allocpaging(1);	
+}
+
+void* _allocpaging(uint8_t use_mut) {
+	//TODO: more memory efficient algorithm (maybe modify malloc)
+	uint64_t ret = (uint64_t)_kcalloc(kheap_shared, 0x2000, 1, use_mut);
+	if (ret == 0) {
+		return 0;
+	}
+	return (void*)(ret + 0x1000 - (ret % 0x1000));
+}
+
 void* krealloc(struct BlockDescriptor* heapbase, void* ptr, uint64_t length) {
 	struct BlockDescriptor* volatile block = (struct BlockDescriptor* volatile)((uint64_t)ptr - sizeof(struct BlockDescriptor));
 	void* ret;
@@ -573,17 +586,17 @@ uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr) {
 	const PDPT_t volatile p4 = (PDPT_t volatile)(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) {
-		return (uint64_t)p4[l3] & PS_ADDR_MASK;
+		return ((uint64_t)p4[l3] & PS_ADDR_MASK) | (vaddr & 0xFFFFFFF);
 	}
 
 	const PDT_t p3 = (PDT_t volatile)(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (((uint64_t)p3[l2] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) {
-		return (uint64_t)p3[l2] & PS_ADDR_MASK;
+		return ((uint64_t)p3[l2] & PS_ADDR_MASK) | (vaddr & 0xFFFFF);
 	}
 
 	const PT_t volatile p2 = (PT_t volatile)(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
-	return p2[l1] & PS_ADDR_MASK;
+	return (p2[l1] & PS_ADDR_MASK) | (vaddr & 0xFFF);
 }
 #endif /* CORE_MEMORY_C */

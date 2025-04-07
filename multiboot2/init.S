@@ -93,7 +93,7 @@ enter32:
 	movl $(PML4T + 0x1000 - 8), %edi
 	movl $(PDPT1 + 3), (%edi)
 	
-	/* Map high memory 6MiB (last two for static shared kernel heap) */
+	/* Map high memory */
 
 	movl $(PDPT1 + 0x1000 - 16), %edi
 	movl $(PDT1 + 3), (%edi) /* First gibibytes */
@@ -210,6 +210,8 @@ gdt_ptr32:
 
  /* map first 512GiB */
 
+	.globl mp_pdpt0
+mp_pdpt0:
 PDPT0:
 .equ _i, 0
 .rept 0x200
@@ -225,6 +227,7 @@ PDPT0:
 
 	.globl k0PML4T
 k0PML4T:
+	.globl PML4T
 PML4T:
 .rept 0x200
 	.quad 0

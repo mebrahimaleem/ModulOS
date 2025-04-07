@@ -19,6 +19,15 @@
 #define CORE_MP_H
 
 extern uint64_t mp_bootstrap;
+extern uint64_t mp_pdpt0;
+
+extern uint8_t mp_loading;
+extern uint64_t mp_rsp;
+extern uint64_t mp_cr3;
+extern struct {
+	uint8_t len;
+	uint64_t off;
+} __attribute__((packed)) mp_gdtptr;
 
 void mp_initall(void);
 

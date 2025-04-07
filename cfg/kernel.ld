@@ -49,6 +49,7 @@ SECTIONS {
 	}
 	
 	. = KERNEL_VMA + ADDR(.bss.boot) + SIZEOF(.bss.boot) + 4K - (SIZEOF(.bss.boot) % 4K);
+	KERNEL_START = .;
 	
 	.text BLOCK(4K) : AT (ADDR(.bss.boot) + SIZEOF(.bss.boot) + 4K - (SIZEOF(.bss.boot) % 4K)) {
 		*(.text)

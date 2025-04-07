@@ -17,6 +17,13 @@
 
 #ifndef MULTIBOOT_REALMODE_S
 #define MULTIBOOT_REALMODE_S
+
+#define LOADING_BOOTSTRAP		$0x1
+#define LOADING_IDLE				$0x2
+
+#define CMOS_NMI						$0x70
+#define NMI_DISABLE					$0x80
+
 	.section .text.real
 gdt:
 	gdt.nullseg:
@@ -119,10 +126,95 @@ idt_ptr:
 mp_bootstrap:
 	jmp $0x0, $(bootstrap)
 
-//TODO: store bootstrap info here
+	.globl mp_loading
+mp_loading:
+	.byte 0
+
+	.globl mp_rsp
+mp_rsp:
+	.quad 0
+
+	.globl mp_cr3
+mp_cr3:
+	.quad 0
+
+mp_gdtptr0:
+	.short 0x7F
+	.long 0x7000
+
+	.globl mp_gdtptr
+mp_gdtptr:
+	.short 0x7F
+	.quad 0
+
 bootstrap:
 	mov $0, %ax
 	mov %ax, %ds
+
+	movb LOADING_BOOTSTRAP, %al
+	movb %al, mp_loading
+
+	cli	
+
+	/* disable NMIs */
+	movb NMI_DISABLE, %al
+	outb %al, CMOS_NMI
+	
+	/* Enable PAE and PSE */
+	movl %cr4, %eax
+	orl $0x30, %eax
+	mov %eax, %cr4
+
+	/* First use old PML4T for bootstrapping */
+	movl $PML4T, %edi
+	movl %edi, %cr3
+
+	/* Enter compat mode */
+	movl $0xC0000080, %ecx /* EFER */
+	rdmsr
+	orl $0x100, %eax /* LME */
+	wrmsr
+
+	movl %cr0, %ebx
+	orl $0x80000001, %ebx
+	movl %ebx, %cr0
+
+	/* Enter 64-bit mode */
+	lgdt mp_gdtptr0
+
+	push $0
+	push $0x8
+	push $0
+	push $mp_enter64
+	retfl
+
+	.code64
+mp_enter64:
+	mov $0x10, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	/* now switch to the correct pml4t */
+	movq mp_cr3, %rax
+	movq %rax, %cr3
+
+	/* now switch to correct gdt */
+	lgdt mp_gdtptr
+
+	/* set rsp */
+	movq mp_rsp, %rsp
+
+	/* reset eflags */
+	pushq $0
+	popfq
+
+	//TODO: jump to another bootstrap routine in high memory
+
+	movb LOADING_IDLE, %al
+	movb %al, mp_loading
 bootstrap.hang:
 	jmp bootstrap.hang
 
