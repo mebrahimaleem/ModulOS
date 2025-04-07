@@ -83,7 +83,7 @@ void mp_initall() {
 	struct acpi_lapic* lapic;
 
 	while (1) {
-		hint = acpi_nextAPIC(hint, &lapic);
+		hint = acpi_nextMADT(MADT_LAPIC_TYPE, hint, (struct acpi_madt_ic**)&lapic);
 
 		/* check if end of MADT */
 		if (hint == 0) {

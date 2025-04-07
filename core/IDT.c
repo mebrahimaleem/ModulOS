@@ -49,6 +49,17 @@
 	idt[i].off1 = (((uint64_t)&base) >> 16) & 0xFFFF; \
 	idt[i].off2 = (uint32_t)(((uint64_t)&base) >> 32);
 
+
+uint16_t nextIsr;
+
+void idt_init() {
+	nextIsr = 0x26;
+}
+
+uint16_t idt_getIsrVector() {
+	return ++nextIsr;
+}
+
 void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp) {
 	/* first create TSS so that ISTs work */
 	struct TSS* volatile tss  = (struct TSS* volatile)kmalloc(sizeof(struct TSS));

@@ -158,4 +158,6 @@ void apic_lapic_ISRHandler(uint64_t code);
 
 uint8_t apic_getId(void);
 
+void apic_lapic_sendeoi(void);
+
 #endif /* APIC_LAPIC_H */

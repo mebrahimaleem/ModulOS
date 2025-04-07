@@ -128,6 +128,10 @@ struct TSSD {
 	uint32_t resv2;
 } __attribute__((packed));
 
+void idt_init(void);
+
+uint16_t idt_getIsrVector(void);
+
 void loadidt(void);
 
 void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp);

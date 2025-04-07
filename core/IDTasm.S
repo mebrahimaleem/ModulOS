@@ -289,6 +289,84 @@ ISR_SPUR:
 	movq LAPIC_SPUR_V, %rdi
 	jmp ISR_LAPIC_G
 
+ISR_IOAPIC_G:
+	// save registers
+	pushq %rsi
+	pushq %rax
+	pushq %rcx
+	pushq %rdx
+	pushq %r8
+	pushq %r9
+	pushq %r10
+	pushq %r11
+	// kernel does not use floating point, so no need to save them
+
+	// save cr3
+	movq %cr3, %rsi
+	pushq %rsi //cr3
+
+	// save data segment selectors
+	mov %ds, %ax
+	pushq %rax
+
+	// setup for kernel
+	mov $0x10, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	movq $k0PML4T, %rax
+	movq %rax, %cr3
+	
+	call apic_ioapic_ISRHandler
+
+	// eoi sent by handler
+	// restore data segment selectors
+	popq %rax
+	mov %ax, %ds
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+	mov %ax, %ss
+
+	// restore paging
+	popq %rsi
+	movq %rsi, %cr3
+
+	// restore registers
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rdx
+	popq %rcx
+	popq %rax
+	popq %rsi
+	popq %rdi
+	iretq
+
+	.globl irq_handlers
+irq_handlers:
+.macro ISR_IOAPIC_STUB n
+	pushq %rdi
+	movq $\n, %rdi
+	jmp ISR_IOAPIC_G
+.endm
+
+.set i, 0
+.rept 0xc9
+	ISR_IOAPIC_STUB i
+	.set i, i+1
+.endr
+
+	.globl irq_dummy_start
+irq_dummy_start:
+	ISR_IOAPIC_STUB 0
+	.globl irq_dummy_end
+irq_dummy_end:
+
 	.data
 
 idt_ptr:

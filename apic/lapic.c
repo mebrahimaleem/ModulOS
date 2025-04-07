@@ -165,8 +165,6 @@ void apic_initlocalap(uint64_t* idt) {
 }
 
 void apic_lapic_ISRHandler(uint64_t code) {
-	serialPrintf(SERIAL1, "GOT 0x%x\n", code);
-	
 	union LAPIC_LVT lvt;
 	switch (code) {
 		case LAPIC_CMCI_V:
@@ -208,6 +206,10 @@ void apic_lapic_ISRHandler(uint64_t code) {
 	}
 
 	/* send eoi */
+	apic_lapic_sendeoi();
+}
+
+void apic_lapic_sendeoi() {
 	*(uint32_t* volatile)(lapic_base + LAPIC_EOI_OFF) = LAPIC_EOI;
 }
 

@@ -20,6 +20,10 @@
 
 #include <stdint.h>
 
+#define MADT_LAPIC_TYPE		0x0
+#define MADT_IOAPIC_TYPE	0x1
+#define MADT_REDIR_TYPE		0x2
+
 struct acpi_madt_ic {
 	uint8_t type;
 	uint8_t len;
@@ -33,6 +37,26 @@ struct acpi_lapic {
 	uint32_t enabled : 1;
 	uint32_t capable : 1;
 	uint32_t resv : 30;
+} __attribute__((packed));
+
+struct acpi_ioapic {
+	uint8_t type;
+	uint8_t len;
+	uint8_t apicId;
+	uint8_t resv;
+	uint32_t base;
+	uint32_t intstart;
+} __attribute__((packed));
+
+struct acpi_overrides {
+	uint8_t type;
+	uint8_t len;
+	uint8_t bus;
+	uint8_t source;
+	uint32_t gsi;
+	uint16_t polarity : 2;
+	uint16_t trigger : 2;
+	uint16_t resv : 12;
 } __attribute__((packed));
 
 struct acpi_madt {
@@ -52,6 +76,6 @@ struct acpi_madt {
 
 uint8_t acpi_needDisable8259(void);
 
-uint64_t acpi_nextAPIC(uint64_t hint, struct acpi_lapic** apicIDPtr);
+uint64_t acpi_nextMADT(uint8_t type, uint64_t hint, struct acpi_madt_ic** madtPtr);
 
 #endif /* ACPI_MADT_H */
