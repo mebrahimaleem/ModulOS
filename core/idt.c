@@ -1,4 +1,4 @@
-/* IDT.c - IDT structure */
+/* idt.c - IDT structure */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,7 @@
 
 #include <core/memory.h>
 #include <core/cpulowlevel.h>
-#include <core/IDT.h>
+#include <core/idt.h>
 
 #define TYPE_TSS		0x9
 

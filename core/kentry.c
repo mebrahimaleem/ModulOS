@@ -26,7 +26,7 @@
 #include <core/serial.h>
 #include <core/panic.h>
 #include <core/memory.h>
-#include <core/IDT.h>
+#include <core/idt.h>
 #include <core/mp.h>
 
 #include <acpi/acpica.h>

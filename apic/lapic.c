@@ -22,7 +22,7 @@
 #include <core/atomic.h>
 #include <core/cpulowlevel.h>
 #include <core/portio.h>
-#include <core/IDT.h>
+#include <core/idt.h>
 #include <core/serial.h>
 #include <core/memory.h>
 

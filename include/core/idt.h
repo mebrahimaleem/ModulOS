@@ -1,4 +1,4 @@
-/* IDT.h - IDT structure */
+/* idt.h - IDT structure */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify

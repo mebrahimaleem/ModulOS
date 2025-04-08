@@ -21,7 +21,7 @@
 #include <stdint.h>
 
 #include <core/serial.h>
-#include <core/IDT.h>
+#include <core/idt.h>
 
 #include <apic/lapic.h>
 #include <apic/ioapic.h>

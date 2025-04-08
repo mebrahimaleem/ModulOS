@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include <core/IDT.h>
+#include <core/idt.h>
 #include <core/panic.h>
 #include <core/atomic.h>
 #include <core/memory.h>
