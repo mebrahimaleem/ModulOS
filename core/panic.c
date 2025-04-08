@@ -34,15 +34,13 @@ __attribute__((noreturn)) void panic(uint64_t err) {
 		err = KPANIC_UNK;
 	}
 
-	serialPrintf(SERIAL1, "PANIC: 0x%lX: %s\n", (uint64_t)err, panicmsgs[err]);
-	serialPrintf(SERIAL2, "PANIC: 0x%lX: %s\n", (uint64_t)err, panicmsgs[err]);
+	PANIC_LOGF("0x%lX: %s", (uint64_t)err, panicmsgs[err]);
 	
 	panic_hlt();
 }
 
 __attribute__((noreturn)) void panicmsg(const char* msg) {
-	serialPrintf(SERIAL1, "PANIC: %s\n", msg);
-	serialPrintf(SERIAL2, "PANIC: %s\n", msg);
+	PANIC_LOG(msg);
 
 	panic_hlt();
 }

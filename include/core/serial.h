@@ -30,6 +30,56 @@
 #define SERIAL7  64
 #define SERIAL8  128
 
+#ifdef DEBUG
+#define DEBUG_LOG(fmt) \
+	serialPrintf(1, "[DEBUG]\t"); \
+	serialPrintf(1, fmt); \
+	serialPrintf(1, "\n"); \
+	serialPrintf(2, "[DEBUG]\t"); \
+	serialPrintf(2, fmt); \
+	serialPrintf(2, "\n")
+#define DEBUG_LOGF(fmt, ...) \
+	serialPrintf(1, "[DEBUG]\t"); \
+	serialPrintf(1, fmt, __VA_ARGS__); \
+	serialPrintf(1, "\n"); \
+	serialPrintf(2, "[DEBUG]\t"); \
+	serialPrintf(2, fmt, __VA_ARGS__); \
+	serialPrintf(2, "\n")
+#else
+#define DEBUG_LOG(fmt)
+#define DEBUG_LOGF(fmt, ...)
+#endif
+
+#define INFO_LOG(fmt) \
+	serialPrintf(1, "[INFO]\t"); \
+	serialPrintf(1, fmt); \
+	serialPrintf(1, "\n"); \
+	serialPrintf(2, "[INFO]\t"); \
+	serialPrintf(2, fmt); \
+	serialPrintf(2, "\n")
+#define INFO_LOGF(fmt, ...) \
+	serialPrintf(1, "[INFO]\t"); \
+	serialPrintf(1, fmt, __VA_ARGS__); \
+	serialPrintf(1, "\n"); \
+	serialPrintf(2, "[INFO]\t"); \
+	serialPrintf(2, fmt, __VA_ARGS__); \
+	serialPrintf(2, "\n")
+
+#define PANIC_LOG(fmt) \
+	serialPrintf(1, "[PANIC]\t"); \
+	serialPrintf(1, fmt); \
+	serialPrintf(1, "\n"); \
+	serialPrintf(2, "[PANIC]\t"); \
+	serialPrintf(2, fmt); \
+	serialPrintf(2, "\n")
+#define PANIC_LOGF(fmt, ...) \
+	serialPrintf(1, "[PANIC]\t"); \
+	serialPrintf(1, fmt, __VA_ARGS__); \
+	serialPrintf(1, "\n"); \
+	serialPrintf(2, "[PANIC]\t"); \
+	serialPrintf(2, fmt, __VA_ARGS__); \
+	serialPrintf(2, "\n")
+
 void serialinit(void);
 
 void serialWriteStr(uint8_t com, const char* str);

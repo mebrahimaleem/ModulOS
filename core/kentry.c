@@ -78,108 +78,68 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	/* init serial */
 	serialinit();
 
+	/* cant use fancy logging until memory is initialized */
 #ifdef DEBUG
-	serialWriteStr(SERIAL1, "LOG: SERIAL 1\nSTATUS: Starting memory init...\n");
-	serialWriteStr(SERIAL2, "LOG: SERIAL 2\nSTATUS: Starting memory init...\n");
+	serialWriteStr(SERIAL1, "\n\n[INFO]\tStarting BSP init...\n[INFO]\tStarting memory init...\n");
+	serialWriteStr(SERIAL2, "\n\n[INFO]\tStarting BSP init...\n[INFO]\tStarting memory init...\n");
 #endif /* DEBUG */
 	
 	/* init memory manager */
 	meminit();
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Memory init done\n");
-	serialWriteStr(SERIAL2, "STATUS: Memory init done\n");
-#endif /* DEBUG */
+	INFO_LOG("Memory init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Initializing interrupts...\n");
-	serialWriteStr(SERIAL2, "STATUS: Initializing interrupts...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting interrupts init...");
 
 	static uint64_t k0rsp[] = {(uint64_t)&rsp0, (uint64_t)&rsp1, (uint64_t)&rsp2, (uint64_t)&rsp3, (uint64_t)&rsp4, (uint64_t)&rsp5, (uint64_t)&rsp6, (uint64_t)&rsp7};
 	idt_init();
 	idt_installisrs((struct IDTD* volatile)&IDT_BASE, (uint64_t*)0x7000, &k0rsp[0]);
 	loadidt();
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Interrupts done\n");
-	serialWriteStr(SERIAL2, "STATUS: Interrupts done\n");
-#endif /* DEBUG */
+	INFO_LOG("Interrupts init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting ACPICA subsystem init...\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting ACPICA subsystem init...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting ACPICA first stage init...");
 
 	if(acpiinit() != 0) {
 		panic(KPANIC_ACPI);
 	}
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: ACPICA subsystem init done\n");
-	serialWriteStr(SERIAL2, "STATUS: ACPICA subsystem init done\n");
-#endif /* DEBUG */
+	INFO_LOG("ACPICA first stage init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting local APIC init...\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting local APIC init...\n");
-#endif /* DEBUG */
-
+	INFO_LOG("Starting local APIC init...");
+	
 	apic_initlocal();
 	ksti();
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
-	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
-#endif /* DEBUG */
+	INFO_LOG("Local APIC init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting IO APIC init...\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting IO APIC init...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting IO/APIC init...");
 
 	apic_initio();
 	setInterrupts(0);
 	ksti();
+	
+	INFO_LOG("IO/APIC init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: IO APIC init done\n");
-	serialWriteStr(SERIAL2, "STATUS: IO APIC init done\n");
-#endif /* DEBUG */
-
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting MP init...\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting MP init...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting MP init...");
 
 	mp_initall();
 	
 	/* calibrate local apic timer */
 	apic_lapic_calibrateTimer();
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: All processors initialized\n");
-	serialWriteStr(SERIAL2, "STATUS: All processors initialized\n");
-#endif /* DEBUG */
+	INFO_LOG("MP init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: BSP init done\n");
-	serialWriteStr(SERIAL2, "STATUS: BSP init done\n");
-#endif /* DEBUG */
+	INFO_LOG("BSP init done");
 
 	panic(KPANIC_UNK);
 }
 
 void kapentry() {
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting AP core init...\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting AP core init...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting AP init...");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Initializing interrupts...\n");
-	serialWriteStr(SERIAL2, "STATUS: Initializing interrupts...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting interrupts init...");
+
 	uint64_t rsp[8] = {
 		(uint64_t)kmalloc(0x4000),
 		(uint64_t)kmalloc(0x1000),
@@ -192,15 +152,9 @@ void kapentry() {
 	idt_installisrs((struct IDTD* volatile)&IDT_BASE, (uint64_t*)mp_gdtptr.off, &rsp[0]);
 	loadidt();
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Interrupts done\n");
-	serialWriteStr(SERIAL2, "STATUS: Interrupts done\n");
-#endif /* DEBUG */
+	INFO_LOG("Interrupts init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Starting local APIC init...\n");
-	serialWriteStr(SERIAL2, "STATUS: Starting local APIC init...\n");
-#endif /* DEBUG */
+	INFO_LOG("Starting local APIC init...");
 
 	apic_initlocalap();
 	ksti();
@@ -211,16 +165,10 @@ void kapentry() {
 	/* let bsp know that ap is done initializing and bsp can continue */
 	mp_loading = MP_LOADING_IDLE;
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
-	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
-#endif /* DEBUG */
+	INFO_LOG("Local APIC init done");
 
-#ifdef DEBUG
-	serialWriteStr(SERIAL1, "STATUS: AP init done\n");
-	serialWriteStr(SERIAL2, "STATUS: AP init done\n");
-#endif /* DEBUG */
-
+	INFO_LOG("AP init done");
+	
 	panic(KPANIC_UNK);
 }
 
