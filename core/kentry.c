@@ -154,6 +154,8 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 	mp_initall();
+	apic_maskIrq(apic_translateGsi(IOAPIC_ISA_PIT)); //TODO: calibrate timer before masking PIT
+	apic_maskIrq(apic_translateGsi(IOAPIC_ISA_RTC));
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: All processors initialized\n");

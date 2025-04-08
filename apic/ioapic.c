@@ -22,6 +22,7 @@
 
 #include <core/IDT.h>
 #include <core/panic.h>
+#include <core/atomic.h>
 #include <core/memory.h>
 
 #include <acpi/madt.h>
@@ -39,29 +40,34 @@
 #define LO_MASK				0xFFFE5000
 #define HI_MASK				0x00FFFFFF
 
-#define DLVRY_FIXED		0x0000
-#define DEST_PHYSCL		0x0000
-#define INTOL_LOWA		0x2000
-#define TRIG_LEVEL		0x8000
+#define DLVRY_FIXED		0x00000
+#define DEST_PHYSCL		0x00000
+#define INTOL_LOWA		0x02000
+#define TRIG_LEVEL		0x08000
+#define MASK_INT			0x10000
 
 #define OVER_LOA			0x3
 #define OVER_TRL			0x3
 
-uint8_t irq_remaps[255];
+uint32_t irq_remaps_inv[16]; //only 16 isa irqs
+
+struct apic_ioapic* ioapics;
+mutex_t ioapic_mutex;
 
 void apic_initio() {
+	ioapic_mutex = kcreateMutex();
+	ioapics = 0;
 	uint64_t hint = 0;
-	uint8_t i;
+	uint32_t i;
 
 	/* first iterate through source overrides to find correct config */
-	uint32_t* flags = kmalloc(256 * 4);
+	uint32_t* flags = kmalloc(4096 * 4);
 	for (i = 0; i < 16; i++) {
-		flags[i] = 0;
-		irq_remaps[i] = i; //default to identity
+		flags[i] = 0; //ISA default is active hi edge triggered
+		irq_remaps_inv[i] = i;
 	}
-	for (i = 16; i < 255; i++) {
+	for (i = 16; i < 4096; i++) {
 		flags[i] = INTOL_LOWA | TRIG_LEVEL;
-		irq_remaps[i] = i; //default to identity
 	}
 
 	struct acpi_overrides* overrides;
@@ -72,8 +78,13 @@ void apic_initio() {
 			break;
 		}
 
+		if (overrides->gsi >= 4096 || overrides->source >= 16) {
+			/* not supported */
+			panic(KPANIC_APIC);
+		}
+		
 		flags[overrides->gsi] = 0;
-		irq_remaps[overrides->gsi] = overrides->source;
+		irq_remaps_inv[overrides->source] = overrides->gsi;
 
 		if (overrides->polarity == OVER_LOA) {
 			flags[overrides->gsi] |= INTOL_LOWA;
@@ -92,6 +103,8 @@ void apic_initio() {
 	uint32_t hi;
 	uint8_t isr;
 
+	struct apic_ioapic* tapic;
+
 	while (1) {
 		hint = acpi_nextMADT(MADT_IOAPIC_TYPE, hint, (struct acpi_madt_ic**)&ioapic);
 		
@@ -101,9 +114,17 @@ void apic_initio() {
 
 		*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOAPICVER;
 		const uint8_t maxreds = (uint8_t)(*(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) >> 16);
+
+		tapic = kmalloc(sizeof(struct apic_ioapic));
+		tapic->mingsi = ioapic->intstart;
+		tapic->maxgsi = ioapic->intstart + maxreds + 1;
+		tapic->base = ioapic->base;
+		tapic->next = ioapics;
+		ioapics = tapic;
+		kfree(tapic);
 		
 		for (i = 0; i <= maxreds; i++) {
-			isr = idt_claimIsrVector(irq_remaps[i + ioapic->intstart] + ISR_IOAPIC_START);
+			isr = idt_claimIsrVector(i + ioapic->intstart + ISR_IOAPIC_START);
 
 			if (isr == 0) {
 				/* out of ISRs */
@@ -126,4 +147,36 @@ void apic_initio() {
 
 	kfree(flags);
 }
+
+uint32_t apic_translateGsi(uint64_t code) {
+	const uint32_t gsi = code & ISR_INTERNAL_MASK;
+	if (gsi < 16) {
+		return irq_remaps_inv[gsi];
+	}
+	return gsi;
+}
+
+void apic_maskIrq(uint32_t gsi) {
+	kacquireMutex(ioapic_mutex);
+	/* iterate IOAPICs to find the one in charge of the gsi */
+	for (struct apic_ioapic* ioapic = ioapics; ioapic != 0; ioapic = ioapic->next) {
+		if (gsi >= ioapic->mingsi && gsi < ioapic->maxgsi) {
+			const uint32_t index = gsi - ioapic->mingsi;
+
+			/* mask the irq */
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			uint32_t lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			uint32_t hi = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
+
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo | MASK_INT;
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi;
+			 break;
+		}
+	}
+	kreleaseMutex(ioapic_mutex);
+}
+
 #endif /* APIC_IOAPIC_C */

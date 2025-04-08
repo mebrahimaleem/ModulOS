@@ -24,6 +24,7 @@
 #include <core/IDT.h>
 
 #include <apic/lapic.h>
+#include <apic/ioapic.h>
 #include <apic/isr.h>
 
 void isr_handler(uint64_t code) {
@@ -33,13 +34,13 @@ void isr_handler(uint64_t code) {
 	}
 
 #ifdef DEBUG
-	serialPrintf(SERIAL1, "ISR: Vector: 0x%x Internal:", code + 0x20);
+	serialPrintf(SERIAL1, "ISR: Vector: 0x%x Internal: 0x", code + 0x20);
 #endif
 
 	code = idt_translateCode(code);
 
 #ifdef DEBUG
-	serialPrintf(SERIAL1, "%x\n ", code);
+	serialPrintf(SERIAL1, "%x\n", code);
 #endif
 
 	// check if no eoi

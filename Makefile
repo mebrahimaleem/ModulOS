@@ -151,9 +151,9 @@ $(ACPICA_TARGETS_C): $(obj)/acpica/%.o: acpica/%.c | $(obj)/acpica/
 	$(MAKE) -C acpica/ $@
 
 # ACPI
-$(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c | $(obj)/acpi/
+$(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c $(incl)/acpi/%.h | $(obj)/acpi/
 	$(MAKE) -C acpi/ $@
 
 # APIC
-$(APIC_TARGETS_C): $(obj)/apic/%.o: apic/%.c | $(obj)/apic/
+$(APIC_TARGETS_C): $(obj)/apic/%.o: apic/%.c $(incl)/apic/%.h | $(obj)/apic/
 	$(MAKE) -C apic/ $@

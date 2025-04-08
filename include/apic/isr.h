@@ -18,6 +18,7 @@
 #ifndef APIC_ISR_H
 #define APIC_ISR_H
 
+#define ISR_INTERNAL_MASK	0x0FFF
 #define ISR_LAPIC_START		0x1000
 #define ISR_IOAPIC_START	0x2000
 

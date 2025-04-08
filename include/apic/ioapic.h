@@ -18,6 +18,22 @@
 #ifndef APIC_IOAPIC_H
 #define APIC_IOAPIC_H
 
+#define IOAPIC_ISA_PIT	0x0
+#define IOAPIC_ISA_KBD	0x1
+#define IOAPIC_ISA_RTC	0x8
+
+struct apic_ioapic {
+	uint32_t mingsi;
+	uint32_t maxgsi;
+	uint32_t base;
+	struct apic_ioapic* next;
+};
+
 void apic_initio(void);
+
+/* translates an IRQ code to gsi */
+uint32_t apic_translateGsi(uint64_t code);
+
+void apic_maskIrq(uint32_t gsi);
 
 #endif /* APIC_IOAPIC_H */

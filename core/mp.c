@@ -148,6 +148,9 @@ void mp_initall() {
 		/* wait for AP to finish bootstrapping */
 		while (mp_loading == LOADING_BOOTSTRAP);
 	}
+	
+	/* Enabled NMIs */
+	outb(CMOS_ADDR, REG_STS_B);
 
 	ksti();
 }
