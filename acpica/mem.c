@@ -73,8 +73,7 @@ void* AcpiOsAllocate(ACPI_SIZE Size) {
 }
 
 void AcpiOsFree(void *Memory) {
-	//TODO: crashes because Memory is a bad ptr. Figure out why
-	//kfree(Memory);
+	kfree(Memory);
 }
 
 BOOLEAN AcpiOsReadable(void *Memory, ACPI_SIZE Length) {

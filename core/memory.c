@@ -433,6 +433,9 @@ void* _kmalloc(uint64_t length, uint8_t use_mut) {
 				block->size = KMEM_BLOCK_SIZEMASK & alen;
 				ret = (void*)((uint64_t)block + sizeof(struct BlockDescriptor));
 
+				/* get next block */
+				block = (struct BlockDescriptor* volatile)((uint64_t)(block) + block->size);
+
 				block->flags = KMEM_BLOCK_FREE;
 				block->size = KMEM_BLOCK_SIZEMASK & (t0 - alen);
 				

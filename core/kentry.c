@@ -32,6 +32,7 @@
 #include <acpi/acpica.h>
 
 #include <apic/lapic.h>
+#include <apic/ioapic.h>
 
 struct avail_memory_t kavail_memory;
 
@@ -96,6 +97,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 	static uint64_t k0rsp[] = {(uint64_t)&rsp0, (uint64_t)&rsp1, (uint64_t)&rsp2, (uint64_t)&rsp3, (uint64_t)&rsp4, (uint64_t)&rsp5, (uint64_t)&rsp6, (uint64_t)&rsp7};
+	idt_init();
 	idt_installisrs((struct IDTD* volatile)&IDT_BASE, (uint64_t*)0x7000, &k0rsp[0]);
 	loadidt();
 
@@ -132,11 +134,28 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 #ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: Starting IO APIC init...\n");
+	serialWriteStr(SERIAL2, "STATUS: Starting IO APIC init...\n");
+#endif /* DEBUG */
+
+	apic_initio();
+	setInterrupts(0);
+	ksti();
+
+#ifdef DEBUG
+	serialWriteStr(SERIAL1, "STATUS: IO APIC init done\n");
+	serialWriteStr(SERIAL2, "STATUS: IO APIC init done\n");
+#endif /* DEBUG */
+
+#ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Starting MP init...\n");
 	serialWriteStr(SERIAL2, "STATUS: Starting MP init...\n");
 #endif /* DEBUG */
 
 	mp_initall();
+	
+	/* calibrate local apic timer */
+	apic_lapic_calibrateTimer();
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: All processors initialized\n");
@@ -183,16 +202,19 @@ void kapentry() {
 	serialWriteStr(SERIAL2, "STATUS: Starting local APIC init...\n");
 #endif /* DEBUG */
 
-	apic_initlocalap((uint64_t*)&IDT_BASE);
+	apic_initlocalap();
 	ksti();
+
+	/* calibrate local apic timer */
+	apic_lapic_calibrateTimer();
+
+	/* let bsp know that ap is done initializing and bsp can continue */
+	mp_loading = MP_LOADING_IDLE;
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
 	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
 #endif /* DEBUG */
-
-	/* let bsp know that ap is done initializing and ready to receive tasks */
-	mp_loading = MP_LOADING_IDLE;
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: AP init done\n");

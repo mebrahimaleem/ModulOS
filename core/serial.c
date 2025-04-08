@@ -19,6 +19,7 @@
 #define CORE_SERIAL_C
 
 #include <core/atomic.h>
+#include <core/memory.h>
 #include <core/portio.h>
 #include <core/utils.h>
 #include <core/serial.h>
@@ -194,6 +195,7 @@ void serialVprintf(uint8_t com, const char* fmt, va_list va) {
 	char* buf;
 	formatstr(fmt, &buf, va);
 	serialWriteStr(com, buf);
+	kfree(buf);
 }
 
 #endif /* CORE_SERIAL_C */
