@@ -55,6 +55,8 @@ uint32_t irq_remaps_inv[16]; //only 16 isa irqs
 struct apic_ioapic* ioapics;
 mutex_t ioapic_mutex;
 
+uint8_t apic_pitisr;
+
 void apic_initio() {
 	ioapic_mutex = kcreateMutex();
 	ioapics = 0;
@@ -122,7 +124,6 @@ void apic_initio() {
 		tapic->base = ioapic->base;
 		tapic->next = ioapics;
 		ioapics = tapic;
-		kfree(tapic);
 		
 		for (i = 0; i <= maxreds; i++) {
 			isr = idt_claimIsrVector(i + ioapic->intstart + ISR_IOAPIC_START);
@@ -142,15 +143,15 @@ void apic_initio() {
 			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i + 1;
 			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apic_getId() << 24);
 
+			/* mask everything, unmask as we need them */	
+			apic_maskIrq(i + ioapic->intstart);
+
 			/* check for ISA PIT */
 			if (i + ioapic->intstart == irq_remaps_inv[IOAPIC_ISA_PIT]) {
-				idt_installcustomisr((struct IDTD* volatile)&IDT_BASE, (uint64_t)&lowlatency_isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, isr);
-				/* mask PIT until we need it */
-				apic_maskIrq(i + ioapic->intstart);
+				apic_pitisr = isr; //save vector for calibration purposes
 			}
-			else {
-				idt_installisr((struct IDTD* volatile)&IDT_BASE, isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
-			}
+
+			idt_installisr((struct IDTD* volatile)&IDT_BASE, isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 		}
 	}
 
@@ -195,7 +196,7 @@ void apic_unmaskIrq(uint32_t gsi) {
 		if (gsi >= ioapic->mingsi && gsi < ioapic->maxgsi) {
 			const uint32_t index = gsi - ioapic->mingsi;
 
-			/* mask the irq */
+			/* unmask the irq */
 			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
 			uint32_t lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
 			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
@@ -205,6 +206,29 @@ void apic_unmaskIrq(uint32_t gsi) {
 			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo & (uint32_t)~MASK_INT;
 			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
 			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi;
+			 break;
+		}
+	}
+	kreleaseMutex(ioapic_mutex);
+}
+
+void apic_changeTarget(uint32_t gsi, uint8_t apicid) {
+	kacquireMutex(ioapic_mutex);
+	/* iterate IOAPICs to find the one in charge of the gsi */
+	for (struct apic_ioapic* ioapic = ioapics; ioapic != 0; ioapic = ioapic->next) {
+		if (gsi >= ioapic->mingsi && gsi < ioapic->maxgsi) {
+			const uint32_t index = gsi - ioapic->mingsi;
+
+			/* change target field */
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			uint32_t lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			uint32_t hi = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) & HI_MASK;
+
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo;
+			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apicid << 24);
 			 break;
 		}
 	}

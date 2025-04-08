@@ -142,7 +142,6 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	setInterrupts(0);
 	ksti();
 
-
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: IO APIC init done\n");
 	serialWriteStr(SERIAL2, "STATUS: IO APIC init done\n");
@@ -154,12 +153,9 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 
 	mp_initall();
-	apic_maskIrq(apic_translateGsi(IOAPIC_ISA_RTC));
 	
-	/* start by calibrating bsp timer */
+	/* calibrate local apic timer */
 	apic_lapic_calibrateTimer();
-
-	apic_maskIrq(apic_translateGsi(IOAPIC_ISA_PIT));
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: All processors initialized\n");
@@ -206,16 +202,19 @@ void kapentry() {
 	serialWriteStr(SERIAL2, "STATUS: Starting local APIC init...\n");
 #endif /* DEBUG */
 
-	apic_initlocalap((uint64_t*)&IDT_BASE);
+	apic_initlocalap();
 	ksti();
+
+	/* calibrate local apic timer */
+	apic_lapic_calibrateTimer();
+
+	/* let bsp know that ap is done initializing and bsp can continue */
+	mp_loading = MP_LOADING_IDLE;
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: Local APIC init done\n");
 	serialWriteStr(SERIAL2, "STATUS: Local APIC init done\n");
 #endif /* DEBUG */
-
-	/* let bsp know that ap is done initializing and ready to receive tasks */
-	mp_loading = MP_LOADING_IDLE;
 
 #ifdef DEBUG
 	serialWriteStr(SERIAL1, "STATUS: AP init done\n");

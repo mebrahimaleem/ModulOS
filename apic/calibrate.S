@@ -30,6 +30,7 @@
 
 #define LAPIC_EOI				$0x00000000
 #define LAPIC_TIMR			$0xFFFFFFFF
+#define LAPIC_DISABLE		$0x00000000
 
 #define PIT_DATA		$0x40
 #define RELOAD_LO		$0x9C
@@ -78,6 +79,9 @@ lowlatency_isr:
 
 	/* record apic timer value */
 	movl LAPIC_CCD_OFF(%rsi), %ebx
+
+	/* disable apic timer */
+	movl LAPIC_DISABLE, LAPIC_ICD_OFF(%rsi)
 
 	movb IDLE, calibrate_done
 

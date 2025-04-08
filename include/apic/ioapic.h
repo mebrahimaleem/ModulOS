@@ -29,6 +29,8 @@ struct apic_ioapic {
 	struct apic_ioapic* next;
 };
 
+extern uint8_t apic_pitisr;
+
 void apic_initio(void);
 
 /* translates an IRQ code to gsi */
@@ -37,5 +39,7 @@ uint32_t apic_translateGsi(uint64_t code);
 void apic_maskIrq(uint32_t gsi);
 
 void apic_unmaskIrq(uint32_t gsi);
+
+void apic_changeTarget(uint32_t gsi, uint8_t apicid);
 
 #endif /* APIC_IOAPIC_H */

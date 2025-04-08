@@ -146,9 +146,16 @@ union LAPIC_LVT {
 	} thrm __attribute__((packed));
 };
 
+struct cpu_specific {
+	uint64_t calib_whole;
+	uint64_t calib_frac;
+};
+
 void apic_initlocal(void);
 
-void apic_initlocalap(uint64_t* idt);
+void apic_initlocalap(void);
+
+void apic_installisrs(struct IDTD* volatile idtd);
 
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest);
 
