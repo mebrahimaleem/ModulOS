@@ -1,4 +1,4 @@
-/* ioapic.h - IO APIC routines */
+/* calibrate.h - precision calibration routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,27 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef APIC_IOAPIC_H
-#define APIC_IOAPIC_H
+#ifndef APIC_CALIBRATE_H
+#define APIC_CALIBRATE_H
 
-#define IOAPIC_ISA_PIT	0x0
-#define IOAPIC_ISA_KBD	0x1
-#define IOAPIC_ISA_RTC	0x8
+uint32_t calibrate_lapic_timer(uint32_t gsi, uint64_t apicbase);
 
-struct apic_ioapic {
-	uint32_t mingsi;
-	uint32_t maxgsi;
-	uint32_t base;
-	struct apic_ioapic* next;
-};
+extern const void lowlatency_isr;
 
-void apic_initio(void);
+#endif /* APIC_CALIBRATE_H */
 
-/* translates an IRQ code to gsi */
-uint32_t apic_translateGsi(uint64_t code);
 
-void apic_maskIrq(uint32_t gsi);
-
-void apic_unmaskIrq(uint32_t gsi);
-
-#endif /* APIC_IOAPIC_H */

@@ -57,7 +57,7 @@ uint8_t next_isr_hint;
 
 void idt_init() {
 	idt_isrs = kcalloc(sizeof(struct ISR), FREE_ISRS_COUNT);
-	/* offset for easy indexing, code will never access invalid index */
+	/* offset for easy ving, code will never access invalid index */
 
 	/* mark 0x80 as used for syscalls*/
 	idt_isrs[0x80 - FREE_ISRS_START].used = 1;
@@ -173,6 +173,17 @@ void idt_installisr(struct IDTD* volatile idt, uint8_t index, uint8_t ist, uint8
 	idt[index].present = (uint8_t)(present & 0x1);
 	idt[index].off1 = (offsymb >> 16) & 0xFFFF;
 	idt[index].off2 = (uint32_t)(offsymb >> 32);
+}
+
+void idt_installcustomisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
+	idt[v].off0 = offsymb & 0xFFFF;
+	idt[v].segsel = IDT_KCODESEG;
+	idt[v].ist = (uint8_t)(ist & 0x7);
+	idt[v].type = (uint8_t)(type & 0xF);
+	idt[v].dpl = (uint8_t)(dpl & 0x3);
+	idt[v].present = (uint8_t)(present & 0x1);
+	idt[v].off1 = (offsymb >> 16) & 0xFFFF;
+	idt[v].off2 = (uint32_t)(offsymb >> 32);
 }
 
 #endif /* CORE_IDT_C */

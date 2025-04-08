@@ -24,5 +24,8 @@ build: $(filter $(obj)/apic/%.o,$(APIC_TARGETS))
 %/:
 	-mkdir -p $@
 
+$(APIC_TARGETS_S): $(obj)/apic/%.o: %.S
+	$(KERNEL_CC) $(CFLAGS) -o $@ $<
+
 $(APIC_TARGETS_C): $(obj)/apic/%.o: %.c $(incl)/apic/%.h
 	$(KERNEL_CC) $(CFLAGS) -o $@ $<

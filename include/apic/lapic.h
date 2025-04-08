@@ -158,4 +158,6 @@ uint8_t apic_getId(void);
 
 void apic_lapic_sendeoi(void);
 
+void apic_lapic_calibrateTimer(void);
+
 #endif /* APIC_LAPIC_H */

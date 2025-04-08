@@ -21,12 +21,15 @@
 #include <core/panic.h>
 #include <core/atomic.h>
 #include <core/cpulowlevel.h>
+#include <core/portio.h>
 #include <core/IDT.h>
 #include <core/serial.h>
 
+#include <apic/calibrate.h>
 #include <apic/isr.h>
 #include <apic/lapic.h>
 #include <apic/pic8259.h>
+#include <apic/ioapic.h>
 #include <acpi/madt.h>
 
 #define LAPIC_MSR_BASE				0x1B
@@ -51,6 +54,12 @@
 #define LAPIC_LVT_LNT1_OFF		0x360
 #define LAPIC_LVT_EROR_OFF		0x370
 
+#define LAPIC_TMR_DIV_OFF			0x3E0
+#define LAPIC_TMR_DIV					0xB
+#define LAPIC_ICD_OFF					0x380
+
+#define TIMER_INITIAL					0xFFFFFFFF
+
 #define MAXLA_LEAF						0x80000000
 #define MAXPA_LEAF						0x80000008
 #define CLOCK_LEAF						0x15
@@ -60,6 +69,16 @@
 #define IIPP_HIGH							0x0
 
 #define IPI_DLVRY_PENDING			0x1000
+
+#define TIMER_DISABLE					0x0
+#define TIMER_INFCOUNT				0xFFFFFFFF
+
+#define PIT_CMD_ADDR					0x43
+
+#define PIT_BINARY						0x00
+#define PIT_RATE							0x04
+#define PIT_LOHI							0x30
+#define PIT_CHN0							0x00
 
 uint64_t lapic_base;
 mutex_t ipi_mutex;
@@ -154,8 +173,11 @@ void apic_initlocalap(uint64_t* idt) {
 	idt_installisr(idtd, lvt.error.vector, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
 	idt_installisr(idtd, LAPIC_SPURIOUS_VECTOR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
-	/* setup timer */
-	//TODO: callibrate clock
+
+	/* disable timer */
+	*(uint32_t* volatile)(lapic_base + LAPIC_ICD_OFF) = TIMER_DISABLE;
+	*(uint32_t* volatile)(lapic_base + LAPIC_TMR_DIV_OFF) = LAPIC_TMR_DIV;
+	
 	
 	/* enable */
 	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
@@ -179,6 +201,16 @@ void apic_lapic_waitForIpi(void) {
 
 uint8_t apic_getId() {
 	return (uint8_t)(*(uint32_t* volatile)(lapic_base + LAPIC_IDR_OFF) >> 24);
+}
+
+void apic_lapic_calibrateTimer() {
+	/* configure PIT */
+	outb(PIT_CMD_ADDR, PIT_BINARY | PIT_RATE | PIT_LOHI | PIT_CHN0);
+
+	/* transfer to asm for low latency measurements */
+	const uint64_t period = TIMER_INITIAL - (uint32_t)calibrate_lapic_timer(apic_translateGsi(IOAPIC_ISA_PIT), lapic_base);
+
+	//TODO: finish calibration
 }
 
 #endif /* APIC_LAPIC_C */

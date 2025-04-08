@@ -25,7 +25,8 @@ test := $(CURDIR)/test
 
 KERNEL_REQS_S := \
 									$(shell find multiboot2/ -type f -name "*.S") \
-									$(shell find core/ -type f -name "*.S")
+									$(shell find core/ -type f -name "*.S") \
+									$(shell find apic/ -type f -name "*.S")
 KERNEL_REQS_C := \
 									$(shell find multiboot2/ -type f -name "*.c") \
 									$(shell find core/ -type f -name "*.c") \
@@ -59,8 +60,9 @@ ACPICA_TARGETS := $(ACPICA_TARGETS_C)
 ACPI_TARGETS_C := $(filter $(obj)/acpi/%,$(ALL_TARGETS_C))
 ACPI_TARGETS := $(ACPI_TARGETS_C)
 
+APIC_TARGETS_S := $(filter $(obj)/apic/%,$(ALL_TARGETS_S))
 APIC_TARGETS_C := $(filter $(obj)/apic/%,$(ALL_TARGETS_C))
-APIC_TARGETS := $(APIC_TARGETS_C)
+APIC_TARGETS := $(APIC_TARGETS_C) $(APIC_TARGETS_S)
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
@@ -156,4 +158,7 @@ $(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c $(incl)/acpi/%.h | $(obj)/acpi/
 
 # APIC
 $(APIC_TARGETS_C): $(obj)/apic/%.o: apic/%.c $(incl)/apic/%.h | $(obj)/apic/
+	$(MAKE) -C apic/ $@
+
+$(APIC_TARGETS_S): $(obj)/apic/%.o: apic/%.S | $(obj)/apic/
 	$(MAKE) -C apic/ $@

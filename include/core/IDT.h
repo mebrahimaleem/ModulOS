@@ -152,6 +152,8 @@ void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp);
 
 void idt_installisr(struct IDTD* volatile idt, uint8_t index, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present);
 
+void idt_installcustomisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v);
+
 #endif /* CORE_IDT_H */
 
 
