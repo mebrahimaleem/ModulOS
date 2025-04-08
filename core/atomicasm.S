@@ -22,6 +22,27 @@
 disableInterrupts:
 .byte 0
 
+buslock:
+	.byte 0
+
+/* void kunlockBus(void); */
+	.globl kunlockBus
+kunlockBus:
+	movb $0,  %al
+	lock xchg buslock, %al
+	ret
+
+/* void klockBus(void); */
+	.globl klockBus
+klockBus:
+	movb $1, %al
+klockBus.buslock:
+	lock xchgb buslock, %al
+	testb %al, %al
+	jnz klockBus.buslock
+	ret
+
+
 /* void ksti(void); */
   .globl ksti
 ksti:

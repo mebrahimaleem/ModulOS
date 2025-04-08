@@ -44,6 +44,9 @@ void ksti(void);
 
 void kcli(void);
 
+void kunlockBus(void);
+void klockBus(void);
+
 void setInterrupts(uint8_t set);
 
 mutex_t kcreateMutex(void);

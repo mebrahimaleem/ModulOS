@@ -41,8 +41,10 @@ void atomicinit(void) {
 
 StaticMutexHandle kcreateStaticMutex() {
 	kcli();
+	klockBus();
 	kmutexes[knextMutex / sizeof(uint8_t)] &= (uint8_t)~(1 << (knextMutex % sizeof(uint8_t))); // clear mutex bit
 	knextMutex++;
+	kunlockBus();
 	ksti();
 	return knextMutex - 1;
 }
@@ -53,11 +55,14 @@ void kacquireStaticMutex(StaticMutexHandle handle) {
 	
 	while (1) {
 		kcli();
+		klockBus();
 		if ((kmutexes[i] & mask) == 0) {
 			kmutexes[i] |= mask;
+			kunlockBus();
 			ksti();
 			return;
 		}
+		kunlockBus();
 		ksti();
 
 		// fast inner busy wait to avoid cli too often
@@ -67,7 +72,9 @@ void kacquireStaticMutex(StaticMutexHandle handle) {
 
 void kreleaseStaticMutex(StaticMutexHandle handle) {
 	kcli();
+	klockBus();
 	kmutexes[handle / sizeof(uint8_t)] &= (uint8_t)~(1 << (handle % sizeof(uint8_t))); // clear mutex bit
+	kunlockBus();
 	ksti();
 }
 
@@ -84,11 +91,14 @@ mutex_t kcreateMutex() {
 void kacquireMutex(mutex_t handle) {
 	while (1) {
 		kcli();
+		klockBus();
 		if (*handle == 0) {
 			*handle = 1;
+			kunlockBus();
 			ksti();
 			return;
 		}
+		kunlockBus();
 		ksti();
 
 		// fast inner busy wait to avoid cli too often
@@ -98,7 +108,9 @@ void kacquireMutex(mutex_t handle) {
 
 void kreleaseMutex(mutex_t handle) {
 	kcli();
+	klockBus();
 	*handle = 0;
+	kunlockBus();
 	ksti();
 }
 
@@ -115,11 +127,14 @@ semaphore_t kcreateSemaphore(uint64_t initial, uint64_t max) {
 void kacquireSemaphore(semaphore_t handle, uint64_t count) {
 	while (1) {
 		kcli();
+		klockBus();
 		if (*handle >= count) {
 			*handle -= count;
+			kunlockBus();
 			ksti();
 			return;
 		}
+		kunlockBus();
 		ksti();
 
 		// fast inner busy wait to avoid cli too often
@@ -129,7 +144,9 @@ void kacquireSemaphore(semaphore_t handle, uint64_t count) {
 
 void kreleaseSemaphore(semaphore_t handle, uint64_t count) {
 	kcli();
+	klockBus();
 	*handle += count;
+	kunlockBus();
 	ksti();
 }
 
@@ -146,11 +163,14 @@ spinlock_t kcreateSpinlock() {
 void kacquireSpinlock(spinlock_t handle) {
 	while (1) {
 		kcli();
+		klockBus();
 		if (*handle == 0) {
 			*handle = 1;
+			kunlockBus();
 			ksti();
 			return;
 		}
+		kunlockBus();
 		ksti();
 
 		// fast inner busy wait to avoid cli too often
@@ -160,7 +180,9 @@ void kacquireSpinlock(spinlock_t handle) {
 
 void kreleaseSpinlock(spinlock_t handle) {
 	kcli();
+	klockBus();
 	*handle = 0;
+	kunlockBus();
 	ksti();
 }
 
