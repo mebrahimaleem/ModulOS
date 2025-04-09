@@ -28,6 +28,7 @@
 #include <core/memory.h>
 #include <core/idt.h>
 #include <core/mp.h>
+#include <core/scheduler.h>
 
 #include <acpi/acpica.h>
 
@@ -123,6 +124,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 
 	INFO_LOG("Starting MP init...");
 
+	scheduler_init();
 	mp_initall();
 	
 	/* calibrate local apic timer */
@@ -132,7 +134,8 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 
 	INFO_LOG("BSP init done");
 
-	panic(KPANIC_UNK);
+	INFO_LOG("Calling scheduler");
+	scheduler_nextTask();
 }
 
 void kapentry() {
@@ -168,8 +171,9 @@ void kapentry() {
 	INFO_LOG("Local APIC init done");
 
 	INFO_LOG("AP init done");
-	
-	panic(KPANIC_UNK);
+
+	INFO_LOG("Calling scheduler");
+	scheduler_nextTask();
 }
 
 #endif /* CORE_KENTRY_C */
