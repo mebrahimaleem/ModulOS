@@ -40,8 +40,13 @@
 #define CS_OFF	0x90
 #define CR3_OFF	0x98
 
-#define RFL_OFF	0xa0
-#define RIP_OFF	0xa8
+#define RFL_OFF	0xA0
+#define RIP_OFF	0xA8
+
+#define FRAME_RSP_OFF	0xC8
+#define FRAME_CS_OFF	0xB8
+#define FRAME_RFL_OFF	0xC0
+#define FRAME_RIP_OFF	0xB0
 
 /* __attribute__((noreturn)) void scheduler_transferTo(struct PCB* pcb); */
 	.globl scheduler_transferTo
@@ -64,6 +69,10 @@ scheduler_transferTo:
 	movq R13_OFF(%rdi), %r13
 	movq R14_OFF(%rdi), %r14
 	movq R15_OFF(%rdi), %r15
+
+	/* align stack to 16 bytes */
+	subq $0x10, %rsp
+	andq $~0xF, %rsp
 
 	/* set fs */
 	movq FS_OFF(%rdi), %rax
@@ -101,6 +110,57 @@ scheduler_transferTo:
 
 	/* iret to new context */
 	iretq
+
+	.globl scheduler_isr
+scheduler_isr:
+	subq $8, %rsp /* skip rip */
+	subq $8, %rsp /* skip rfl */
+
+	movq %cr3, %rax
+	pushq %rax /* cr3 */
+
+	subq $8, %rsp /* skip cs */
+
+	xorq %rax, %rax
+
+	movw %fs, %ax
+	pushq %rax /* fs */
+
+	movw %ds, %ax
+	pushq %rax /* ds */
+
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	subq $8, %rsp /* skip rsp */
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
+
+	movq FRAME_RSP_OFF(%rsp), %rax
+	movq %rax, RSP_OFF(%rsp) /* rsp */
+
+	movq FRAME_CS_OFF(%rsp), %rax
+	movq %rax, CS_OFF(%rsp) /* cs */
+
+	movq FRAME_RFL_OFF(%rsp), %rax
+	movq %rax, RFL_OFF(%rsp) /* rfl */
+
+	movq FRAME_RIP_OFF(%rsp), %rax
+	movq %rax, RIP_OFF(%rsp) /* rip */
+
+	movq %rsp, %rdi
+
+	call scheduler_reenter
 
 #endif /* CORE_SCHEDULERASM_S*/
 

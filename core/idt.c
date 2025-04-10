@@ -92,10 +92,10 @@ uint64_t idt_translateCode(uint64_t code) {
 	return idt_isrs[(uint8_t)code].code;
 }
 
-void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp) {
+void idt_installisrs(volatile struct IDTD* idt, uint64_t* gdt, uint64_t* rsp) {
 	/* first create TSS so that ISTs work */
-	struct TSS* volatile tss  = (struct TSS* volatile)kmalloc(sizeof(struct TSS));
-	struct TSSD* volatile tssd = (struct TSSD* volatile)&gdt[8];
+	volatile struct TSS* tss  = (volatile struct TSS* )kmalloc(sizeof(struct TSS));
+	volatile struct TSSD* tssd = (volatile struct TSSD* )&gdt[8];
 
 	tssd->lim0 = (sizeof(struct TSS) - 1) & 0xFFFF;
 	tssd->base0 = (uint64_t)tss & 0xFFFF;
@@ -162,7 +162,7 @@ void idt_installisrs(struct IDTD* volatile idt, uint64_t* gdt, uint64_t* rsp) {
 	IDTDE2(ISR_MC, 0x12, 3);	
 }
 
-void idt_installisr(struct IDTD* volatile idt, uint8_t index, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present) {
+void idt_installisr(volatile struct IDTD* idt, uint8_t index, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present) {
 	const uint64_t irq_size = (uint64_t)&irq_dummy_end - (uint64_t)&irq_dummy_start;
 	const uint64_t offsymb = (uint64_t)&irq_handlers + irq_size * ((uint64_t)index - FREE_ISRS_START);
 	idt[index].off0 = offsymb & 0xFFFF;
@@ -175,7 +175,7 @@ void idt_installisr(struct IDTD* volatile idt, uint8_t index, uint8_t ist, uint8
 	idt[index].off2 = (uint32_t)(offsymb >> 32);
 }
 
-void idt_installcustomisr(struct IDTD* volatile idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
+void idt_installcustomisr(volatile struct IDTD* idt, uint64_t offsymb, uint8_t ist, uint8_t type, uint8_t dpl, uint8_t present, uint8_t v) {
 	idt[v].off0 = offsymb & 0xFFFF;
 	idt[v].segsel = IDT_KCODESEG;
 	idt[v].ist = (uint8_t)(ist & 0x7);

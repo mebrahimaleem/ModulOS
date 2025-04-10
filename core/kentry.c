@@ -43,26 +43,26 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	}
 
 	/* get memmap */
-	uint32_t total_size = ((struct mb2tag_fixed* volatile)(uint64_t)mb2tag_ptr)->total_size;
+	uint32_t total_size = ((volatile struct mb2tag_fixed* )(uint64_t)mb2tag_ptr)->total_size;
 	uint32_t i;
-	struct mb2tag_memmap* volatile memmap;
+	volatile struct mb2tag_memmap* memmap;
 	uint32_t t0;
 
 	/* parse tags */
-	for (i = mb2tag_ptr + sizeof(struct mb2tag_fixed); i < mb2tag_ptr + total_size; i += ((struct mb2tag_start* volatile)(uint64_t)i)->size) {
+	for (i = mb2tag_ptr + sizeof(struct mb2tag_fixed); i < mb2tag_ptr + total_size; i += ((volatile struct mb2tag_start* )(uint64_t)i)->size) {
 		/* align to 8 byte */
 		t0 = i % 8;
 		i += t0 == 0 ? 0 : 8 - t0;
 
 		/* check tag */
-		switch (((struct mb2tag_start* volatile)(uint64_t)i)->type) {
+		switch (((volatile struct mb2tag_start* )(uint64_t)i)->type) {
 			case MB2TAG_TYPE_END: //last tag
 				i = mb2tag_ptr + total_size;
 				break;
 
 			case MB2TAG_TYPE_MEMMAP:
-				memmap = (struct mb2tag_memmap* volatile)(uint64_t)i;
-				kavail_memory.entries = memmap->entries;
+				memmap = (volatile struct mb2tag_memmap* )(uint64_t)i;
+				kavail_memory.entries =(struct mb2tag_memmap_entry*)memmap->entries;
 				kavail_memory.length = (uint32_t)((memmap->size - sizeof(struct mb2tag_memmap) + sizeof(struct mb2tag_memmap_entry)) / memmap->entry_size);
 				break;
 			default:
@@ -71,7 +71,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	}
 
 	/* set kernel instance to 0 */
-	kPML4T = (PML4T_t volatile)&k0PML4T;
+	kPML4T = (volatile PML4T_t )&k0PML4T;
 
 	/* init atomic */
 	atomicinit();
@@ -94,7 +94,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 
 	static uint64_t k0rsp[] = {(uint64_t)&rsp0, (uint64_t)&rsp1, (uint64_t)&rsp2, (uint64_t)&rsp3, (uint64_t)&rsp4, (uint64_t)&rsp5, (uint64_t)&rsp6, (uint64_t)&rsp7};
 	idt_init();
-	idt_installisrs((struct IDTD* volatile)&IDT_BASE, (uint64_t*)0x7000, &k0rsp[0]);
+	idt_installisrs((volatile struct IDTD* )&IDT_BASE, (uint64_t*)0x7000, &k0rsp[0]);
 	loadidt();
 
 	INFO_LOG("Interrupts init done");
@@ -144,15 +144,15 @@ void kapentry() {
 	INFO_LOG("Starting interrupts init...");
 
 	uint64_t rsp[8] = {
-		(uint64_t)kmalloc(0x4000),
-		(uint64_t)kmalloc(0x1000),
-		(uint64_t)kmalloc(0x1000),
-		(uint64_t)kmalloc(0x1000),
-		(uint64_t)kmalloc(0x80),
-		(uint64_t)kmalloc(0x80),
-		(uint64_t)kmalloc(0x80),
-		(uint64_t)kmalloc(0x80)};
-	idt_installisrs((struct IDTD* volatile)&IDT_BASE, (uint64_t*)mp_gdtptr.off, &rsp[0]);
+		mp_rsp,
+		(uint64_t)kmalloc(0x1000) + 0x1000,
+		(uint64_t)kmalloc(0x1000) + 0x1000,
+		(uint64_t)kmalloc(0x1000) + 0x1000,
+		(uint64_t)kmalloc(0x80) + 0x80,
+		(uint64_t)kmalloc(0x80) + 0x80,
+		(uint64_t)kmalloc(0x80) + 0x80,
+		(uint64_t)kmalloc(0x1000) + 0x1000};
+	idt_installisrs((volatile struct IDTD* )&IDT_BASE, (uint64_t*)mp_gdtptr.off, &rsp[0]);
 	loadidt();
 
 	INFO_LOG("Interrupts init done");

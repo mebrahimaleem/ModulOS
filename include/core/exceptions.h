@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-void exception_handler(uint64_t code, uint64_t frameptr, uint64_t cr3);
+__attribute__((noreturn)) void exception_handler(uint64_t code, uint64_t frameptr, uint64_t cr3);
 
 #endif /* CORE_EXCEPTIONS_H */
 

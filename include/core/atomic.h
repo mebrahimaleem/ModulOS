@@ -44,8 +44,7 @@ void ksti(void);
 
 void kcli(void);
 
-void kunlockBus(void);
-void klockBus(void);
+uint64_t kxchg(volatile uint64_t* ptr, uint64_t v);
 
 void setInterrupts(uint8_t set);
 

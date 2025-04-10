@@ -59,6 +59,8 @@
 #define LAPIC_EROR_CODE		0x6
 #define LAPIC_SPURIOUS_VECTOR	0xFF
 
+#include <core/idt.h>
+
 extern uint64_t ISR_CMCI;
 extern uint64_t ISR_TIMR;
 extern uint64_t ISR_THRM;
@@ -155,7 +157,7 @@ void apic_initlocal(void);
 
 void apic_initlocalap(void);
 
-void apic_installisrs(struct IDTD* volatile idtd);
+void apic_installisrs(volatile struct IDTD* idtd);
 
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest);
 
@@ -166,5 +168,7 @@ uint8_t apic_getId(void);
 void apic_lapic_sendeoi(void);
 
 void apic_lapic_calibrateTimer(void);
+
+void apic_setTimerDeadline(uint64_t us);
 
 #endif /* APIC_LAPIC_H */

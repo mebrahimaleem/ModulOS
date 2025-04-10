@@ -327,8 +327,9 @@ rsp5:
 .endr
 rsp6:
 
+/* scheduler stack */
 	.globl rsp7
-.rept 0x10
+.rept 0x200
 	.quad 0
 .endr
 rsp7:

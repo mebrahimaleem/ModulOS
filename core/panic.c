@@ -18,6 +18,8 @@
 #ifndef CORE_PANIC_C
 #define CORE_PANIC_C
 
+#include <stdint.h>
+
 #include <core/utils.h>
 #include <core/serial.h>
 #include <core/panic.h>
@@ -41,6 +43,12 @@ __attribute__((noreturn)) void panic(uint64_t err) {
 
 __attribute__((noreturn)) void panicmsg(const char* msg) {
 	PANIC_LOG(msg);
+
+	panic_hlt();
+}
+
+__attribute__((noreturn)) void panicmsgc(const char* msg, uint64_t c) {
+	PANIC_LOGF("%s 0x%lX", msg, c);
 
 	panic_hlt();
 }

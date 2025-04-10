@@ -55,9 +55,13 @@ struct PCB {
 	struct PCB* prev;
 } __attribute__((packed));
 
+extern const void scheduler_isr;
+
 __attribute__((noreturn)) void scheduler_nextTask(void);
 
 __attribute__((noreturn)) void scheduler_transferTo(struct PCB* pcb);
+
+__attribute__((noreturn)) void scheduler_reenter(struct PCB* pcb);
 
 void scheduler_schedulePCB(struct PCB* pcb);
 

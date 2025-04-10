@@ -115,8 +115,8 @@ void apic_initio() {
 			break;
 		}
 
-		*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOAPICVER;
-		const uint8_t maxreds = (uint8_t)(*(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) >> 16);
+		*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOAPICVER;
+		const uint8_t maxreds = (uint8_t)(*(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) >> 16);
 
 		tapic = kmalloc(sizeof(struct apic_ioapic));
 		tapic->mingsi = ioapic->intstart;
@@ -133,15 +133,15 @@ void apic_initio() {
 				panic(KPANIC_APIC);
 			}
 
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i;
-			lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) & LO_MASK;
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i + 1;
-			hi = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) & HI_MASK;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i;
+			lo = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) & LO_MASK;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i + 1;
+			hi = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) & HI_MASK;
 
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo | isr | DLVRY_FIXED | DEST_PHYSCL | flags[i + ioapic->intstart];
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i + 1;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apic_getId() << 24);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = lo | isr | DLVRY_FIXED | DEST_PHYSCL | flags[i + ioapic->intstart];
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + i + i + 1;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apic_getId() << 24);
 
 			/* mask everything, unmask as we need them */	
 			apic_maskIrq(i + ioapic->intstart);
@@ -151,7 +151,7 @@ void apic_initio() {
 				apic_pitisr = isr; //save vector for calibration purposes
 			}
 
-			idt_installisr((struct IDTD* volatile)&IDT_BASE, isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
+			idt_installisr((volatile struct IDTD* )&IDT_BASE, isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 		}
 	}
 
@@ -174,15 +174,15 @@ void apic_maskIrq(uint32_t gsi) {
 			const uint32_t index = gsi - ioapic->mingsi;
 
 			/* mask the irq */
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
-			uint32_t lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
-			uint32_t hi = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			uint32_t lo = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			uint32_t hi = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base);
 
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo | MASK_INT;
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = lo | MASK_INT;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = hi;
 			 break;
 		}
 	}
@@ -197,15 +197,15 @@ void apic_unmaskIrq(uint32_t gsi) {
 			const uint32_t index = gsi - ioapic->mingsi;
 
 			/* unmask the irq */
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
-			uint32_t lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
-			uint32_t hi = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			uint32_t lo = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			uint32_t hi = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base);
 
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo & (uint32_t)~MASK_INT;
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = lo & (uint32_t)~MASK_INT;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = hi;
 			 break;
 		}
 	}
@@ -220,15 +220,15 @@ void apic_changeTarget(uint32_t gsi, uint8_t apicid) {
 			const uint32_t index = gsi - ioapic->mingsi;
 
 			/* change target field */
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
-			uint32_t lo = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base);
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
-			uint32_t hi = *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) & HI_MASK;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			uint32_t lo = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			uint32_t hi = *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) & HI_MASK;
 
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = lo;
-			*(uint32_t* volatile)(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
-			 *(uint32_t* volatile)(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apicid << 24);
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = lo;
+			*(volatile uint32_t* )(uint64_t)(IOREGSEL_OFF + ioapic->base) = IOREDTBL_ST + index + index + 1;
+			 *(volatile uint32_t* )(uint64_t)(IOWIN_OFF + ioapic->base) = hi | (apicid << 24);
 			 break;
 		}
 	}

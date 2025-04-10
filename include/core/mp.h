@@ -23,7 +23,7 @@
 extern uint64_t mp_bootstrap;
 extern uint64_t mp_pdpt0;
 
-extern uint8_t mp_loading;
+extern volatile uint8_t mp_loading;
 extern uint64_t mp_rsp;
 extern struct {
 	uint16_t len;

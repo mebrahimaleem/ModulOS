@@ -66,7 +66,7 @@ APIC_TARGETS := $(APIC_TARGETS_C) $(APIC_TARGETS_S)
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
-CDEBUG := -D DEBUG -O0
+#CDEBUG := -D DEBUG -O0
 CFLAGS := $(CWARN) -O2 $(CDEBUG) -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
 	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g3 -F dwarf -I $(CURDIR)/include/
 
@@ -84,7 +84,7 @@ clean:
 
 .PHONY: simulateqemu
 simulateqemu: $(obj)/modulos.img | $(test)/
-	qemu-system-x86_64 -s -S -smp sockets=1,cores=4,threads=1 -serial vc -serial file:$(test)/serial -d cpu_reset,int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
+	qemu-system-x86_64 -s -smp 4 -serial vc -serial file:$(test)/serial -d cpu_reset,int -m 16G -monitor stdio -drive format=raw,file=$<,if=ide,media=disk
 
 .PHONY: debuggdb
 debuggdb: $(obj)/modulos-dbg

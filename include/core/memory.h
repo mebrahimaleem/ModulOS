@@ -63,7 +63,7 @@ enum PageGranularity {
 	PAGE_GRANULARITY_1G,
 };
 
-extern PML4T_t volatile kPML4T;
+extern volatile PML4T_t kPML4T;
 
 extern uint8_t _pmembitmap;
 extern const void _kheap_shared;

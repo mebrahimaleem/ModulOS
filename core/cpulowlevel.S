@@ -70,5 +70,11 @@ ltr:
 	ltr %ax
 	ret
 
+/* void pause(void); */
+	.globl pause
+pause:
+	pause
+	ret
+
 #endif /* CORE_CPULOWLEVEL_S */
 

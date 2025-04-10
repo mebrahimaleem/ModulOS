@@ -21,11 +21,17 @@
 #include <stdint.h>
 
 #include <core/atomic.h>
+#include <core/cpulowlevel.h>
 #include <core/memory.h>
 #include <core/scheduler.h>
+#include <core/serial.h>
 
-struct PCB* bot = 0;
-struct PCB* top = 0;
+#include <apic/lapic.h>
+
+#define QUANTUM_US	50000
+
+struct PCB* volatile bot = 0;
+struct PCB* volatile top = 0;
 
 mutex_t scheduler_mutex;
 
@@ -42,7 +48,7 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 	struct PCB* temp;
 	while (1) {
 		kacquireMutex(scheduler_mutex);
-		
+
 		if (top != 0) {
 			/* dequeue from queue */
 			pcb = *top;
@@ -52,17 +58,52 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 				bot = 0;
 			}
 
-			kfree(temp);
+			kfree((struct PCB*)temp);
 
 			kreleaseMutex(scheduler_mutex);
 			break;
 		}
 
 		kreleaseMutex(scheduler_mutex);
-		while (top == 0);
+		while (top == 0)
+			pause();
 	}
 
+	apic_setTimerDeadline(QUANTUM_US);
 	scheduler_transferTo(&pcb);
+}
+
+__attribute__((noreturn)) void scheduler_reenter(struct PCB* pcb) {
+	apic_lapic_sendeoi();
+
+	struct PCB* nonvolatile = kmalloc(sizeof(struct PCB));
+	
+	nonvolatile->rip = pcb->rip;
+	nonvolatile->rfl = pcb->rfl;
+	nonvolatile->cr3 = pcb->cr3;
+	nonvolatile->cs  = pcb->cs;
+	nonvolatile->fs  = pcb->fs;
+	nonvolatile->ds  = pcb->ds;
+	nonvolatile->r15 = pcb->r15;
+	nonvolatile->r14 = pcb->r14;
+	nonvolatile->r13 = pcb->r13;
+	nonvolatile->r12 = pcb->r12;
+	nonvolatile->r11 = pcb->r11;
+	nonvolatile->r10 = pcb->r10;
+	nonvolatile->r9  = pcb->r9;
+	nonvolatile->r8  = pcb->r8;
+	nonvolatile->rdi = pcb->rdi;
+	nonvolatile->rsi = pcb->rsi;
+	nonvolatile->rbp = pcb->rbp;
+	nonvolatile->rsp = pcb->rsp;
+	nonvolatile->rdx = pcb->rdx;
+	nonvolatile->rcx = pcb->rcx;
+	nonvolatile->rbx = pcb->rbx;
+	nonvolatile->rax = pcb->rax;
+	
+	scheduler_schedulePCB(nonvolatile);
+	
+	scheduler_nextTask();
 }
 
 void scheduler_schedulePCB(struct PCB* pcb) {

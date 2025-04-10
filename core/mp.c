@@ -60,8 +60,8 @@ void mp_initall() {
 	outb(CMOS_DATA, SHUTDOWN_AP_STARTUP);
 
 	/* set warm reset vector */
-	*(uint16_t* volatile)(WARM_RESET_VSEG) = (uint16_t)((uint64_t)&mp_bootstrap >> 4);
-	*(uint16_t* volatile)(WARM_RESET_VOFF) = (uint16_t)0; // since ap startup routine is 4K aligned
+	*(volatile uint16_t* )(WARM_RESET_VSEG) = (uint16_t)((uint64_t)&mp_bootstrap >> 4);
+	*(volatile uint16_t* )(WARM_RESET_VOFF) = (uint16_t)0; // since ap startup routine is 4K aligned
 
 	uint8_t reg;
 	/* temporarly program RTC timer for polling 1024Hz */

@@ -29,6 +29,8 @@ void cpuid(uint32_t ieax, uint32_t iecx, uint32_t* oeax, uint32_t* oebx, uint32_
 
 void ltr(void);
 
+void pause(void);
+
 #endif /* CORE_CPULOWLEVEL_H */
 
 
