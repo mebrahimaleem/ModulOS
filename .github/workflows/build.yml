@@ -14,7 +14,7 @@ jobs:
       - name: Install apt packages
         run: |
           sudo apt update
-          sudo apt install build-essential bison flex texinfo xorriso mtools grub-pc grub-pc-bin grub-gfxpayload-lists
+          sudo apt install build-essential bison flex texinfo xorriso mtools grub-pc grub-pc-bin grub-gfxpayload-list libgmp-dev libmpfr-dev libmpc-dev libisl-dev gettext
 
       - name: Export variables
         run: |
@@ -54,7 +54,6 @@ jobs:
       - name: Build gcc
         working-directory: build-gcc
         run: |
-          (cd ../gcc-${GCCVER}/ && exec contrib/download_prerequisites)
           ../gcc-${GCCVER}/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers 
           make -j5 all-gcc
           sudo make install-gcc
