@@ -32,4 +32,6 @@ __attribute__((noreturn)) void panic(uint64_t err);
 
 __attribute__((noreturn)) void panicmsg(const char* msg);
 
+__attribute__((noreturn)) void panicmsgc(const char* msg, uint64_t c);
+
 #endif /* CORE_PANIC_H */

@@ -22,8 +22,8 @@
 #include <core/atomic.h>
 #include <core/cpulowlevel.h>
 #include <core/portio.h>
-#include <core/IDT.h>
-#include <core/serial.h>
+#include <core/idt.h>
+#include <core/scheduler.h>
 #include <core/memory.h>
 
 #include <apic/calibrate.h>
@@ -32,7 +32,6 @@
 #include <apic/pic8259.h>
 #include <apic/ioapic.h>
 #include <acpi/madt.h>
-
 
 #define LAPIC_MSR_BASE				0x1B
 #define LAPIC_MSR_ENABLE			0x800
@@ -125,11 +124,11 @@ void apic_initlocal() {
 	lapic_isrs[4] = idt_claimIsrVector(LAPIC_LNT0_CODE + ISR_LAPIC_START);
 	lapic_isrs[5] = idt_claimIsrVector(LAPIC_EROR_CODE + ISR_LAPIC_START);
 
-	apic_installisrs((struct IDTD* volatile)&IDT_BASE);
+	apic_installisrs((volatile struct IDTD*)&IDT_BASE);
 	apic_initlocalap();
 }
 
-void apic_installisrs(struct IDTD* volatile idtd) {
+void apic_installisrs(volatile struct IDTD* idtd) {
 	idt_installisr(idtd, lapic_isrs[0], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 	idt_installisr(idtd, lapic_isrs[1], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 	idt_installisr(idtd, lapic_isrs[2], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
@@ -141,7 +140,7 @@ void apic_installisrs(struct IDTD* volatile idtd) {
 
 void apic_initlocalap() {
 	/* disable while being set up */
-	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR;
+	*(volatile uint32_t* )(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR;
 
 	/* set LVTs */
 	union LAPIC_LVT lvt;	
@@ -149,25 +148,25 @@ void apic_initlocalap() {
 	lvt.cmci.vector = lapic_isrs[0];
 	lvt.cmci.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.cmci.mask = NOMASK;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_CMCI_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_CMCI_OFF) = lvt;
 
 	lvt.zero = 0;
 	lvt.timer.vector = lapic_isrs[1];
 	lvt.timer.mask = NOMASK;
 	lvt.timer.timr_mode = ONESHOT_TIMER;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_TIMR_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_TIMR_OFF) = lvt;
 
 	lvt.zero = 0;
 	lvt.thrm.vector = lapic_isrs[2];
 	lvt.thrm.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.thrm.mask = NOMASK;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_THRM_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_THRM_OFF) = lvt;
 
 	lvt.zero = 0;
 	lvt.perfcm.vector = lapic_isrs[3];
 	lvt.perfcm.dlvry_mode = LAPIC_DLVRY_FIXED;
 	lvt.perfcm.mask = NOMASK;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_PRCR_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_PRCR_OFF) = lvt;
 
 	/* ExtINT */
 	lvt.zero = 0;
@@ -176,7 +175,7 @@ void apic_initlocalap() {
 	lvt.lint0.iipp = IIPP_HIGH;
 	lvt.lint0.trig_mode = LAPIC_TRIGMODE_EDGE;
 	lvt.lint0.mask = NOMASK;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT0_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_LNT0_OFF) = lvt;
 
 	/* NMI */
 	lvt.zero = 0;
@@ -185,42 +184,44 @@ void apic_initlocalap() {
 	lvt.lint1.iipp = IIPP_HIGH;
 	lvt.lint1.trig_mode = LAPIC_TRIGMODE_EDGE;
 	lvt.lint1.mask = NOMASK;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_LNT1_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_LNT1_OFF) = lvt;
 	/* NMI handler already installed */
 
 	lvt.error.vector = lapic_isrs[5];
 	lvt.error.mask = NOMASK;
-	*(union LAPIC_LVT* volatile)(lapic_base + LAPIC_LVT_EROR_OFF) = lvt;
+	*(volatile union LAPIC_LVT* )(lapic_base + LAPIC_LVT_EROR_OFF) = lvt;
 
 	/* disable timer */
-	*(uint32_t* volatile)(lapic_base + LAPIC_ICD_OFF) = TIMER_DISABLE;
-	*(uint32_t* volatile)(lapic_base + LAPIC_TMR_DIV_OFF) = LAPIC_TMR_DIV;
+	*(volatile uint32_t* )(lapic_base + LAPIC_ICD_OFF) = TIMER_DISABLE;
+	*(volatile uint32_t* )(lapic_base + LAPIC_TMR_DIV_OFF) = LAPIC_TMR_DIV;
 	
 	/* enable */
-	*(uint32_t* volatile)(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
+	*(volatile uint32_t* )(lapic_base + LAPIC_SVR_OFF) = LAPIC_SPURIOUS_VECTOR | LAPIC_INT_ENABLE;
 
 	/* create cpuspecific entry */
 	lapic_percpu[apic_getId()] = kmalloc(sizeof(struct cpu_specific));
 }
 
 void apic_lapic_sendeoi() {
-	*(uint32_t* volatile)(lapic_base + LAPIC_EOI_OFF) = LAPIC_EOI;
+	*(volatile uint32_t* )(lapic_base + LAPIC_EOI_OFF) = LAPIC_EOI;
 }
 
 void apic_lapic_sendipi(uint8_t v, uint32_t flg, uint8_t dest) {
 	kacquireMutex(ipi_mutex);
 	apic_lapic_waitForIpi();
-	*(uint32_t* volatile)(lapic_base + LAPIC_ICR1_OFF) = dest << 24;
-	*(uint32_t* volatile)(lapic_base + LAPIC_ICR0_OFF) = v | flg;
+	*(volatile uint32_t* )(lapic_base + LAPIC_ICR1_OFF) = dest << 24;
+	*(volatile uint32_t* )(lapic_base + LAPIC_ICR0_OFF) = v | flg;
 	kreleaseMutex(ipi_mutex);
 }
 
-void apic_lapic_waitForIpi(void) {
-	while ((*(uint32_t* volatile)(lapic_base + LAPIC_ICR0_OFF) & IPI_DLVRY_PENDING) == IPI_DLVRY_PENDING);
+
+void apic_lapic_waitForIpi() {
+	while ((*(volatile uint32_t* )(lapic_base + LAPIC_ICR0_OFF) & IPI_DLVRY_PENDING) == IPI_DLVRY_PENDING)
+		pause();
 }
 
 uint8_t apic_getId() {
-	return (uint8_t)(*(uint32_t* volatile)(lapic_base + LAPIC_IDR_OFF) >> 24);
+	return (uint8_t)(*(volatile uint32_t* )(lapic_base + LAPIC_IDR_OFF) >> 24);
 }
 
 void apic_lapic_calibrateTimer() {
@@ -228,7 +229,10 @@ void apic_lapic_calibrateTimer() {
 	kacquireMutex(pit_mutex);
 
 	/* swtich to low latency ISR for high precision calibration */
-	idt_installcustomisr((struct IDTD* volatile)&IDT_BASE, (uint64_t)&lowlatency_isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, apic_pitisr);
+	idt_installcustomisr((volatile struct IDTD*)&IDT_BASE, (uint64_t)&lowlatency_isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, apic_pitisr);
+
+	/* switch to generic ISR to avoid accidently schduling */
+	idt_installisr((volatile struct IDTD*)&IDT_BASE, lapic_isrs[1], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
 	const uint32_t gsi = apic_translateGsi(IOAPIC_ISA_PIT);
 	const uint8_t apicId = apic_getId();
@@ -243,7 +247,10 @@ void apic_lapic_calibrateTimer() {
 	const uint64_t period = TIMER_INITIAL - (uint32_t)calibrate_lapic_timer(gsi, lapic_base);
 
 	/* swtich back to normal ISR */
-	idt_installisr((struct IDTD* volatile)&IDT_BASE, apic_pitisr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
+	idt_installisr((volatile struct IDTD*)&IDT_BASE, apic_pitisr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
+
+	idt_installcustomisr((volatile struct IDTD*)&IDT_BASE, (uint64_t)&scheduler_isr, 7, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, lapic_isrs[1]);
+
 	kreleaseMutex(pit_mutex);
 
 	/*
@@ -256,6 +263,12 @@ void apic_lapic_calibrateTimer() {
 
 	lapic_percpu[apicId]->calib_whole = period / PIT_PERIOD_US;
 	lapic_percpu[apicId]->calib_frac = period % PIT_PERIOD_US;
+}
+
+void apic_setTimerDeadline(uint64_t us) {
+	const uint8_t apicid = apic_getId();
+	const uint32_t deadline = (uint32_t)(us * lapic_percpu[apicid]->calib_whole) + (uint32_t)(us * lapic_percpu[apicid]->calib_frac / PIT_PERIOD_US);
+	*(volatile uint32_t*)(lapic_base + LAPIC_ICD_OFF) = deadline;
 }
 
 #endif /* APIC_LAPIC_C */

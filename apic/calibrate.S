@@ -51,7 +51,9 @@ calibrate_lapic_timer:
   outb %al, PIT_DATA
 
 	pushq %rdi
+	pushq %rsi
 	call apic_unmaskIrq
+	popq %rsi
 	popq %rdi
 
 	// wait for status to become 0 before continuing

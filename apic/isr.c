@@ -21,7 +21,7 @@
 #include <stdint.h>
 
 #include <core/serial.h>
-#include <core/IDT.h>
+#include <core/idt.h>
 
 #include <apic/lapic.h>
 #include <apic/ioapic.h>
@@ -33,18 +33,12 @@ void isr_handler(uint64_t code) {
 		return;
 	}
 
-#ifdef DEBUG
-	serialPrintf(SERIAL1, "ISR: Vector: 0x%x Internal: 0x", code + 0x20);
-#endif
+	uint64_t internal = idt_translateCode(code);
 
-	code = idt_translateCode(code);
-
-#ifdef DEBUG
-	serialPrintf(SERIAL1, "%x\n", code);
-#endif
+	DEBUG_LOGF("ISR Vector: 0x%lx Internal 0x%lx", code, internal);
 
 	// check if no eoi
-	if (code == ISR_LAPIC_START + LAPIC_LNT0_CODE) {
+	if (internal == ISR_LAPIC_START + LAPIC_LNT0_CODE) {
 		return;
 	}
 

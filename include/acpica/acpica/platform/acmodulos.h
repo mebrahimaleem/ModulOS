@@ -23,8 +23,12 @@
 #define ACPI_DEBUGGER
 
 #ifdef DEBUG
-#define ACPI_DEBUG_OUTPUT 1
+#define ACPI_DEBUG_OUTPUT
 #endif
+
+#define ACPI_MSG_INFO			"[INFO]\tACPICA: "
+#define ACPI_MSG_WARNING	"[WARN]\tACPICA: "
+#define ACPI_MSG_ERROR		"[ERROR]\tACPICA: "
 
 #define ACPI_USE_LOCAL_CACHE
 

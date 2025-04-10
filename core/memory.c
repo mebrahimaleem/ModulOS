@@ -45,15 +45,15 @@
 
 uint64_t kphint;
 
-PML4T_t volatile kPML4T;
+volatile PML4T_t kPML4T;
 
-uint8_t* volatile pmembitmap;
+volatile uint8_t* pmembitmap;
 
 struct Blocks32M* kmemblocks32M;
 
-struct BlockDescriptor* volatile heapbase;
+volatile struct BlockDescriptor* heapbase;
 
-struct PagesFree* volatile kpagesfree;
+volatile struct PagesFree* kpagesfree;
 
 StaticMutexHandle pagingGlobalMutex;
 StaticMutexHandle memoryGlobalLock;
@@ -112,7 +112,7 @@ void meminit(void) {
 	}
 
 	/* setup memory */
-	heapbase = (struct BlockDescriptor* volatile)&_kheap_shared;
+	heapbase = (volatile struct BlockDescriptor* )&_kheap_shared;
 	
 	/* shared memory block descriptors */
 	/* first block descriptor is reserved and has the maximum size of the heap (half of remaining memory) */
@@ -183,7 +183,7 @@ uint64_t memfcb(uint64_t length) {
 	return 0; //No memory of length found
 }
 
-void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity) {
+void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity) {
 	_mapv2p(pml4t, vaddr, paddr, flags, granularity, 1);
 }
 
@@ -192,7 +192,7 @@ void mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 * all arguments in bytes and must be 4K page aligned
 * undefined behavior when overwriting previous entries with a different granularity
 */
-void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
+void _mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut) {
 	kacquireStaticMutex(pagingGlobalMutex);
 
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
@@ -210,7 +210,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 		pml4t[l4] = (PDPT_t)(calculatePaddr(kPML4T, t0) | flags);
 	}
 
-	const PDPT_t volatile p4 = (PDPT_t volatile)(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	const volatile PDPT_t p4 = (volatile PDPT_t )(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (granularity == PAGE_GRANULARITY_1G) {
 		p4[l3] = (PDT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
@@ -227,7 +227,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 		p4[l3] = (PDT_t)(calculatePaddr(kPML4T, t0) | flags);
 	}
 
-	const PDT_t p3 = (PDT_t volatile)(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	const PDT_t p3 = (volatile PDT_t )(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (granularity == PAGE_GRANULARITY_2M) {
 		p3[l2] = (PT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
@@ -244,7 +244,7 @@ void _mapv2p(PML4T_t volatile pml4t, void* vaddr, void* paddr, uint8_t flags, en
 		p3[l2] = (PT_t)(calculatePaddr(kPML4T, t0) | flags);
 	}
 
-	const PT_t volatile p2 = (PT_t volatile)(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	const volatile PT_t p2 = (volatile PT_t )(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	p2[l1] = (uint64_t)paddr | flags;
 	tlbflush_addr(vaddr);
@@ -262,7 +262,7 @@ uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut) {
 	kacquireStaticMutex(memoryGlobalLock);
 	uint64_t i = 0;
-	struct PagesFree* t0;
+	volatile struct PagesFree* t0;
 	uint8_t* t1;
 
 	while (i < length && kpagesfree != 0) {
@@ -323,7 +323,7 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 			}
 			t0 = kpagesfree;
 			kpagesfree = kpagesfree->next;
-			kfree(t0);
+			kfree((void*)t0);
 		}
 	}
 
@@ -374,7 +374,7 @@ uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8
 		t0 = (struct PagesFree*)_kmalloc(sizeof(struct PagesFree), use_mut);
 		t0->length = PMEMBITS_G - rem;
 		t0->addr = t1;
-		t0->next = kpagesfree;
+		t0->next = (struct PagesFree*)kpagesfree;
 		kpagesfree = t0;
 	}
 
@@ -404,7 +404,7 @@ void* _kmalloc(uint64_t length, uint8_t use_mut) {
 	const uint64_t alen = length + sizeof(struct BlockDescriptor) + 8 - (length % 8);
 	
 	void* ret;
-	struct BlockDescriptor* volatile block = &heapbase[4];
+	volatile struct BlockDescriptor* block = &heapbase[4];
 	uint64_t t0;
 
 	while (alen + (uint64_t)block < lim + (uint64_t)heapbase) {
@@ -413,7 +413,7 @@ void* _kmalloc(uint64_t length, uint8_t use_mut) {
 			block->flags = KMEM_BLOCK_USED;
 			block->size = KMEM_BLOCK_SIZEMASK & alen;
 			ret = (void*)((uint64_t)block + sizeof(struct BlockDescriptor));
-			block = (struct BlockDescriptor* volatile)((uint64_t)(block) + alen);
+			block = (volatile struct BlockDescriptor* )((uint64_t)(block) + alen);
 			
 			/* set next block as free */
 			block->size = 0;
@@ -434,7 +434,7 @@ void* _kmalloc(uint64_t length, uint8_t use_mut) {
 				ret = (void*)((uint64_t)block + sizeof(struct BlockDescriptor));
 
 				/* get next block */
-				block = (struct BlockDescriptor* volatile)((uint64_t)(block) + block->size);
+				block = (volatile struct BlockDescriptor* )((uint64_t)(block) + block->size);
 
 				block->flags = KMEM_BLOCK_FREE;
 				block->size = KMEM_BLOCK_SIZEMASK & (t0 - alen);
@@ -456,7 +456,7 @@ void* _kmalloc(uint64_t length, uint8_t use_mut) {
 		}
 
 		/* get next block */
-		block = (struct BlockDescriptor* volatile)((uint64_t)(block) + block->size);
+		block = (volatile struct BlockDescriptor* )((uint64_t)(block) + block->size);
 	}
 
 	/* out of memory */
@@ -514,7 +514,7 @@ void* _allocpaging(uint8_t use_mut) {
 }
 
 void* krealloc(void* ptr, uint64_t length) {
-	struct BlockDescriptor* volatile block = (struct BlockDescriptor* volatile)((uint64_t)ptr - sizeof(struct BlockDescriptor));
+	volatile struct BlockDescriptor* block = (volatile struct BlockDescriptor* )((uint64_t)ptr - sizeof(struct BlockDescriptor));
 	void* ret;
 
 	//TODO: peek if next if free or last
@@ -534,8 +534,8 @@ void* krealloc(void* ptr, uint64_t length) {
 
 void kfree(void* ptr) {
 	//TODO: call unmap
-	struct BlockDescriptor* volatile block = (struct BlockDescriptor* volatile)((uint64_t)ptr - sizeof(struct BlockDescriptor));
-	const struct BlockDescriptor* nblk = (struct BlockDescriptor* volatile)((uint64_t)(block) + block->size);
+	volatile struct BlockDescriptor* block = (volatile struct BlockDescriptor* )((uint64_t)ptr - sizeof(struct BlockDescriptor));
+	volatile const struct BlockDescriptor* nblk = (volatile struct BlockDescriptor* )((uint64_t)(block) + block->size);
 
 	/* check if next is last */
 	if (nblk->flags == KMEM_BLOCK_LAST) {
@@ -561,19 +561,19 @@ uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr) {
 	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
 	const uint64_t l1 = 0x1FF & ((uint64_t)vaddr / 0x1000); // identify 2GiB
 
-	const PDPT_t volatile p4 = (PDPT_t volatile)(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	const volatile PDPT_t p4 = (volatile PDPT_t )(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) {
 		return ((uint64_t)p4[l3] & PS_ADDR_MASK) | (vaddr & 0xFFFFFFF);
 	}
 
-	const PDT_t p3 = (PDT_t volatile)(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	const PDT_t p3 = (volatile PDT_t )(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (((uint64_t)p3[l2] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) {
 		return ((uint64_t)p3[l2] & PS_ADDR_MASK) | (vaddr & 0xFFFFF);
 	}
 
-	const PT_t volatile p2 = (PT_t volatile)(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	const volatile PT_t p2 = (volatile PT_t )(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	return (p2[l1] & PS_ADDR_MASK) | (vaddr & 0xFFF);
 }

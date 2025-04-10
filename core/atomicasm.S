@@ -22,6 +22,13 @@
 disableInterrupts:
 .byte 0
 
+/* uint64_t kxchg(uint64_t* ptr, uint64_t v); */
+	.globl kxchg
+kxchg:
+	lock xchg (%rdi), %rsi
+	mov %rsi, %rax
+	ret
+
 /* void ksti(void); */
   .globl ksti
 ksti:

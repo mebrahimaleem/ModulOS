@@ -19,55 +19,54 @@
 #define CORE_ATOMIC_C
 
 #include <core/atomic.h>
+#include <core/cpulowlevel.h>
+#include <core/serial.h>
 #include <core/memory.h>
+
+#include <apic/lapic.h>
+
+#define MAX_KSTATICMUTEX	0x20
+#define LOCK							0x01
+#define UNLOCK						0x00
 
 extern uint8_t disableInterrupts;
 
-#define MAX_KSTATICMUTEX 0x1000
+static uint64_t kstaticmutexes[MAX_KSTATICMUTEX];
 
-static uint8_t kstaticmutexes[MAX_KSTATICMUTEX / sizeof(uint8_t)];
-
-uint8_t* kmutexes;
+volatile uint64_t* kmutexes;
 
 uint64_t knextMutex;
-uint64_t knumMutex;
 
 void atomicinit(void) {
 	knextMutex = 0;
-	knumMutex = MAX_KSTATICMUTEX;
 	kmutexes = kstaticmutexes;
 	disableInterrupts = 1;
 }
 
 StaticMutexHandle kcreateStaticMutex() {
 	kcli();
-	kmutexes[knextMutex / sizeof(uint8_t)] &= (uint8_t)~(1 << (knextMutex % sizeof(uint8_t))); // clear mutex bit
+	kmutexes[knextMutex] = 0;
 	knextMutex++;
 	ksti();
 	return knextMutex - 1;
 }
 
 void kacquireStaticMutex(StaticMutexHandle handle) {
-	const uint64_t i = handle / sizeof(uint8_t);
-	const uint8_t mask = 1 << (handle % sizeof(uint8_t));
-	
+	uint64_t exp;
 	while (1) {
 		kcli();
-		if ((kmutexes[i] & mask) == 0) {
-			kmutexes[i] |= mask;
-			ksti();
-			return;
-		}
+		exp = kxchg(&kmutexes[handle], LOCK);
 		ksti();
+		if (exp == UNLOCK) return;
 
 		// fast inner busy wait to avoid cli too often
-		while((kmutexes[i] & mask) == mask);
+		while(kmutexes[handle] == LOCK);
 	}
 }
 
 void kreleaseStaticMutex(StaticMutexHandle handle) {
 	kcli();
-	kmutexes[handle / sizeof(uint8_t)] &= (uint8_t)~(1 << (handle % sizeof(uint8_t))); // clear mutex bit
+	kxchg(&kmutexes[handle], UNLOCK);
 	ksti();
 }
 
@@ -77,28 +76,27 @@ void setInterrupts(uint8_t set) {
 
 mutex_t kcreateMutex() {
 	mutex_t ret = kmalloc(sizeof(_mutex_t));
-	*ret = 0;
+	*ret = UNLOCK;
 	return ret;
 }
 
 void kacquireMutex(mutex_t handle) {
+	uint64_t exp;
 	while (1) {
 		kcli();
-		if (*handle == 0) {
-			*handle = 1;
-			ksti();
-			return;
-		}
+		exp = kxchg(handle, LOCK);
 		ksti();
+		if (exp == UNLOCK) break;
 
 		// fast inner busy wait to avoid cli too often
-		while(*handle == 1);
+		while(*(volatile mutex_t )handle == LOCK)
+			pause();
 	}
 }
 
 void kreleaseMutex(mutex_t handle) {
 	kcli();
-	*handle = 0;
+	kxchg(handle, UNLOCK);
 	ksti();
 }
 
@@ -113,6 +111,7 @@ semaphore_t kcreateSemaphore(uint64_t initial, uint64_t max) {
 }
 
 void kacquireSemaphore(semaphore_t handle, uint64_t count) {
+	//TODO: implement bus locking
 	while (1) {
 		kcli();
 		if (*handle >= count) {
@@ -128,6 +127,7 @@ void kacquireSemaphore(semaphore_t handle, uint64_t count) {
 }
 
 void kreleaseSemaphore(semaphore_t handle, uint64_t count) {
+	//TODO: implement bus locking
 	kcli();
 	*handle += count;
 	ksti();
@@ -144,6 +144,7 @@ spinlock_t kcreateSpinlock() {
 }
 
 void kacquireSpinlock(spinlock_t handle) {
+	//TODO: implement bus locking
 	while (1) {
 		kcli();
 		if (*handle == 0) {
@@ -159,6 +160,7 @@ void kacquireSpinlock(spinlock_t handle) {
 }
 
 void kreleaseSpinlock(spinlock_t handle) {
+	//TODO: implement bus locking
 	kcli();
 	*handle = 0;
 	ksti();

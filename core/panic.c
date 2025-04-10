@@ -18,6 +18,8 @@
 #ifndef CORE_PANIC_C
 #define CORE_PANIC_C
 
+#include <stdint.h>
+
 #include <core/utils.h>
 #include <core/serial.h>
 #include <core/panic.h>
@@ -34,15 +36,19 @@ __attribute__((noreturn)) void panic(uint64_t err) {
 		err = KPANIC_UNK;
 	}
 
-	serialPrintf(SERIAL1, "PANIC: 0x%lX: %s\n", (uint64_t)err, panicmsgs[err]);
-	serialPrintf(SERIAL2, "PANIC: 0x%lX: %s\n", (uint64_t)err, panicmsgs[err]);
+	PANIC_LOGF("0x%lX: %s", (uint64_t)err, panicmsgs[err]);
 	
 	panic_hlt();
 }
 
 __attribute__((noreturn)) void panicmsg(const char* msg) {
-	serialPrintf(SERIAL1, "PANIC: %s\n", msg);
-	serialPrintf(SERIAL2, "PANIC: %s\n", msg);
+	PANIC_LOG(msg);
+
+	panic_hlt();
+}
+
+__attribute__((noreturn)) void panicmsgc(const char* msg, uint64_t c) {
+	PANIC_LOGF("%s 0x%lX", msg, c);
 
 	panic_hlt();
 }

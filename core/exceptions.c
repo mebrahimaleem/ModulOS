@@ -20,17 +20,14 @@
 
 #include <stdint.h>
 
-#include <core/utils.h>
 #include <core/panic.h>
 
 #include <core/exceptions.h>
 
 void exception_handler(uint64_t code, uint64_t frameptr, uint64_t cr3) {
 	//TODO: handle exception
-	char* msg;
-	formatstr2("Exception: 0x%X", &msg, code);
-	panicmsg(msg);
 
+	panicmsgc("Exception: ", code);
 }
 
 #endif /* CORE_EXCEPTIONS_C */
