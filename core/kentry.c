@@ -86,6 +86,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 #endif /* DEBUG */
 	
 	/* init memory manager */
+	initpaging();
 	meminit();
 
 	INFO_LOG("Memory init done");
