@@ -59,6 +59,8 @@
 #define LAPIC_EROR_CODE		0x6
 #define LAPIC_SPURIOUS_VECTOR	0xFF
 
+#define LAPIC_IPI_FLUSH_CODE	0x7
+
 #include <core/idt.h>
 
 extern uint64_t ISR_CMCI;
@@ -170,5 +172,7 @@ void apic_lapic_sendeoi(void);
 void apic_lapic_calibrateTimer(void);
 
 void apic_setTimerDeadline(uint64_t us);
+
+void apic_lapic_sendipi_flush(void);
 
 #endif /* APIC_LAPIC_H */

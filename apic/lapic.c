@@ -80,6 +80,8 @@
 #define PIT_LOHI							0x30
 #define PIT_CHN0							0x00
 
+#define IPI_FLUSH_INDEX				0x0
+
 /* no need to keep track of fraction since PIT is not precise enough */
 #define PIT_PERIOD_US					10000
 
@@ -88,6 +90,9 @@ mutex_t ipi_mutex;
 mutex_t pit_mutex;
 
 uint8_t lapic_isrs[6];
+uint8_t ipi_isrs[1];
+
+uint8_t lapic_init = 0;
 
 struct cpu_specific* lapic_percpu[256];
 
@@ -127,8 +132,12 @@ void apic_initlocal() {
 	lapic_isrs[4] = idt_claimIsrVector(LAPIC_LNT0_CODE + ISR_LAPIC_START);
 	lapic_isrs[5] = idt_claimIsrVector(LAPIC_EROR_CODE + ISR_LAPIC_START);
 
+	ipi_isrs[IPI_FLUSH_INDEX] = idt_claimIsrVector(LAPIC_IPI_FLUSH_CODE + ISR_LAPIC_START);
+
 	apic_installisrs((volatile struct IDTD*)&IDT_BASE);
 	apic_initlocalap();
+
+	lapic_init = 1;
 }
 
 void apic_installisrs(volatile struct IDTD* idtd) {
@@ -139,6 +148,8 @@ void apic_installisrs(volatile struct IDTD* idtd) {
 	idt_installisr(idtd, lapic_isrs[4], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 	idt_installisr(idtd, lapic_isrs[5], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 	idt_installisr(idtd, LAPIC_SPURIOUS_VECTOR, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
+
+	idt_installisr(idtd, ipi_isrs[IPI_FLUSH_INDEX], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 }
 
 void apic_initlocalap() {
@@ -272,6 +283,12 @@ void apic_setTimerDeadline(uint64_t us) {
 	const uint8_t apicid = apic_getId();
 	const uint32_t deadline = (uint32_t)(us * lapic_percpu[apicid]->calib_whole) + (uint32_t)(us * lapic_percpu[apicid]->calib_frac / PIT_PERIOD_US);
 	*(volatile uint32_t*)(lapic_base + LAPIC_ICD_OFF) = deadline;
+}
+
+void apic_lapic_sendipi_flush() {
+	if (!lapic_init) return;
+
+	apic_lapic_sendipi(ipi_isrs[IPI_FLUSH_INDEX], LAPIC_IPI_FIXED | LAPIC_IPI_PHYSC | LAPIC_IPI_ASSERT | LAPIC_IPI_EDGE | LAPIC_IPI_ALLEX, 0);
 }
 
 #endif /* APIC_LAPIC_C */

@@ -28,6 +28,8 @@
 
 #include <multiboot2/multiboot2.h>
 
+#include <apic/lapic.h>
+
 #define ORDER_4K		0x0
 #define ORDER_8K		0x1
 #define ORDER_16K		0x2
@@ -266,6 +268,7 @@ void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 	if (granularity == PAGE_GRANULARITY_1G) {
 		p4[l3] = (PDT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
 		tlbflush();
+		apic_lapic_sendipi_flush();
 		return;
 	}
 
@@ -283,6 +286,7 @@ void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 	if (granularity == PAGE_GRANULARITY_2M) {
 		p3[l2] = (PT_t)((uint64_t)paddr | flags | KMEM_PAGEFLAG_PS);
 		tlbflush();
+		apic_lapic_sendipi_flush();
 		return;
 	}
 	
@@ -299,6 +303,7 @@ void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 
 	p2[l1] = (uint64_t)paddr | flags;
 	tlbflush_addr(vaddr);
+	apic_lapic_sendipi_flush();
 }
 
 void paging_changeFlags(PML4T_t pml4t, void* vaddr, uint8_t flags, enum PageGranularity granularity) {
@@ -313,6 +318,7 @@ void paging_changeFlags(PML4T_t pml4t, void* vaddr, uint8_t flags, enum PageGran
 		*(volatile uint64_t*)&p4[l3] &= FLAG_MASK;
 		*(volatile uint64_t*)&p4[l3] |= flags;
 		tlbflush();
+		apic_lapic_sendipi_flush();
 		return;
 	}
 
@@ -326,6 +332,7 @@ void paging_changeFlags(PML4T_t pml4t, void* vaddr, uint8_t flags, enum PageGran
 		*(volatile uint64_t*)&p3[l2] &= FLAG_MASK;
 		*(volatile uint64_t*)&p3[l2] |= flags;
 		tlbflush();
+		apic_lapic_sendipi_flush();
 		return;
 	}
 	
@@ -338,6 +345,7 @@ void paging_changeFlags(PML4T_t pml4t, void* vaddr, uint8_t flags, enum PageGran
 	*(volatile uint64_t*)&p2[l1] &= FLAG_MASK;
 	*(volatile uint64_t*)&p2[l1] |= flags;
 	tlbflush_addr(vaddr);
+	apic_lapic_sendipi_flush();
 }
 
 void paging_splitStruct(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {
@@ -360,6 +368,7 @@ void paging_splitStruct(PML4T_t pml4t, void* vaddr, enum PageGranularity granula
 			paddr += SIZE_2M;
 		}
 		tlbflush();
+		apic_lapic_sendipi_flush();
 		return;
 	}
 
@@ -377,6 +386,7 @@ void paging_splitStruct(PML4T_t pml4t, void* vaddr, enum PageGranularity granula
 			paddr += SIZE_4K;
 		}
 		tlbflush();
+		apic_lapic_sendipi_flush();
 		return;
 	}
 
@@ -424,6 +434,7 @@ void* kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length) {
 
 uint8_t kmunmap(PML4T_t pml4t, void* addr, uint64_t length) {
 	//TODO: implement
+	return 1;
 }
 
 uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr) {

@@ -22,6 +22,7 @@
 
 #include <core/serial.h>
 #include <core/idt.h>
+#include <core/memory.h>
 
 #include <apic/lapic.h>
 #include <apic/ioapic.h>
@@ -36,6 +37,15 @@ void isr_handler(uint64_t code) {
 	uint64_t internal = idt_translateCode(code);
 
 	DEBUG_LOGF("ISR Vector: 0x%lx Internal 0x%lx", code, internal);
+
+	/* handle pre eoi isrs */
+	switch (internal) {
+		case ISR_LAPIC_START + LAPIC_IPI_FLUSH_CODE: /* tlb flush */
+			tlbflush();
+			break;
+		default:
+			break;
+	}
 
 	// check if no eoi
 	if (internal == ISR_LAPIC_START + LAPIC_LNT0_CODE) {

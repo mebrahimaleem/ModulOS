@@ -125,7 +125,6 @@ void* _kmalloc(struct BlockDescriptor* heapbase, uint64_t length) {
 			heapbase[1].size *= 2;
 		}
 
-		//TODO: sync with other cores
 		if (kmmap(kPML4T, (void*)((uint64_t)heapbase + csize), KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE, heapbase[1].size - csize) == 1) {
 			return 0; /* out of pages */
 		}
