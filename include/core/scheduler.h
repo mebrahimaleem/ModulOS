@@ -18,6 +18,8 @@
 #ifndef CORE_SCHEDULER_H
 #define CORE_SCHEDULER_H
 
+typedef uint64_t pid_t;
+
 struct PCB {
 	uint64_t rax;
 	uint64_t rbx;
@@ -48,10 +50,8 @@ struct PCB {
 
 	enum state {
 		RUNNING,
-		SLEEPING
+		KILL
 	} state;
-
-	uint64_t PID;
 
 	struct PCB* next;
 	struct PCB* prev;
@@ -59,7 +59,7 @@ struct PCB {
 
 struct TLS {
 	struct PCB* pcb;
-	uint64_t PID;
+	pid_t PID;
 };
 
 extern const void scheduler_isr;
@@ -71,6 +71,8 @@ __attribute__((noreturn)) void scheduler_transferTo(struct PCB* pcb);
 __attribute__((noreturn)) void scheduler_reenter(struct PCB* pcb);
 
 void scheduler_schedulePCB(struct PCB* pcb);
+
+void scheduler_schedulePID(pid_t PID);
 
 void scheduler_init(void);
 

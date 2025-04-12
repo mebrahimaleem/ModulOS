@@ -127,6 +127,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	INFO_LOG("Starting MP init...");
 
 	scheduler_init();
+	thread_init();
 	mp_initall();
 	
 	/* calibrate local apic timer */

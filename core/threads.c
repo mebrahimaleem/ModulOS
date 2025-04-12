@@ -27,13 +27,36 @@
 #define KERNEL_CS					0x08
 #define KERNEL_FLAGS			0x200
 
-uint64_t nextPID = 0;
+#define INIT_THREADS			0x10
 
-uint64_t thread_generatePID() {
-	return nextPID++; //TODO: handle wraparound
+#define USED	1
+#define FREE	0
+
+pid_t maxPID;
+struct Thread* threads;
+
+
+void thread_init() {
+	maxPID = INIT_THREADS;
+	threads = kzalloc(sizeof(struct Thread) * INIT_THREADS);
 }
 
-struct PCB* thread_kernelFromAddress(uint64_t addr) {
+pid_t thread_claimPID() {
+	for (uint64_t i = 0; i < maxPID; i++) {
+		if (threads[i].used == FREE) {
+				threads[i].used = USED;
+				return i;
+		}
+	}
+	/* otherwise allocate more threads */
+	const pid_t ret = maxPID;
+	maxPID *= 2;
+	threads = kzrealloc(threads, sizeof(struct Thread) * maxPID);
+	threads[ret].used = USED;
+	return ret;
+}
+
+pid_t thread_kernelFromAddress(uint64_t addr) {
 	struct TLS* tls = kmalloc(sizeof(struct TLS));
 
 	struct PCB* ret = kmalloc(sizeof(struct PCB));
@@ -66,8 +89,19 @@ struct PCB* thread_kernelFromAddress(uint64_t addr) {
 	ret->state = RUNNING;
 
 	tls->pcb = ret;
-	tls->PID = thread_generatePID();
-	return ret;
+	tls->PID = thread_claimPID();
+	threads[tls->PID].tls = tls;
+
+	return tls->PID;
+}
+
+struct PCB* thread_PIDtoPCB(pid_t PID) {
+	return threads[PID].tls->pcb;
+}
+
+void thread_kill(pid_t PID) {
+	threads[PID].tls->pcb->state = KILL;
+	threads[PID].used = FREE;
 }
 
 #endif /* CORE_THREADS_C */

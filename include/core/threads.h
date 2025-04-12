@@ -18,13 +18,26 @@
 #ifndef CORE_THREADS_H
 #define CORE_THREADS_H
 
-uint64_t thread_generatePID(void);
+#include <core/scheduler.h>
+
+struct Thread {
+	uint8_t used : 1;
+	struct TLS* tls;
+};
+
+void thread_init(void);
+
+pid_t thread_claimPID(void);
 
 /* 
  * creates a kernel thread from an address (usually of a routine or function with no arguments)
  * sets up a stack and sets all non system registers to zero
 */
-struct PCB* thread_kernelFromAddress(uint64_t addr);
+pid_t thread_kernelFromAddress(uint64_t addr);
+
+struct PCB* thread_PIDtoPCB(pid_t PID);
+
+void thread_kill(pid_t PID);
 
 #endif /* CORE_THREADS_H */
 

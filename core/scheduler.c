@@ -23,6 +23,7 @@
 #include <core/atomic.h>
 #include <core/cpulowlevel.h>
 #include <core/memory.h>
+#include <core/threads.h>
 #include <core/scheduler.h>
 #include <core/serial.h>
 
@@ -45,18 +46,31 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 	//TODO: handle sleeping and priority 
 	/* wait for something to go in the queue */
 	struct PCB pcb;
+	struct PCB* tmp;
 	while (1) {
 		kacquireMutex(scheduler_mutex);
+
 
 		if (top != 0) {
 			/* dequeue from queue */
 			pcb = *top;
+			tmp = top;
 			top = top->prev;
 			if (top == 0) {
 				bot = 0;
 			}
 
-			/* don't free since fs is pointer to tls which has a pointer to pcb which can be reused */
+			/* check state */
+			switch (pcb.state) {
+				case KILL:
+					/* kill by freeing, and moving to next PCB */
+					kfree((void*)pcb.fs); /* TLS */
+					kfree(tmp); /* PCB */
+					kreleaseMutex(scheduler_mutex);
+					continue;
+				default:
+					break;
+			}
 
 			kreleaseMutex(scheduler_mutex);
 			break;
@@ -108,9 +122,9 @@ void scheduler_schedulePCB(struct PCB* pcb) {
 	kacquireMutex(scheduler_mutex);
 
 	/* enqueue to queue */
+	pcb->prev = 0;
 	pcb->next = bot;
 	if (bot == 0) {
-		pcb->prev = 0;
 		top = pcb;
 	}
 	else {
@@ -119,6 +133,10 @@ void scheduler_schedulePCB(struct PCB* pcb) {
 	bot = pcb;
 
 	kreleaseMutex(scheduler_mutex);
+}
+
+void scheduler_schedulePID(pid_t PID) {
+	scheduler_schedulePCB(thread_PIDtoPCB(PID));
 }
 
 #endif /* CORE_SCHEDULER_C */
