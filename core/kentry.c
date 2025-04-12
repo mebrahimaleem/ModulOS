@@ -29,6 +29,7 @@
 #include <core/idt.h>
 #include <core/mp.h>
 #include <core/scheduler.h>
+#include <core/threads.h>
 
 #include <acpi/acpica.h>
 

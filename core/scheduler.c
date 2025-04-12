@@ -45,20 +45,18 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 	//TODO: handle sleeping and priority 
 	/* wait for something to go in the queue */
 	struct PCB pcb;
-	struct PCB* temp;
 	while (1) {
 		kacquireMutex(scheduler_mutex);
 
 		if (top != 0) {
 			/* dequeue from queue */
 			pcb = *top;
-			temp = top;
 			top = top->prev;
 			if (top == 0) {
 				bot = 0;
 			}
 
-			kfree((struct PCB*)temp);
+			/* don't free since fs is pointer to tls which has a pointer to pcb which can be reused */
 
 			kreleaseMutex(scheduler_mutex);
 			break;
@@ -76,32 +74,32 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 __attribute__((noreturn)) void scheduler_reenter(struct PCB* pcb) {
 	apic_lapic_sendeoi();
 
-	struct PCB* nonvolatile = kmalloc(sizeof(struct PCB));
+	struct PCB* oldpcb = ((struct TLS*)(pcb->fs))->pcb;
 	
-	nonvolatile->rip = pcb->rip;
-	nonvolatile->rfl = pcb->rfl;
-	nonvolatile->cr3 = pcb->cr3;
-	nonvolatile->cs  = pcb->cs;
-	nonvolatile->fs  = pcb->fs;
-	nonvolatile->ds  = pcb->ds;
-	nonvolatile->r15 = pcb->r15;
-	nonvolatile->r14 = pcb->r14;
-	nonvolatile->r13 = pcb->r13;
-	nonvolatile->r12 = pcb->r12;
-	nonvolatile->r11 = pcb->r11;
-	nonvolatile->r10 = pcb->r10;
-	nonvolatile->r9  = pcb->r9;
-	nonvolatile->r8  = pcb->r8;
-	nonvolatile->rdi = pcb->rdi;
-	nonvolatile->rsi = pcb->rsi;
-	nonvolatile->rbp = pcb->rbp;
-	nonvolatile->rsp = pcb->rsp;
-	nonvolatile->rdx = pcb->rdx;
-	nonvolatile->rcx = pcb->rcx;
-	nonvolatile->rbx = pcb->rbx;
-	nonvolatile->rax = pcb->rax;
+	oldpcb->rip = pcb->rip;
+	oldpcb->rfl = pcb->rfl;
+	oldpcb->cr3 = pcb->cr3;
+	oldpcb->cs  = pcb->cs;
+	oldpcb->fs  = pcb->fs;
+	oldpcb->ds  = pcb->ds;
+	oldpcb->r15 = pcb->r15;
+	oldpcb->r14 = pcb->r14;
+	oldpcb->r13 = pcb->r13;
+	oldpcb->r12 = pcb->r12;
+	oldpcb->r11 = pcb->r11;
+	oldpcb->r10 = pcb->r10;
+	oldpcb->r9  = pcb->r9;
+	oldpcb->r8  = pcb->r8;
+	oldpcb->rdi = pcb->rdi;
+	oldpcb->rsi = pcb->rsi;
+	oldpcb->rbp = pcb->rbp;
+	oldpcb->rsp = pcb->rsp;
+	oldpcb->rdx = pcb->rdx;
+	oldpcb->rcx = pcb->rcx;
+	oldpcb->rbx = pcb->rbx;
+	oldpcb->rax = pcb->rax;
 	
-	scheduler_schedulePCB(nonvolatile);
+	scheduler_schedulePCB(oldpcb);
 	
 	scheduler_nextTask();
 }

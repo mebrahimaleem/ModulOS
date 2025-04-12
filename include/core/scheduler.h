@@ -51,9 +51,16 @@ struct PCB {
 		SLEEPING
 	} state;
 
+	uint64_t PID;
+
 	struct PCB* next;
 	struct PCB* prev;
 } __attribute__((packed));
+
+struct TLS {
+	struct PCB* pcb;
+	uint64_t PID;
+};
 
 extern const void scheduler_isr;
 

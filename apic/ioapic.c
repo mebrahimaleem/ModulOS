@@ -126,7 +126,7 @@ void apic_initio() {
 		ioapics = tapic;
 
 		/* set correct paging attributes */
-		paging_changeFlags(kPML4T, (void*)ioapic->base, KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE | KMEM_PAGE_WT | KMEM_PAGE_NOCACHE, PAGE_GRANULARITY_4K);
+		paging_changeFlags(kPML4T, (void*)(uint64_t)ioapic->base, KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE | KMEM_PAGE_WT | KMEM_PAGE_NOCACHE, PAGE_GRANULARITY_4K);
 		
 		for (i = 0; i <= maxreds; i++) {
 			isr = idt_claimIsrVector(i + ioapic->intstart + ISR_IOAPIC_START);
