@@ -20,61 +20,23 @@
 
 #include <stdint.h>
 
+#include <core/atomic.h>
+#include <core/paging.h>
+
 #define KMEM_BLOCK_LAST	0
 #define KMEM_BLOCK_USED	1
 #define KMEM_BLOCK_FREE	2
 #define KMEM_BLOCK_RESV	3
-
-#define KMEM_BLOCK_SIZEMASK	0x3FFFFFFFFFFFFFFF
-#define PS_ADDR_MASK				0xFFFFFFFFFF000
-
-#define KMEM_PAGEFLAG_PS		0x80
-
-#define KMEM_PAGE_PRESENT		0x1
-#define KMEM_PAGE_WRITE			0x2
-
-#define KMEM_ID_OFF					0x0
-
-typedef uint64_t**** PML4T_t;
-typedef uint64_t*** PDPT_t;
-typedef uint64_t** PDT_t;
-typedef uint64_t* PT_t;
-
-struct Blocks32M {
-	uint16_t allocated;
-	uint64_t bitmap[128];
-	struct Blocks32M* next;
-};
-
-struct PagesFree {
-	uint8_t* addr;
-	uint64_t length;
-	struct PagesFree* next;
-};
 
 struct BlockDescriptor {
 	uint64_t size : 62;
 	uint64_t flags : 2;
 } __attribute((packed));
 
-enum PageGranularity {
-	PAGE_GRANULARITY_4K,
-	PAGE_GRANULARITY_2M,
-	PAGE_GRANULARITY_1G,
-};
-
-extern volatile PML4T_t kPML4T;
-
-extern uint8_t _pmembitmap;
 extern const void _kheap_shared;
 extern const void _kheap_end;
 
 void meminit(void);
-
-/*
-* finds free continious blocks of 32MiB physical memory of at least size length
-*/
-uint64_t memfcb(uint64_t length);
 
 /*
 * flushes the tlb entry for a single page (addr)
@@ -87,34 +49,16 @@ void tlbflush_addr(void* addr);
 */
 void tlbflush(void);
 
-/*
-* maps virtual memory to physical address
-* all arguments in bytes and must be 4K page aligned
-*/
-void mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity);
-void _mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity, uint8_t use_mut);
-
-void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity);
-
-uint64_t kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length);
-uint64_t _kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length, uint8_t use_mut);
-
-uint8_t kmummap(PML4T_t pml4t, void* addr, uint64_t length);
-
 void* kmalloc(uint64_t length);
-void* _kmalloc(uint64_t length, uint8_t use_mut);
+void* _kmalloc(struct BlockDescriptor* heapbase, uint64_t length);
 
 void* kcalloc(uint64_t count, uint64_t length);
-void* _kcalloc(uint64_t count, uint64_t length, uint8_t use_mut);
 
-void* allocpaging(void);
-void* _allocpaging(uint8_t use_mut);
+void* kzalloc(uint64_t length);
 
 void* krealloc(void* ptr, uint64_t length);
 
 void kfree(void* ptr);
-
-uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr);
 
 #endif /* CORE_MEMORY_H */
 

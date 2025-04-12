@@ -35,14 +35,4 @@ tlbflush:
 	movq %rax, %cr3
 	ret
 
-	.bss
-
-/* 32 mibibyte granularity for 256TiB and each byte holds 8 entries so 1MiB bitmap*/
-	.align 8
-	.globl _pmembitmap
-_pmembitmap:
-.rept 0x20000
-	.quad 0
-.endr
-
 #endif /* CORE_MEMORYASM_S */

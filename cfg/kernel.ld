@@ -19,6 +19,7 @@ ENTRY(_start)
 
 KERNEL_VMA = -0x80000000;
 MAXMEM = -0x1;
+STATIC_HEAP_SIZE = 0x100000;
 
 SECTIONS {
 	. = 0x7000;
@@ -67,7 +68,9 @@ SECTIONS {
 
 	ASSERT(. <= KERNEL_VMA + 4M, "Error: Core kernel exceeds 4MiB limit")
 
-	_kheap_shared = . + 4K - (. % 4K);
+	_kheap_static = . + 4K - (. % 4K);
+
+	_kheap_shared = _kheap_static + STATIC_HEAP_SIZE;
 
 	. = MAXMEM;
 	_kheap_end = .;

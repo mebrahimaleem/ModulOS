@@ -102,7 +102,7 @@ void mp_initall() {
 		
 		mp_loading = LOADING_WAITSIPI;
 		mp_rsp = (uint64_t)kmalloc(0x4000) + 0x4000;
-		mp_gdtptr.off = calculatePaddr(kPML4T, (uint64_t)gdt);
+		mp_gdtptr.off = (uint64_t)gdt;
 
 		/* send init sipi sipi */
 		for (i = 0; i < 20; ) {
