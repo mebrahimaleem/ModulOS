@@ -52,7 +52,11 @@
 #define SIZE_2M		0x200000
 #define SIZE_4M		0x400000
 
-#define PAGING_ORDER_SLAB	16
+#define FLAG_MASK				0xFFFFFFFFFFFFFFE1
+#define FLAGS_ONLY_MASK	0x1F
+
+#define COMPONENT_2M		0xFFFFFFFFFFE00000	
+#define COMPONENT_1G		0xFFFFFFFFC0000000
 
 #define ALIGN_TO(addr, align) ((uint64_t)(addr + align - 1) & ~(uint64_t)(align - 1))
 
@@ -243,7 +247,6 @@ void freepaging() {
 /*
 * maps virtual memory to physical address
 * all arguments in bytes and must be 4K page aligned
-* undefined behavior when overwriting previous entries with a different granularity
 */
 void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity) {
 	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
@@ -271,6 +274,10 @@ void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 		p4[l3] = (PDT_t)(t0 | flags);
 	}
 
+	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) { // wrong granularity
+		paging_splitStruct(pml4t, vaddr, PAGE_GRANULARITY_1G);
+	}
+
 	const PDT_t p3 = (volatile PDT_t )(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	if (granularity == PAGE_GRANULARITY_2M) {
@@ -284,10 +291,96 @@ void mapv2p(volatile PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enu
 		p3[l2] = (PT_t)(t0 | flags);
 	}
 
+	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) { // wrong granularity
+		paging_splitStruct(pml4t, vaddr, PAGE_GRANULARITY_2M);
+	}
+
 	const volatile PT_t p2 = (volatile PT_t )(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
 
 	p2[l1] = (uint64_t)paddr | flags;
 	tlbflush_addr(vaddr);
+}
+
+void paging_changeFlags(PML4T_t pml4t, void* vaddr, uint8_t flags, enum PageGranularity granularity) {
+	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
+	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
+	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
+	const uint64_t l1 = 0x1FF & ((uint64_t)vaddr / 0x1000); // identify 2GiB
+
+	const volatile PDPT_t p4 = (volatile PDPT_t )(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
+
+	if (granularity == PAGE_GRANULARITY_1G) {
+		*(volatile uint64_t*)&p4[l3] &= FLAG_MASK;
+		*(volatile uint64_t*)&p4[l3] |= flags;
+		tlbflush();
+		return;
+	}
+
+	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) { // wrong granularity
+		paging_splitStruct(pml4t, vaddr, PAGE_GRANULARITY_1G);
+	}
+
+	const PDT_t p3 = (volatile PDT_t )(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
+
+	if (granularity == PAGE_GRANULARITY_2M) {
+		*(volatile uint64_t*)&p3[l2] &= FLAG_MASK;
+		*(volatile uint64_t*)&p3[l2] |= flags;
+		tlbflush();
+		return;
+	}
+	
+	if (((uint64_t)p4[l3] & KMEM_PAGEFLAG_PS) == KMEM_PAGEFLAG_PS) { // wrong granularity
+		paging_splitStruct(pml4t, vaddr, PAGE_GRANULARITY_2M);
+	}
+
+	const volatile PT_t p2 = (volatile PT_t )(((uint64_t)p3[l2] & PS_ADDR_MASK) + KMEM_ID_OFF);
+
+	*(volatile uint64_t*)&p2[l1] &= FLAG_MASK;
+	*(volatile uint64_t*)&p2[l1] |= flags;
+	tlbflush_addr(vaddr);
+}
+
+void paging_splitStruct(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {
+	const uint64_t l4 = 0x1FF & ((uint64_t)vaddr / 0x8000000000); // identify 512GiB
+	const uint64_t l3 = 0x1FF & ((uint64_t)vaddr / 0x0040000000); // identify 1GiB
+	const uint64_t l2 = 0x1FF & ((uint64_t)vaddr / 0x200000); // identify 2MiB
+
+	const volatile PDPT_t p4 = (volatile PDPT_t )(((uint64_t)pml4t[l4] & PS_ADDR_MASK) + KMEM_ID_OFF);
+	uint16_t i;
+
+	if (granularity == PAGE_GRANULARITY_1G) {
+		uint64_t paddr = (uint64_t)p4[l3] & PS_ADDR_MASK;
+		const uint8_t flags = (uint64_t)p4[l3] & FLAGS_ONLY_MASK;
+		/* clear the entry, then map it again with finer granularity */
+		p4[l3] = 0;
+		vaddr = (void*)((uint64_t)vaddr & COMPONENT_1G);
+		for (i = 0; i < 512; i++) {
+			mapv2p(pml4t, vaddr, (void*)paddr, flags, PAGE_GRANULARITY_2M);
+			vaddr = (void*)((uint64_t)vaddr + SIZE_2M);
+			paddr += SIZE_2M;
+		}
+		tlbflush();
+		return;
+	}
+
+	const PDT_t p3 = (volatile PDT_t )(((uint64_t)p4[l3] & PS_ADDR_MASK) + KMEM_ID_OFF);
+
+	if (granularity == PAGE_GRANULARITY_2M) {
+		uint64_t paddr = (uint64_t)p3[l2] & PS_ADDR_MASK;
+		const uint8_t flags = (uint64_t)p3[l2] & FLAGS_ONLY_MASK;
+		/* clear the entry, then map it again with finer granularity */
+		p3[l2] = 0;
+		vaddr = (void*)((uint64_t)vaddr & COMPONENT_2M);
+		for (i = 0; i < 512; i++) {
+			mapv2p(pml4t, vaddr, (void*)paddr, flags, PAGE_GRANULARITY_4K);
+			vaddr = (void*)((uint64_t)vaddr + SIZE_4K);
+			paddr += SIZE_4K;
+		}
+		tlbflush();
+		return;
+	}
+
+	/* cant split 4K */
 }
 
 void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity) {

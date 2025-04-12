@@ -23,8 +23,10 @@
 
 #define KMEM_PAGEFLAG_PS		0x80
 
-#define KMEM_PAGE_PRESENT		0x1
-#define KMEM_PAGE_WRITE			0x2
+#define KMEM_PAGE_PRESENT		0x01
+#define KMEM_PAGE_WRITE			0x02
+#define KMEM_PAGE_WT				0x08
+#define KMEM_PAGE_NOCACHE		0x10
 
 #define KMEM_ID_OFF					0x0
 
@@ -64,7 +66,11 @@ uint64_t calculatePaddr(PML4T_t pml4t, uint64_t vaddr);
 * all arguments in bytes and must be 4K page aligned
 */
 void mapv2p(PML4T_t pml4t, void* vaddr, void* paddr, uint8_t flags, enum PageGranularity granularity);
+
 void unmapv2p(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity);
+
+void paging_changeFlags(PML4T_t pml4t, void* vaddr, uint8_t flags, enum PageGranularity granularity);
+void paging_splitStruct(PML4T_t pml4t, void* vaddr, enum PageGranularity granularity);
 
 void* kmmap(PML4T_t pml4t, void* addr, uint8_t flags, uint64_t length);
 uint8_t kmunmap(PML4T_t pml4t, void* addr, uint64_t length);
