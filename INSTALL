@@ -1,4 +1,4 @@
-# Building Instructions
+# Installing Instructions
 
 The ModulOS image can be built by running the `make` command in the root directory of the source tree. This will create the `obj/modulos.img` which can be copied to a drive. Optionally, debugging symbols can be found in `obj/modulos-dbg`.
 
