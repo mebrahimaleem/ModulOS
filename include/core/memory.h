@@ -57,6 +57,7 @@ void* kcalloc(uint64_t count, uint64_t length);
 void* kzalloc(uint64_t length);
 
 void* krealloc(void* ptr, uint64_t length);
+void* kzrealloc(void* ptr, uint64_t length);
 
 void kfree(void* ptr);
 

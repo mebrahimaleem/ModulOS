@@ -1,4 +1,4 @@
-/* isr.g - interrupt service routines */
+/* threads.h - multithreading routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,26 +15,39 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef APIC_ISR_H
-#define APIC_ISR_H
-
-#define ISR_INTERNAL_MASK	0x0FFF
-#define ISR_LAPIC_START		0x1000
-#define ISR_IOAPIC_START	0x2000
+#ifndef CORE_THREADS_H
+#define CORE_THREADS_H
 
 #include <core/scheduler.h>
 
-#define V_TO_CODE(v) (v - 0x20)
-
-struct ISR_callback {
-	void (*callback)(uint64_t);
-	struct ISR_callback* next;
+struct Thread {
+	uint8_t used : 1;
+	struct TLS* tls;
+	uint8_t wakeSignal;
 };
 
-void isr_init(void);
+void thread_init(void);
 
-void isr_registerCallback(void (*callback)(uint64_t), uint8_t v);
+pid_t thread_claimPID(void);
 
-void isr_handler(uint64_t code);
+/* 
+ * creates a kernel thread from an address (usually of a routine or function with no arguments)
+ * sets up a stack and sets all non system registers to zero
+*/
+pid_t thread_kernelFromAddress(uint64_t addr);
 
-#endif /* APIC_ISR_H */
+struct PCB* thread_PIDtoPCB(pid_t PID);
+
+void thread_kill(pid_t PID);
+
+pid_t thread_getPID(void);
+
+/* time in milliseconds */
+void thread_wait(uint64_t time);
+
+void thread_enterSleep(void);
+
+void thread_wakeup(pid_t PID);
+
+#endif /* CORE_THREADS_H */
+

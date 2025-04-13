@@ -23,6 +23,7 @@
 #include <core/atomic.h>
 #include <core/cpulowlevel.h>
 #include <core/memory.h>
+#include <core/threads.h>
 #include <core/scheduler.h>
 #include <core/serial.h>
 
@@ -45,20 +46,36 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 	//TODO: handle sleeping and priority 
 	/* wait for something to go in the queue */
 	struct PCB pcb;
-	struct PCB* temp;
+	struct PCB* tmp;
 	while (1) {
 		kacquireMutex(scheduler_mutex);
+
 
 		if (top != 0) {
 			/* dequeue from queue */
 			pcb = *top;
-			temp = top;
+			tmp = top;
 			top = top->prev;
 			if (top == 0) {
 				bot = 0;
 			}
 
-			kfree((struct PCB*)temp);
+			/* check state */
+			switch (pcb.state) {
+				case KILL:
+					/* kill by freeing, and moving to next PCB */
+					kfree((void*)pcb.fs); /* TLS */
+					kfree(tmp); /* PCB */
+					kreleaseMutex(scheduler_mutex);
+					continue;
+				case SLEEP:
+					/* reschedule and try next */
+					kreleaseMutex(scheduler_mutex);
+					scheduler_schedulePCB(tmp);
+					continue;
+				default:
+					break;
+			}
 
 			kreleaseMutex(scheduler_mutex);
 			break;
@@ -69,39 +86,41 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 			pause();
 	}
 
+	lapic_percpu[apic_getId()]->last_tls = pcb.tls;
 	apic_setTimerDeadline(QUANTUM_US);
 	scheduler_transferTo(&pcb);
 }
 
 __attribute__((noreturn)) void scheduler_reenter(struct PCB* pcb) {
 	apic_lapic_sendeoi();
+	ksti();
 
-	struct PCB* nonvolatile = kmalloc(sizeof(struct PCB));
+	struct PCB* oldpcb = lapic_percpu[apic_getId()]->last_tls->pcb;
 	
-	nonvolatile->rip = pcb->rip;
-	nonvolatile->rfl = pcb->rfl;
-	nonvolatile->cr3 = pcb->cr3;
-	nonvolatile->cs  = pcb->cs;
-	nonvolatile->fs  = pcb->fs;
-	nonvolatile->ds  = pcb->ds;
-	nonvolatile->r15 = pcb->r15;
-	nonvolatile->r14 = pcb->r14;
-	nonvolatile->r13 = pcb->r13;
-	nonvolatile->r12 = pcb->r12;
-	nonvolatile->r11 = pcb->r11;
-	nonvolatile->r10 = pcb->r10;
-	nonvolatile->r9  = pcb->r9;
-	nonvolatile->r8  = pcb->r8;
-	nonvolatile->rdi = pcb->rdi;
-	nonvolatile->rsi = pcb->rsi;
-	nonvolatile->rbp = pcb->rbp;
-	nonvolatile->rsp = pcb->rsp;
-	nonvolatile->rdx = pcb->rdx;
-	nonvolatile->rcx = pcb->rcx;
-	nonvolatile->rbx = pcb->rbx;
-	nonvolatile->rax = pcb->rax;
+	oldpcb->rip = pcb->rip;
+	oldpcb->rfl = pcb->rfl;
+	oldpcb->cr3 = pcb->cr3;
+	oldpcb->cs  = pcb->cs;
+	oldpcb->fs  = pcb->fs;
+	oldpcb->ds  = pcb->ds;
+	oldpcb->r15 = pcb->r15;
+	oldpcb->r14 = pcb->r14;
+	oldpcb->r13 = pcb->r13;
+	oldpcb->r12 = pcb->r12;
+	oldpcb->r11 = pcb->r11;
+	oldpcb->r10 = pcb->r10;
+	oldpcb->r9  = pcb->r9;
+	oldpcb->r8  = pcb->r8;
+	oldpcb->rdi = pcb->rdi;
+	oldpcb->rsi = pcb->rsi;
+	oldpcb->rbp = pcb->rbp;
+	oldpcb->rsp = pcb->rsp;
+	oldpcb->rdx = pcb->rdx;
+	oldpcb->rcx = pcb->rcx;
+	oldpcb->rbx = pcb->rbx;
+	oldpcb->rax = pcb->rax;
 	
-	scheduler_schedulePCB(nonvolatile);
+	scheduler_schedulePCB(oldpcb);
 	
 	scheduler_nextTask();
 }
@@ -110,9 +129,9 @@ void scheduler_schedulePCB(struct PCB* pcb) {
 	kacquireMutex(scheduler_mutex);
 
 	/* enqueue to queue */
+	pcb->prev = 0;
 	pcb->next = bot;
 	if (bot == 0) {
-		pcb->prev = 0;
 		top = pcb;
 	}
 	else {
@@ -121,6 +140,10 @@ void scheduler_schedulePCB(struct PCB* pcb) {
 	bot = pcb;
 
 	kreleaseMutex(scheduler_mutex);
+}
+
+void scheduler_schedulePID(pid_t PID) {
+	scheduler_schedulePCB(thread_PIDtoPCB(PID));
 }
 
 #endif /* CORE_SCHEDULER_C */

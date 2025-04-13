@@ -48,6 +48,8 @@
 #define FRAME_RFL_OFF	0xC0
 #define FRAME_RIP_OFF	0xB0
 
+#define FS_MSR	0xC0000100
+
 /* __attribute__((noreturn)) void scheduler_transferTo(struct PCB* pcb); */
 	.globl scheduler_transferTo
 scheduler_transferTo:
@@ -74,13 +76,11 @@ scheduler_transferTo:
 	subq $0x10, %rsp
 	andq $~0xF, %rsp
 
-	/* set fs */
-	movq FS_OFF(%rdi), %rax
-	movw %ax, %fs
-
 	/* set cr3 */
 	movq CR3_OFF(%rdi), %rax
 	movq %rax, %cr3
+
+	/* TODO: implement fs */
 
 	/* set data segment selectors */
 	movq DS_OFF(%rdi), %rax
@@ -116,18 +116,13 @@ scheduler_isr:
 	subq $8, %rsp /* skip rip */
 	subq $8, %rsp /* skip rfl */
 
-	movq %cr3, %rax
-	pushq %rax /* cr3 */
+	subq $8, %rsp /* skip cr3 */
 
 	subq $8, %rsp /* skip cs */
 
-	xorq %rax, %rax
+	subq $8, %rsp /* skip fs, TODO */
 
-	movw %fs, %ax
-	pushq %rax /* fs */
-
-	movw %ds, %ax
-	pushq %rax /* ds */
+	subq $8, %rsp /* skip ds */
 
 	pushq %r15
 	pushq %r14
@@ -146,6 +141,12 @@ scheduler_isr:
 	pushq %rbx
 	pushq %rax
 
+	movq %cr3, %rax
+	movq %rax, CR3_OFF(%rsp) /* cr3 */
+
+	movq %ds, %rax
+	movq %rax, DS_OFF(%rsp) /* ds */
+
 	movq FRAME_RSP_OFF(%rsp), %rax
 	movq %rax, RSP_OFF(%rsp) /* rsp */
 
@@ -157,6 +158,8 @@ scheduler_isr:
 
 	movq FRAME_RIP_OFF(%rsp), %rax
 	movq %rax, RIP_OFF(%rsp) /* rip */
+
+	/* TODO: restore cr3 */
 
 	movq %rsp, %rdi
 

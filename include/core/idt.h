@@ -54,13 +54,6 @@ extern uint64_t ISR_DF;
 extern uint64_t ISR_MC;
 
 extern uint64_t rsp0;
-extern uint64_t rsp1;
-extern uint64_t rsp2;
-extern uint64_t rsp3;
-extern uint64_t rsp4;
-extern uint64_t rsp5;
-extern uint64_t rsp6;
-extern uint64_t rsp7;
 
 extern uint64_t irq_dummy_start;
 extern uint64_t irq_dummy_end;

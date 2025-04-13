@@ -31,6 +31,8 @@
 #include <apic/lapic.h>
 #include <apic/pic8259.h>
 #include <apic/ioapic.h>
+#include <apic/pit.h>
+
 #include <acpi/madt.h>
 
 #define LAPIC_MSR_BASE				0x1B
@@ -73,13 +75,6 @@
 
 #define TIMER_DISABLE					0x0
 
-#define PIT_CMD_ADDR					0x43
-
-#define PIT_BINARY						0x00
-#define PIT_RATE							0x04
-#define PIT_LOHI							0x30
-#define PIT_CHN0							0x00
-
 #define IPI_FLUSH_INDEX				0x0
 
 /* no need to keep track of fraction since PIT is not precise enough */
@@ -87,7 +82,6 @@
 
 uint64_t lapic_base;
 mutex_t ipi_mutex;
-mutex_t pit_mutex;
 
 uint8_t lapic_isrs[6];
 uint8_t ipi_isrs[1];
@@ -98,7 +92,6 @@ struct cpu_specific* lapic_percpu[256];
 
 void apic_initlocal() {
 	ipi_mutex = kcreateMutex();
-	pit_mutex = kcreateMutex();
 
 	if(acpi_needDisable8259()) {
 		pic_mask8259();
@@ -242,20 +235,18 @@ void apic_lapic_calibrateTimer() {
 	//TODO: recalibrate on PState change
 	kacquireMutex(pit_mutex);
 
+	const uint32_t gsi = apic_translateGsi(IOAPIC_ISA_PIT);
+	const uint8_t apicId = apic_getId();
+
+	apic_maskIrq(gsi);
 	/* swtich to low latency ISR for high precision calibration */
 	idt_installcustomisr((volatile struct IDTD*)&IDT_BASE, (uint64_t)&lowlatency_isr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, apic_pitisr);
 
 	/* switch to generic ISR to avoid accidently schduling */
 	idt_installisr((volatile struct IDTD*)&IDT_BASE, lapic_isrs[1], 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
-	const uint32_t gsi = apic_translateGsi(IOAPIC_ISA_PIT);
-	const uint8_t apicId = apic_getId();
-
 	/* change IOAPIC PIT IRQ to local APIC */
 	apic_changeTarget(gsi, apicId);
-
-	/* configure PIT */
-	outb(PIT_CMD_ADDR, PIT_BINARY | PIT_RATE | PIT_LOHI | PIT_CHN0);
 
 	/* transfer to asm for low latency measurements */
 	const uint64_t period = TIMER_INITIAL - (uint32_t)calibrate_lapic_timer(gsi, lapic_base);
@@ -264,6 +255,8 @@ void apic_lapic_calibrateTimer() {
 	idt_installisr((volatile struct IDTD*)&IDT_BASE, apic_pitisr, 0, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT);
 
 	idt_installcustomisr((volatile struct IDTD*)&IDT_BASE, (uint64_t)&scheduler_isr, 7, IDT_TYPE_INT, IDT_KDPL, IDT_PRESENT, lapic_isrs[1]);
+	
+	apic_unmaskIrq(gsi);
 
 	kreleaseMutex(pit_mutex);
 

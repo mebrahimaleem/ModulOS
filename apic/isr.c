@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 
+#include <core/atomic.h>
 #include <core/serial.h>
 #include <core/idt.h>
 #include <core/memory.h>
@@ -28,6 +29,27 @@
 #include <apic/ioapic.h>
 #include <apic/isr.h>
 
+struct ISR_callback* cached_callbacks[256];
+
+mutex_t callbackLock;
+
+void isr_init(void) {
+	callbackLock = kcreateMutex();
+
+	for (uint16_t i = 0; i < 256; i++)
+		cached_callbacks[i] = 0;
+}
+
+void isr_registerCallback(void (*callback)(uint64_t), uint8_t v) {
+	kacquireMutex(callbackLock);
+	struct ISR_callback* cached = kmalloc(sizeof(struct ISR_callback));
+	cached->callback = callback;
+	cached->next = cached_callbacks[v];
+	cached_callbacks[v] = cached;
+	kreleaseMutex(callbackLock);
+}
+
+
 void isr_handler(uint64_t code) {
 	/* check for spurious */
 	if (code == LAPIC_SPURIOUS_VECTOR) {
@@ -35,8 +57,6 @@ void isr_handler(uint64_t code) {
 	}
 
 	uint64_t internal = idt_translateCode(code);
-
-	DEBUG_LOGF("ISR Vector: 0x%lx Internal 0x%lx", code, internal);
 
 	/* handle pre eoi isrs */
 	switch (internal) {
@@ -54,6 +74,14 @@ void isr_handler(uint64_t code) {
 
 	/* send eoi */
 	apic_lapic_sendeoi();
+
+	/* evaluate cached callbacks */
+	kacquireMutex(callbackLock);
+	for (struct ISR_callback* callback = cached_callbacks[code]; callback != 0; callback = callback->next) {
+		callback->callback(internal);
+	}
+
+	kreleaseMutex(callbackLock);
 }
 
 #endif /* APIC_ISR_C */

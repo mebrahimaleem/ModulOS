@@ -29,11 +29,14 @@
 #include <core/idt.h>
 #include <core/mp.h>
 #include <core/scheduler.h>
+#include <core/threads.h>
 
 #include <acpi/acpica.h>
 
 #include <apic/lapic.h>
 #include <apic/ioapic.h>
+#include <apic/pit.h>
+#include <apic/isr.h>
 
 struct avail_memory_t kavail_memory;
 
@@ -93,9 +96,18 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 
 	INFO_LOG("Starting interrupts init...");
 
-	static uint64_t k0rsp[] = {(uint64_t)&rsp0, (uint64_t)&rsp1, (uint64_t)&rsp2, (uint64_t)&rsp3, (uint64_t)&rsp4, (uint64_t)&rsp5, (uint64_t)&rsp6, (uint64_t)&rsp7};
+	uint64_t rsp[8] = {
+		(uint64_t)&rsp0,
+		(uint64_t)kmalloc(0x1000) + 0x1000,
+		(uint64_t)kmalloc(0x1000) + 0x1000,
+		(uint64_t)kmalloc(0x1000) + 0x1000,
+		(uint64_t)kmalloc(0x80) + 0x80,
+		(uint64_t)kmalloc(0x80) + 0x80,
+		(uint64_t)kmalloc(0x80) + 0x80,
+		(uint64_t)kmalloc(0x1000) + 0x1000};
 	idt_init();
-	idt_installisrs((volatile struct IDTD* )&IDT_BASE, (uint64_t*)0x7000, &k0rsp[0]);
+	idt_installisrs((volatile struct IDTD* )&IDT_BASE, (uint64_t*)0x7000, &rsp[0]);
+	isr_init();
 	loadidt();
 
 	INFO_LOG("Interrupts init done");
@@ -118,6 +130,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	INFO_LOG("Starting IO/APIC init...");
 
 	apic_initio();
+	apic_initpit();
 	setInterrupts(0);
 	ksti();
 	
@@ -126,6 +139,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	INFO_LOG("Starting MP init...");
 
 	scheduler_init();
+	thread_init();
 	mp_initall();
 	
 	/* calibrate local apic timer */

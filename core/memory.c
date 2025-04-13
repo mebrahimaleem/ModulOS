@@ -171,6 +171,20 @@ void* krealloc(void* ptr, uint64_t length) {
 	}
 }
 
+void* kzrealloc(void* ptr, uint64_t length) {
+	volatile struct BlockDescriptor* block = (volatile struct BlockDescriptor* )((uint64_t)ptr - sizeof(struct BlockDescriptor));
+	void* ret;
+
+	//TODO: peek if next if free or last
+	ret = kzalloc(length);
+	if (ret == 0) {
+		return 0;
+	}
+	kcopy(ptr, ret, block->size - sizeof(struct BlockDescriptor));
+	kfree(ptr);
+	return ret;
+}
+
 void kfree(void* ptr) {
 	//TODO: call unmap
 	volatile struct BlockDescriptor* block = (volatile struct BlockDescriptor* )((uint64_t)ptr - sizeof(struct BlockDescriptor));
