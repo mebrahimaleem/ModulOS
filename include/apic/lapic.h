@@ -62,6 +62,7 @@
 #define LAPIC_IPI_FLUSH_CODE	0x7
 
 #include <core/idt.h>
+#include <core/scheduler.h>
 
 extern uint64_t ISR_CMCI;
 extern uint64_t ISR_TIMR;
@@ -153,7 +154,10 @@ union LAPIC_LVT {
 struct cpu_specific {
 	uint64_t calib_whole;
 	uint64_t calib_frac;
+	struct TLS* last_tls;
 };
+
+extern struct cpu_specific* lapic_percpu[256];
 
 void apic_initlocal(void);
 

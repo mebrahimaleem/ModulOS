@@ -68,6 +68,11 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 					kfree(tmp); /* PCB */
 					kreleaseMutex(scheduler_mutex);
 					continue;
+				case SLEEP:
+					/* reschedule and try next */
+					kreleaseMutex(scheduler_mutex);
+					scheduler_schedulePCB(tmp);
+					continue;
 				default:
 					break;
 			}
@@ -81,14 +86,16 @@ __attribute__((noreturn)) void scheduler_nextTask() {
 			pause();
 	}
 
+	lapic_percpu[apic_getId()]->last_tls = pcb.tls;
 	apic_setTimerDeadline(QUANTUM_US);
 	scheduler_transferTo(&pcb);
 }
 
 __attribute__((noreturn)) void scheduler_reenter(struct PCB* pcb) {
 	apic_lapic_sendeoi();
+	ksti();
 
-	struct PCB* oldpcb = ((struct TLS*)(pcb->fs))->pcb;
+	struct PCB* oldpcb = lapic_percpu[apic_getId()]->last_tls->pcb;
 	
 	oldpcb->rip = pcb->rip;
 	oldpcb->rfl = pcb->rfl;

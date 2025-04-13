@@ -32,10 +32,6 @@
 #define LAPIC_TIMR			$0xFFFFFFFF
 #define LAPIC_DISABLE		$0x00000000
 
-#define PIT_DATA		$0x40
-#define RELOAD_LO		$0x9C
-#define RELOAD_HI		$0x2E
-
 /* void calibrate_lapic_timer(uint32_t gsi, uint64_t apicbase); */
 	.globl calibrate_lapic_timer
 calibrate_lapic_timer:
@@ -43,12 +39,6 @@ calibrate_lapic_timer:
 	// set status to initial
 	movb BUSY, calibrate_done
 	movb INITIAL, calibrate_sts
-
-	/* reset PIT */
-	movb RELOAD_LO, %al
-  outb %al, PIT_DATA
-	movb RELOAD_HI, %al
-  outb %al, PIT_DATA
 
 	pushq %rdi
 	pushq %rsi

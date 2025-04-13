@@ -1,4 +1,4 @@
-/* isr.g - interrupt service routines */
+/* pit.h - PIT ISR */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,26 +15,27 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef APIC_ISR_H
-#define APIC_ISR_H
+#ifndef APIC_PIT_H
+#define APIC_PIT_H
 
-#define ISR_INTERNAL_MASK	0x0FFF
-#define ISR_LAPIC_START		0x1000
-#define ISR_IOAPIC_START	0x2000
+#include <core/threads.h>
 
-#include <core/scheduler.h>
+extern mutex_t pit_mutex;
 
-#define V_TO_CODE(v) (v - 0x20)
-
-struct ISR_callback {
-	void (*callback)(uint64_t);
-	struct ISR_callback* next;
+struct PIT_deadline {
+	pid_t PID;
+	uint64_t deadline;
+	struct PIT_deadline* next;
+	struct PIT_deadline* prev;
 };
 
-void isr_init(void);
+void apic_initpit(void);
 
-void isr_registerCallback(void (*callback)(uint64_t), uint8_t v);
+/* delay in milliseconds, but not accurate until 10ms */
+void apic_addDeadline(pid_t PID, uint64_t delay);
 
-void isr_handler(uint64_t code);
+uint64_t apic_pit_time(void);
 
-#endif /* APIC_ISR_H */
+void apic_PIThandler(uint64_t internal);
+
+#endif /* APIC_PIT_H */

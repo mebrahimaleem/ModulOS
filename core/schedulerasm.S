@@ -76,16 +76,11 @@ scheduler_transferTo:
 	subq $0x10, %rsp
 	andq $~0xF, %rsp
 
-	/* set fs */
-	movl $FS_MSR, %ecx
-	movq FS_OFF(%rdi), %rax
-	movq %rax, %rdx
-	shrq $32, %rdx
-	wrmsr
-
 	/* set cr3 */
 	movq CR3_OFF(%rdi), %rax
 	movq %rax, %cr3
+
+	/* TODO: implement fs */
 
 	/* set data segment selectors */
 	movq DS_OFF(%rdi), %rax
@@ -125,9 +120,7 @@ scheduler_isr:
 
 	subq $8, %rsp /* skip cs */
 
-	xorq %rax, %rax
-
-	subq $8, %rsp /* skip fs */
+	subq $8, %rsp /* skip fs, TODO */
 
 	subq $8, %rsp /* skip ds */
 
@@ -150,12 +143,6 @@ scheduler_isr:
 
 	movq %cr3, %rax
 	movq %rax, CR3_OFF(%rsp) /* cr3 */
-
-	movl $FS_MSR, %ecx
-	rdmsr
-	shlq $32, %rdx
-	orq %rdx, %rax
-	movq %rax, FS_OFF(%rsp) /* fs */
 
 	movq %ds, %rax
 	movq %rax, DS_OFF(%rsp) /* ds */

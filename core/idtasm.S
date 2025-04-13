@@ -289,50 +289,5 @@ IDT_END:
 .endr
 rsp0:
 
-// smaller ones for NMI, MC, and DF
-	.globl rsp1
-.rept 0x200
-	.quad 0
-.endr
-rsp1:
-
-	.globl rsp2
-.rept 0x200
-	.quad 0
-.endr
-rsp2:
-
-	.globl rsp3
-.rept 0x200
-	.quad 0
-.endr
-rsp3:
-
-// really small ones, probably not every needed
-	.globl rsp4
-.rept 0x10
-	.quad 0
-.endr
-rsp4:
-
-	.globl rsp5
-.rept 0x10
-	.quad 0
-.endr
-rsp5:
-
-	.globl rsp6
-.rept 0x10
-	.quad 0
-.endr
-rsp6:
-
-/* scheduler stack */
-	.globl rsp7
-.rept 0x200
-	.quad 0
-.endr
-rsp7:
-
 #endif /* CORE_IDTasm_S */
 

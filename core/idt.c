@@ -111,28 +111,26 @@ void idt_installisrs(volatile struct IDTD* idt, uint64_t* gdt, uint64_t* rsp) {
 	tss->rsp00 = (uint32_t)(rsp[0]) & 0xFFFFFFFF;
 	tss->rsp01 = (uint32_t)(rsp[0] >> 32) & 0xFFFFFFFF;
 
-	// TODO: add rings 1 and 2
-
 	tss->ist10 = (uint32_t)(rsp[1]) & 0xFFFFFFFF;
 	tss->ist11 = (uint32_t)(rsp[1] >> 32) & 0xFFFFFFFF;
 
 	tss->ist20 = (uint32_t)(rsp[2]) & 0xFFFFFFFF;
-	tss->ist21 = (uint32_t)(rsp[2]> 32) & 0xFFFFFFFF;
+	tss->ist21 = (uint32_t)(rsp[2] >> 32) & 0xFFFFFFFF;
 
 	tss->ist30 = (uint32_t)(rsp[3]) & 0xFFFFFFFF;
-	tss->ist31 = (uint32_t)(rsp[3]> 32) & 0xFFFFFFFF;
+	tss->ist31 = (uint32_t)(rsp[3] >> 32) & 0xFFFFFFFF;
 
 	tss->ist40 = (uint32_t)(rsp[4]) & 0xFFFFFFFF;
-	tss->ist41 = (uint32_t)(rsp[4]> 32) & 0xFFFFFFFF;
+	tss->ist41 = (uint32_t)(rsp[4] >> 32) & 0xFFFFFFFF;
 
 	tss->ist50 = (uint32_t)(rsp[5]) & 0xFFFFFFFF;
-	tss->ist51 = (uint32_t)(rsp[5]> 32) & 0xFFFFFFFF;
+	tss->ist51 = (uint32_t)(rsp[5] >> 32) & 0xFFFFFFFF;
 
 	tss->ist60 = (uint32_t)(rsp[6]) & 0xFFFFFFFF;
-	tss->ist61 = (uint32_t)(rsp[6]> 32) & 0xFFFFFFFF;
+	tss->ist61 = (uint32_t)(rsp[6] >> 32) & 0xFFFFFFFF;
 
 	tss->ist70 = (uint32_t)(rsp[7]) & 0xFFFFFFFF;
-	tss->ist71 = (uint32_t)(rsp[7]> 32) & 0xFFFFFFFF;
+	tss->ist71 = (uint32_t)(rsp[7] >> 32) & 0xFFFFFFFF;
 
 	// don't use iomap
 	tss->iomap_addr = sizeof(struct TSS);

@@ -23,6 +23,7 @@
 struct Thread {
 	uint8_t used : 1;
 	struct TLS* tls;
+	uint8_t wakeSignal;
 };
 
 void thread_init(void);
@@ -38,6 +39,15 @@ pid_t thread_kernelFromAddress(uint64_t addr);
 struct PCB* thread_PIDtoPCB(pid_t PID);
 
 void thread_kill(pid_t PID);
+
+pid_t thread_getPID(void);
+
+/* time in milliseconds */
+void thread_wait(uint64_t time);
+
+void thread_enterSleep(void);
+
+void thread_wakeup(pid_t PID);
 
 #endif /* CORE_THREADS_H */
 

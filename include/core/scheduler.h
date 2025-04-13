@@ -20,6 +20,8 @@
 
 typedef uint64_t pid_t;
 
+struct TLS;
+
 struct PCB {
 	uint64_t rax;
 	uint64_t rbx;
@@ -39,7 +41,7 @@ struct PCB {
 	uint64_t r15;
 
 	uint64_t ds;
-	uint64_t fs;
+	uint64_t fs; /* unused */
 	uint64_t cs;
 	uint64_t cr3;
 
@@ -50,11 +52,14 @@ struct PCB {
 
 	enum state {
 		RUNNING,
-		KILL
+		KILL,
+		SLEEP
 	} state;
 
 	struct PCB* next;
 	struct PCB* prev;
+
+	struct TLS* tls;
 } __attribute__((packed));
 
 struct TLS {

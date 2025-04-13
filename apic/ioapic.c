@@ -30,6 +30,7 @@
 #include <apic/calibrate.h>
 #include <apic/isr.h>
 #include <apic/lapic.h>
+#include <apic/pit.h>
 #include <apic/ioapic.h>
 
 #define IOREGSEL_OFF	0x00
