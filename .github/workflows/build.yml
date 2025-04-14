@@ -14,7 +14,7 @@ jobs:
       - name: Install apt packages
         run: |
           sudo apt update
-          sudo apt install build-essential bison flex texinfo genext2fs grub-pc grub-pc-bin grub-gfxpayload-lists libgmp-dev libmpfr-dev libmpc-dev libisl-dev gettext
+          sudo apt install build-essential bison flex texinfo e2fsprogs genext2fs grub-pc grub-pc-bin grub-gfxpayload-lists libgmp-dev libmpfr-dev libmpc-dev libisl-dev gettext
 
       - name: Export variables
         run: |

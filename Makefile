@@ -120,23 +120,24 @@ rootfs: | $(obj)/rootfs/
 	-mkdir -p $@
 
 $(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
-	# Copy files
 	mkdir -p $(obj)/rootfs/boot/grub/ $(obj)/rootfs/usr/share/doc/ModulOS/
 	cp $< $(obj)/rootfs/boot/
 	cp cfg/grub.cfg $(obj)/rootfs/boot/grub/
 	cp COPYING COPYING.LESSER $(obj)/rootfs/usr/share/doc/ModulOS/
-	# Create 4GiB disk
+# Create 4GiB disk
 	dd if=/dev/zero of=$@ count=1024 bs=4M
-	# Format it
+# Format it
 	parted -s $@ mklabel msdos
 	parted -s $@ mkpart primary ext2 1MiB 100%
 	parted -s $@ set 1 boot on
-	# Create grub image
-	echo "configfile (hd0,msdos1)/boot/grub/grub.cfg" > $(obj)/earlyconf.cfg
-	grub-mkimage -O i386-pc -o $(obj)/grub.img -p /boot/grub --config=$(obj)/earlyconf.cfg biosdisk part_msdos ext2 configfile normal multiboot2
-	# Create filesystem image
+# Create filesystem image
 	genext2fs -b 4194304 -d $(obj)/rootfs/ $(obj)/fs.img
-	# dd into image file
+	tune2fs -U random $(obj)/fs.img
+# Create grub image
+	echo "search --no-floppy --fs-uuid --set=root $$(tune2fs -l build/fs.img | grep UUID | head -n 1 | awk '{print $$3}')" > $(obj)/earlyconf.cfg
+	echo "configfile /boot/grub/grub.cfg" >> $(obj)/earlyconf.cfg
+	grub-mkimage -O i386-pc -o $(obj)/grub.img -p /boot/grub --config=$(obj)/earlyconf.cfg biosdisk part_msdos ext2 configfile normal multiboot2 search
+# dd into image file
 	dd if=/usr/lib/grub/i386-pc/boot.img of=$@ count=446 bs=1 conv=notrunc status=progress
 	dd if=$(obj)/grub.img of=$@ seek=1 bs=512 conv=notrunc status=progress
 	dd if=$(obj)/fs.img of=$@ seek=1 bs=1M conv=notrunc status=progress
