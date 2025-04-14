@@ -1,0 +1,13 @@
+# Installing Instructions
+
+The ModulOS image can be built by running the `make` command in the root directory of the source tree. This will create the `obj/modulos.img` which can be copied to a drive. Optionally, debugging symbols can be found in `obj/modulos-dbg`.
+
+By default, debugging related logging is disabled and optimizations are enabled. This can be changed by uncommenting the line starting with `#CDEBUG` in the top level Makefile.
+
+## Cross Compilation Instructions
+
+- binutils 2.44 was build with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --with-sysroot --disable-nls --disable-werror`
+
+- gcc 14.2.0 was build with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --disable-nls --enable-languages=c --without-headers`
+
+The version of binutils and gcc should not matter as long as they are recent
