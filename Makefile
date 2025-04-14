@@ -96,7 +96,7 @@ debuggdb: $(obj)/modulos-dbg
 
 
 .PHONY: rootfs
-rootfs: | $(obj)/iso/
+rootfs: | $(obj)/rootfs/
 	mkdir -p \
 		$|bin/ \
 		$|boot/ \
@@ -120,13 +120,26 @@ rootfs: | $(obj)/iso/
 	-mkdir -p $@
 
 $(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
-	mkdir -p $(obj)/iso/boot/grub/ $(obj)/iso/usr/share/doc/ModulOS/
-	cp $< $(obj)/iso/boot/
-	cp cfg/grub.cfg $(obj)/iso/boot/grub/
-	cp COPYING COPYING.LESSER $(obj)/iso/usr/share/doc/ModulOS/
-
-# It is very important that grub-pc (and related) packages are installed on the build platform for this to work right
-	grub-mkrescue -o $@ $(obj)/iso/
+	# Copy files
+	mkdir -p $(obj)/rootfs/boot/grub/ $(obj)/rootfs/usr/share/doc/ModulOS/
+	cp $< $(obj)/rootfs/boot/
+	cp cfg/grub.cfg $(obj)/rootfs/boot/grub/
+	cp COPYING COPYING.LESSER $(obj)/rootfs/usr/share/doc/ModulOS/
+	# Create 4GiB disk
+	dd if=/dev/zero of=$@ count=1024 bs=4M
+	# Format it
+	parted -s $@ mklabel msdos
+	parted -s $@ mkpart primary ext2 1MiB 100%
+	parted -s $@ set 1 boot on
+	# Create grub image
+	echo "configfile (hd0,msdos1)/boot/grub/grub.cfg" > $(obj)/earlyconf.cfg
+	grub-mkimage -O i386-pc -o $(obj)/grub.img -p /boot/grub --config=$(obj)/earlyconf.cfg biosdisk part_msdos ext2 configfile normal multiboot2
+	# Create filesystem image
+	genext2fs -b 4194304 -d $(obj)/rootfs/ $(obj)/fs.img
+	# dd into image file
+	dd if=/usr/lib/grub/i386-pc/boot.img of=$@ count=446 bs=1 conv=notrunc status=progress
+	dd if=$(obj)/grub.img of=$@ seek=1 bs=512 conv=notrunc status=progress
+	dd if=$(obj)/fs.img of=$@ seek=1 bs=1M conv=notrunc status=progress
 
 $(obj)/modulos: $(obj)/modulos-dbg | $(obj)/
 	$(KERNEL_STRIP) -s -o $@ $<
