@@ -80,13 +80,11 @@
 /* no need to keep track of fraction since PIT is not precise enough */
 #define PIT_PERIOD_US					10000
 
-uint64_t lapic_base;
+uint64_t lapic_base = 0;
 mutex_t ipi_mutex;
 
 uint8_t lapic_isrs[6];
 uint8_t ipi_isrs[1];
-
-uint8_t lapic_init = 0;
 
 struct cpu_specific* lapic_percpu[256];
 
@@ -129,8 +127,6 @@ void apic_initlocal() {
 
 	apic_installisrs((volatile struct IDTD*)&IDT_BASE);
 	apic_initlocalap();
-
-	lapic_init = 1;
 }
 
 void apic_installisrs(volatile struct IDTD* idtd) {
@@ -279,8 +275,7 @@ void apic_setTimerDeadline(uint64_t us) {
 }
 
 void apic_lapic_sendipi_flush() {
-	if (!lapic_init) return;
-
+	// lapic_base is zero before init (which is mapped and zeroed), so sending ipis at any time is fine
 	apic_lapic_sendipi(ipi_isrs[IPI_FLUSH_INDEX], LAPIC_IPI_FIXED | LAPIC_IPI_PHYSC | LAPIC_IPI_ASSERT | LAPIC_IPI_EDGE | LAPIC_IPI_ALLEX, 0);
 }
 

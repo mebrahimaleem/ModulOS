@@ -76,6 +76,9 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	/* set kernel instance to 0 */
 	kPML4T = (volatile PML4T_t )&k0PML4T;
 
+	/* fill first 1KiB with zeros for predictable behavior of some uninitialized code (mostly useful for sending ipis) */
+	kfill((void*)0, 1024, 0);
+
 	/* init atomic */
 	atomicinit();
 
