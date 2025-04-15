@@ -15,14 +15,5 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-.PHONY: all
-all: build
-
-.PHONY: build
-build: $(filter $(obj)/acpi/%.o,$(ACPI_TARGETS))
-
-%/:
-	-mkdir -p $@
-
-$(ACPI_TARGETS_C): $(obj)/acpi/%.o: %.c $(incl)/acpi/%.h
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
+$(ACPI_TARGETS_C): $(obj)/%.o: %.c $(deps)/%.d | $(obj)/acpi/
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ $(CFLAGS) $<

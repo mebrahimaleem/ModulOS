@@ -15,15 +15,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-.PHONY: all
-all: build
-
-.PHONY: build
-build: $(filter $(obj)/acpica/%.o,$(ACPICA_TARGETS))
-
-%/:
-	-mkdir -p $@
-
-$(ACPICA_TARGETS_C): $(obj)/acpica/%.o: %.c
+$(ACPICA_TARGETS_C): $(obj)/%.o: %.c $(deps)/%.d | $(obj)/acpica/
 	mkdir -p $(dir $@)
-	$(KERNEL_CC) $(CFLAGS) -I$(incl)/acpica/acpica/ -o $@ $<
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ -I $(incl)/acpica/acpica/ $(CFLAGS) $<

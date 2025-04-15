@@ -15,17 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-.PHONY: all
-all: build
+$(CORE_TARGETS_C): $(obj)/%.o: %.c $(deps)/%.d | $(obj)/core/
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ $(CFLAGS) $<
 
-.PHONY: build
-build: $(filter $(obj)/core/%.o,$(CORE_TARGETS))
-
-%/:
-	-mkdir -p $@
-
-$(CORE_TARGETS_S): $(obj)/core/%.o: %.S
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
-
-$(CORE_TARGETS_C): $(obj)/core/%.o: %.c $(incl)/core/%.h
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
+$(CORE_TARGETS_S): $(obj)/%.o: %.S $(deps)/%.d | $(obj)/core/
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ $(CFLAGS) $<

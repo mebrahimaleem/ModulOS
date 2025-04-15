@@ -15,17 +15,5 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-.PHONY: all
-all: build
-
-.PHONY: build
-build: $(filter $(obj)/multiboot2/%.o,$(ALL_TARGETS))
-
-%/:
-	-mkdir -p $@
-
-$(MULTIBOOT2_TARGETS_S): $(obj)/multiboot2/%.o: %.S
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
-
-$(MULTIBOOT2_TARGETS_C): $(obj)/multiboot2/%.o: %.c $(incl)/multiboot2/%.h
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
+$(MULTIBOOT2_TARGETS_S): $(obj)/%.o: %.S $(deps)/%.d | $(obj)/multiboot2/
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ $(CFLAGS) $<

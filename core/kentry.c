@@ -24,6 +24,7 @@
 #include <core/kentry.h>
 #include <core/atomic.h>
 #include <core/serial.h>
+#include <core/utils.h>
 #include <core/panic.h>
 #include <core/memory.h>
 #include <core/idt.h>
@@ -77,7 +78,7 @@ void kentry(uint32_t mb2tag_ptr, uint32_t mb2magic) {
 	kPML4T = (volatile PML4T_t )&k0PML4T;
 
 	/* fill first 1KiB with zeros for predictable behavior of some uninitialized code (mostly useful for sending ipis) */
-	kfill((void*)0, 1024, 0);
+	//kfill((void*)0, 1024, 0);
 
 	/* init atomic */
 	atomicinit();

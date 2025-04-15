@@ -15,17 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-.PHONY: all
-all: build
+$(APIC_TARGETS_C): $(obj)/%.o: %.c $(deps)/%.d | $(obj)/apic/
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ $(CFLAGS) $<
 
-.PHONY: build
-build: $(filter $(obj)/apic/%.o,$(APIC_TARGETS))
-
-%/:
-	-mkdir -p $@
-
-$(APIC_TARGETS_S): $(obj)/apic/%.o: %.S
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
-
-$(APIC_TARGETS_C): $(obj)/apic/%.o: %.c $(incl)/apic/%.h
-	$(KERNEL_CC) $(CFLAGS) -o $@ $<
+$(APIC_TARGETS_S): $(obj)/%.o: %.S $(deps)/%.d | $(obj)/apic/
+	$(KERNEL_CC) -MT $@ -MF $(deps)/$*.d -o $@ $(CFLAGS) $<

@@ -22,33 +22,32 @@ KERNEL_STRIP := x86_64-elf-strip
 obj := $(CURDIR)/build
 incl := $(CURDIR)/include
 test := $(CURDIR)/test
+deps := $(obj)/deps
 
-KERNEL_REQS_S := \
+KERNEL_SRC_S := \
 									$(shell find multiboot2/ -type f -name "*.S") \
 									$(shell find core/ -type f -name "*.S") \
 									$(shell find apic/ -type f -name "*.S")
-KERNEL_REQS_C := \
-									$(shell find multiboot2/ -type f -name "*.c") \
+KERNEL_SRC_C := \
 									$(shell find core/ -type f -name "*.c") \
 									$(shell find acpica/ -type f -name "*.c") \
 									$(shell find acpi/ -type f -name "*.c") \
 									$(shell find apic/ -type f -name "*.c")
 
-KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_REQS_S))
-KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_REQS_C))
+KERNEL_TARGETS_S := $(patsubst %.S,$(obj)/%.o,$(KERNEL_SRC_S))
+KERNEL_TARGETS_C := $(patsubst %.c,$(obj)/%.o,$(KERNEL_SRC_C))
 KERNEL_TARGETS := $(KERNEL_TARGETS_S) $(KERNEL_TARGETS_C)
 
-ALL_REQS_S := $(KERNEL_REQS_S)
-ALL_REQS_C := $(KERNEL_REQS_C)
-ALL_REQS := $(ALL_REQS_S) $(ALL_REQS_C)
+ALL_SRC_S := $(KERNEL_SRC_S)
+ALL_SRC_C := $(KERNEL_SRC_C)
+ALL_SRC := $(ALL_SRC_S) $(ALL_SRC_C)
 
 ALL_TARGETS_S := $(KERNEL_TARGETS_S)
 ALL_TARGETS_C := $(KERNEL_TARGETS_C)
 ALL_TARGETS := $(ALL_TARGETS_S) $(ALL_TARGETS_C)
 
 MULTIBOOT2_TARGETS_S := $(filter $(obj)/multiboot2/%,$(ALL_TARGETS_S))
-MULTIBOOT2_TARGETS_C := $(filter $(obj)/multiboot2/%,$(ALL_TARGETS_C))
-MULTIBOOT2_TARGETS := $(MULTIBOOT2_TARGETS_S) $(MULTIBOOT2_TARGETS_C)
+MULTIBOOT2_TARGETS := $(MULTIBOOT2_TARGETS_S)
 
 CORE_TARGETS_S := $(filter $(obj)/core/%,$(ALL_TARGETS_S))
 CORE_TARGETS_C := $(filter $(obj)/core/%,$(ALL_TARGETS_C))
@@ -64,10 +63,12 @@ APIC_TARGETS_S := $(filter $(obj)/apic/%,$(ALL_TARGETS_S))
 APIC_TARGETS_C := $(filter $(obj)/apic/%,$(ALL_TARGETS_C))
 APIC_TARGETS := $(APIC_TARGETS_C) $(APIC_TARGETS_S)
 
+KERNEL_DEPS := $(patsubst %.c,$(deps)/%.d,$(KERNEL_SRC_C)) $(patsubst %.S,$(deps)/%.d,$(KERNEL_SRC_S))
+
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
 	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
 #CDEBUG := -D DEBUG -O0
-CFLAGS := $(CWARN) -O2 $(CDEBUG) -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
+CFLAGS := $(CWARN) -O2 $(CDEBUG) -MMD -MP -D_MODULOS -static -fno-pie -mcmodel=kernel -ffreestanding -fomit-frame-pointer -fno-asynchronous-unwind-tables \
 	-mno-red-zone -mno-mmx -mno-sse -mno-sse2 -c -g3 -F dwarf -I $(CURDIR)/include/
 
 export
@@ -94,9 +95,11 @@ debuggdb: $(obj)/modulos-dbg
 		--init-eval-command="sy $<" \
 		--init-eval-command="c"
 
+%/:
+	-mkdir -p $@
 
-.PHONY: rootfs
-rootfs: | $(obj)/rootfs/
+$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER
+	# Create root fs structure
 	mkdir -p \
 		$|bin/ \
 		$|boot/ \
@@ -115,11 +118,6 @@ rootfs: | $(obj)/rootfs/
 		$|tmp/ \
 		$|usr/ $|usr/include/ $|usr/lib/ $|usr/libexec/ $|usr/local/ $|usr/share/ \
 		$|var/ $|var/log/ $|var/mail/ $|var/spool/ $|var/src/ $|var/tmp/
-
-%/:
-	-mkdir -p $@
-
-$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | rootfs
 	# Copy files
 	mkdir -p $(obj)/rootfs/boot/grub/ $(obj)/rootfs/usr/share/doc/ModulOS/
 	cp $< $(obj)/rootfs/boot/
@@ -147,31 +145,9 @@ $(obj)/modulos: $(obj)/modulos-dbg | $(obj)/
 $(obj)/modulos-dbg: cfg/kernel.ld $(KERNEL_TARGETS) | $(obj)/
 	$(KERNEL_LD) -o $@ -T $^
 
-# Multiboot2
-$(MULTIBOOT2_TARGETS_S): $(obj)/multiboot2/%.o: multiboot2/%.S | $(obj)/multiboot2/
-	$(MAKE) -C multiboot2/ $@
+$(KERNEL_DEPS):
+	mkdir -p $(dir $@)
+	touch $@
 
-$(MULTIBOOT2_TARGETS_C): $(obj)/multiboot2/%.o: multiboot2/%.c $(incl)/multiboot2/%.h | $(obj)/multiboot2/
-	$(MAKE) -C multiboot2/ $@
-
-# Core
-$(CORE_TARGETS_S): $(obj)/core/%.o: core/%.S | $(obj)/core/
-	$(MAKE) -C core/ $@
-
-$(CORE_TARGETS_C): $(obj)/core/%.o: core/%.c $(incl)/core/%.h | $(obj)/core/
-	$(MAKE) -C core/ $@
-
-# ACPICA
-$(ACPICA_TARGETS_C): $(obj)/acpica/%.o: acpica/%.c | $(obj)/acpica/
-	$(MAKE) -C acpica/ $@
-
-# ACPI
-$(ACPI_TARGETS_C): $(obj)/acpi/%.o: acpi/%.c $(incl)/acpi/%.h | $(obj)/acpi/
-	$(MAKE) -C acpi/ $@
-
-# APIC
-$(APIC_TARGETS_C): $(obj)/apic/%.o: apic/%.c $(incl)/apic/%.h | $(obj)/apic/
-	$(MAKE) -C apic/ $@
-
-$(APIC_TARGETS_S): $(obj)/apic/%.o: apic/%.S | $(obj)/apic/
-	$(MAKE) -C apic/ $@
+include $(wildcard */Makefile)
+include $(wildcard $(KERNEL_DEPS))
