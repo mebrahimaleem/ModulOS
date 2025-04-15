@@ -109,12 +109,14 @@ void apic_initlocal() {
 
 	cpuGetMSR(LAPIC_MSR_BASE, &t0, &t1);
 
-	lapic_base = addrmask & ((t0 & 0xfffff000) + ((uint64_t)t1 << 32));
 
-	cpuSetMSR(LAPIC_MSR_BASE, (uint32_t)lapic_base | LAPIC_MSR_ENABLE, (uint32_t)(lapic_base >> 32));
+	const uint64_t tempbase = addrmask & ((t0 & 0xfffff000) + ((uint64_t)t1 << 32));
 
 	/* set page to no cache and write through */
-	paging_changeFlags(kPML4T, (void*)lapic_base, KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE | KMEM_PAGE_WT | KMEM_PAGE_NOCACHE, PAGE_GRANULARITY_4K);
+	paging_changeFlags(kPML4T, (void*)tempbase, KMEM_PAGE_PRESENT | KMEM_PAGE_WRITE | KMEM_PAGE_WT | KMEM_PAGE_NOCACHE, PAGE_GRANULARITY_4K);
+
+	lapic_base = tempbase;
+	cpuSetMSR(LAPIC_MSR_BASE, (uint32_t)lapic_base | LAPIC_MSR_ENABLE, (uint32_t)(lapic_base >> 32));
 
 	lapic_isrs[0] = idt_claimIsrVector(LAPIC_CMCI_CODE + ISR_LAPIC_START);
 	lapic_isrs[1] = idt_claimIsrVector(LAPIC_TIMR_CODE + ISR_LAPIC_START);
