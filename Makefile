@@ -98,7 +98,7 @@ debuggdb: $(obj)/modulos-dbg
 %/:
 	-mkdir -p $@
 
-$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER
+$(obj)/modulos.img: $(obj)/modulos cfg/grub.cfg COPYING COPYING.LESSER | $(obj)/rootfs/
 	# Create root fs structure
 	mkdir -p \
 		$|bin/ \
