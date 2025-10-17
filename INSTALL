@@ -12,7 +12,7 @@ The built modules can be customized by commenting/uncommenting the various BUILD
 
 - gcc 15.2.0 was build with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --disable-nls --enable-languages=c --without-headers`
 
-- Patch files can be found in `contrib/patch/`
+- Patch files can be found in `contrib/`
 
 The compiler and binutils should be built in the following order:
 

@@ -56,15 +56,18 @@ COPY_DOC := $(COPY_DOC_TO)COPYING $(COPY_DOC_TO)COPYING.LESSER
 COPY_BOOT_TO := $(obj)/rootfs/boot/
 COPY_BOOT := $(COPY_BOOT_TO)modulos
 
-CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls \
-	-Wnested-externs -Winline -Wno-long-long -Wconversion -Wstrict-prototypes
+CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
+	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
+	-Wstrict-prototypes
 ifdef DEBUG
 CDEBUG := -DDEBUG -Og -g3
 else
 CDEBUG := -O2 -g
 endif
-CFLAGS := $(CDEBUG) $(CWARN) -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostartfiles -nodefaultlibs -nostdlib -fno-asynchronous-unwind-tables -fomit-frame-pointer \
-	-mcmodel=kernel -ffreestanding -F dwarf -static -D_MODULOS $(KERNEL_DEFINES) -lgcc $(CDEBUG) -I $(incl)/ -MMD -MP -c
+CFLAGS := $(CDEBUG) $(CWARN) -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostartfiles \
+	-nodefaultlibs -nostdlib -fno-asynchronous-unwind-tables -fomit-frame-pointer -mcmodel=kernel \
+	-ffreestanding -F dwarf -static -D_MODULOS $(KERNEL_DEFINES) -lgcc $(CDEBUG) -I $(incl)/ -MMD -MP \
+	-c
 
 .PHONY: all
 all: build
