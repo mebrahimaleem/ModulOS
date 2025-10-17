@@ -1,0 +1,67 @@
+name: Build OS
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install apt packages
+        run: |
+          sudo apt update
+          sudo apt install build-essential bison flex texinfo genext2fs grub-pc grub-pc-bin grub-gfxpayload-lists libgmp-dev libmpfr-dev libmpc-dev libisl-dev gettext mtools
+
+      - name: Setup environment
+        run: |
+          echo "PREFIX=/opt/x86_64-elf/" >> $GITHUB_ENV
+          mkdir -p /opt/x86_64-elf
+          echo "/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
+
+      - name: Get GNU keyring
+        run: |
+           wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
+
+      - name: Download binutils
+        run: |
+          wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.45.tar.gz.sig
+          wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.45.tar.gz
+          gpgv --keyring ./gnu-keyring.gpg binutils-2.45.tar.gz.sig binutils-2.45.tar.gz
+          tar xf binutils-2.45.tar.gz
+          mkdir build-binutils
+
+      - name: Download gcc
+        run: |
+          wget https://ftpmirror.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz.sig
+          wget https://ftpmirror.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz
+          gpgv --keyring ./gnu-keyring.gpg gcc-15.2.0.tar.gz.sig gcc-15.2.0.tar.gz
+          tar xf gcc-15.2.0.tar.gz
+          patch -s -p0 < contrib/noredzone.patch
+          mkdir build-gcc
+
+      - name: Build binutils
+        working-directory: build-binutils
+        run: |
+          ../binutils-2.45/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
+          make -j5
+          sudo make install
+
+      - name: Build gcc
+        working-directory: build-gcc
+        run: |
+          ../gcc-15.2.0/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
+          make -j5 all-gcc
+          sudo make install-gcc
+          make all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel' || true
+          sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc/Makefile
+          sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc-noredzone/libgcc/Makefile
+          make -j5 all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel'
+          sudo make install-target-libgcc
+
+      - name: Build ModulOS
+        run: |
+          make -j5
