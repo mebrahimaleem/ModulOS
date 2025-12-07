@@ -1,0 +1,7 @@
+#!/bin/bash
+
+gdb -q -tui \
+	--init-eval-command="tar rem localhost:1234" \
+	--init-eval-command="la sp" \
+	--init-eval-command="sy build/modulos-dbg" \
+	--init-eval-command="c"

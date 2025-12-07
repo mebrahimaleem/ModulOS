@@ -1,4 +1,4 @@
-/* memory.c - kernel memory */
+/* earlymemory.c - early kernel memory */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 
-#include <core/memory.h>
+#include <core/earlymemory.h>
 
 #define MOD8_MASK	(size_t)0x7
 

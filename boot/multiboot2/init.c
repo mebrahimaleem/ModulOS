@@ -20,8 +20,8 @@
 #include <multiboot2/init.h>
 
 #include <core/kentry.h>
-#include <core/memory.h>
-#include <core/acpiTables.h>
+#include <core/earlymemory.h>
+#include <core/acpitables.h>
 
 #define MOD8_MASK	(uint64_t)0x7
 

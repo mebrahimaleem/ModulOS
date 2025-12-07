@@ -1,4 +1,4 @@
-/* modulos.ld - modulos linker script */
+/* earlymemory.h - early kernel memory interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,6 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-INCLUDE "cfg/mp.ld"
-INCLUDE "cfg/boot.ld"
-INCLUDE "cfg/kernel.ld"
+#ifndef CORE_EARLYMEMORY_H
+#define CORE_EARLYMEMORY_H
+
+#include <stddef.h>
+
+extern void* kheap_base;
+
+extern void memory_init_early(void);
+
+extern void* kmalloc_early(size_t size);
+
+extern void kfree_early(void* ptr);
+
+#endif /* CORE_EARLYMEMORY_H */

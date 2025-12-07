@@ -1,4 +1,4 @@
-/* kernel.ld - kernel linker script */
+/* kentry.h - kernel entry point interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,42 +15,28 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-KERNEL_VMA = -0x80000000;
-MAXMEM = -0x1;
+#ifndef CORE_KENTRY_H
+#define CORE_KENTRY_H
 
-PHDRS {
-	kerneltext PT_LOAD FLAGS(1 | 4); /* XR */
-	kerneldata PT_LOAD FLAGS(2 | 4); /* WR */
-}
+#include <stdint.h>
+#include <stddef.h>
 
-SECTIONS {
-	. = KERNEL_VMA + BOOT_END;
-	. = ALIGN(4K);
-	
-	KERNEL_START = .;
-	
-	.text BLOCK(4K) : AT (ADDR(.text) - KERNEL_VMA) {
-		*(.text)
-	} :kerneltext
+#include <core/pfa.h>
+#include <core/acpitables.h>
 
-	. = ALIGN(4K);
+#ifdef GRAPHICSBASE
+#include <graphicsbase/framebuffer.h>
+#endif /* GRAPHICSBASE */
 
-	.data BLOCK(4K) : AT (ADDR(.data) - KERNEL_VMA) {
-		*(.data)
-		*(.rodata*)
-	} :kerneldata
+struct boot_context_t {
+	size_t num_memmap;
+	struct memmap_t* memmap;
+	struct RSDP_t rsdp;
+#ifdef GRAPHICSBASE
+	struct framebuffer_t framebuffer;
+#endif /* GRAPHICSBASE */
+};
 
-	. = ALIGN(4K);
+extern void kentry(void) __attribute__((noreturn));
 
-	.bss BLOCK(4K) : AT (ADDR(.bss) - KERNEL_VMA) {
-		*(.bss)
-	} :kerneldata
-
-	ASSERT(. <= KERNEL_VMA + 4M, "Error: Kernel exceeds 4MiB limit")
-
-	. = ALIGN(4K);
-	_kheap = .;
-
-	. = MAXMEM;
-	_kheap_end = .;
-}
+#endif /* CORE_KENTRY_H */

@@ -1,7 +1,8 @@
+*.
+
 build/
-test/
 
-*.swp
-
-cscope*
+cscope.*
 tags
+
+!.gitignore

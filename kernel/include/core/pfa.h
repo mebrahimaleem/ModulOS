@@ -1,4 +1,4 @@
-/* kentry.h - kernel entry point interface */
+/* pfa.h - Page fram allocator interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,28 +15,28 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_KENTRY_H
-#define CORE_KENTRY_H
+#ifndef CORE_PFA_H
+#define CORE_PFA_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-#include <core/memory.h>
-#include <core/acpiTables.h>
-
-#ifdef GRAPHICSBASE
-#include <graphicsbase/framebuffer.h>
-#endif /* GRAPHICSBASE */
-
-struct boot_context_t {
-	size_t num_memmap;
-	struct memmap_t* memmap;
-	struct RSDP_t rsdp;
-#ifdef GRAPHICSBASE
-	struct framebuffer_t framebuffer;
-#endif /* GRAPHICSBASE */
+struct memmap_t {
+	uint64_t base;
+	size_t length;
+	enum {
+		MEMTYPE_AVLB = 1,
+		MEMTYPE_ACPI = 3,
+		MEMTYPE_PRES = 4,
+		MEMTYPE_DEFC = 5
+	} type;
 };
 
-extern void kentry(void) __attribute__((noreturn));
+extern void pfa_init(struct memmap_t* memmap, size_t num_memmap);
 
-#endif /* CORE_KENTRY_H */
+extern uint64_t pfa_alloc(size_t num_pages);
+
+extern void pfa_free(uint64_t addr, size_t num_pages);
+
+#endif /* CORE_PFA_H */
+

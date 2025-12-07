@@ -1,0 +1,50 @@
+# Makefile - makefile targets template
+# Copyright (C) 2025  Ebrahim Aleem
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>
+
+DEP_DIR := $(OBJ_DIR)/deps
+
+SRC := $(shell find $(SRC_DIRS) -type f \( -name "*.c" -o -name "*.S" \))
+
+TARGETS_S := $(filter %.o, $(patsubst %.S,$(OBJ_DIR)/%.o,$(SRC)))
+TARGETS_C := $(filter %.o, $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC)))
+TARGETS := $(TARGETS_S) $(TARGETS_C)
+DEPS := $(patsubst $(OBJ_DIR)/%.o,$(DEP_DIR)/%.d,$(TARGETS))
+
+LINKER_SRC := $(shell find $(SRC_DIRS) -type f -name "*.ld")
+LDS := $(patsubst %,$(OBJ_DIR)/../lds/%,$(LINKER_SRC))
+
+%/:
+	-mkdir -p $@
+
+$(LDS): $(OBJ_DIR)/../lds/%: %
+	mkdir -p $(dir $@)
+	ln -f -s -r $< $@
+	touch $(OBJ_DIR)/../lds/timestamp
+
+$(OBJ_DIR)/../%: $(OBJ_DIR)/%
+	ln -f -s -r $< $@
+
+$(TARGETS_C): $(OBJ_DIR)/%.o: %.c $(DEP_DIR)/%.d | $(BUILD_DIRS)
+	$(CC) $(CFLAGS) -MT $@ -MF $(DEP_DIR)/$*.d -o $@ $<
+
+$(TARGETS_S): $(OBJ_DIR)/%.o: %.S $(DEP_DIR)/%.d | $(BUILD_DIRS)
+	$(CC) $(CFLAGS) -MT $@ -MF $(DEP_DIR)/$*.d -o $@ $<
+
+$(DEPS):
+	mkdir -p $(dir $@)
+	touch $@
+
+include $(wildcard $(DEPS))

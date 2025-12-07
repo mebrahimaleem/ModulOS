@@ -1,4 +1,4 @@
-/* memory.h - kernel memory interface */
+/* kentry.c - kernel entry point */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,28 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_MEMORY_H
-#define CORE_MEMORY_H
+#include <stdint.h>
 
-#include <stddef.h>
+#include <core/kentry.h>
+#include <core/pfa.h>
 
-struct memmap_t {
-	uint64_t base;
-	size_t length;
-	enum {
-		MEMTYPE_AVLB = 1,
-		MEMTYPE_ACPI = 3,
-		MEMTYPE_PRES = 4,
-		MEMTYPE_DEFC = 5
-	} type;
-};
+struct boot_context_t boot_context;
 
-extern void* kheap_base;
+void kentry() {
+	pfa_init(boot_context.memmap, boot_context.num_memmap);
 
-extern void memory_init_early(void);
-
-extern void* kmalloc_early(size_t size);
-
-extern void kfree_early(void* ptr);
-
-#endif /* CORE_MEMORY_H */
+	while (1) {}
+}
