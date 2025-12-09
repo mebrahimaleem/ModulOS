@@ -1,4 +1,4 @@
-/* pfa.h - Page fram allocator interface */
+/* paging.h - paging managger interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,28 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PFA_H
-#define CORE_PFA_H
-
 #include <stdint.h>
 #include <stddef.h>
 
-struct memmap_t {
-	uint64_t base;
-	size_t length;
-	enum {
-		MEMTYPE_AVLB = 1,
-		MEMTYPE_ACPI = 3,
-		MEMTYPE_PRES = 4,
-		MEMTYPE_DEFC = 5
-	} type;
-};
+#define PAGE_PRESENT	0x1
+#define PAGE_RW				0x2
 
-extern void pfa_init(struct memmap_t* memmap, size_t num_memmap);
+extern void paging_init(uint64_t paging_base);
 
-extern uint64_t pfa_alloc(size_t num_pages);
-
-extern void pfa_free(uint64_t addr, size_t num_pages);
-
-#endif /* CORE_PFA_H */
-
+extern void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);

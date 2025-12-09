@@ -1,5 +1,6 @@
 #!/bin/bash
 
+mkdir -p build/test/
 qemu-system-x86_64 -s -smp 4 -serial vc -serial file:build/test/serial \
 	-d cpu_reset,int -m 16G -monitor stdio \
 	-drive format=raw,file=build/modulos.img,if=ide,media=disk \

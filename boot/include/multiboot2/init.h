@@ -28,7 +28,7 @@
 
 struct mb2_info_t;
 
-extern void multiboot2_init(volatile struct mb2_info_t* info);
+extern void multiboot2_init(struct mb2_info_t* info);
 
 #endif /* _ASM */
 

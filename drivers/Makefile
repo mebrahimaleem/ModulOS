@@ -19,8 +19,8 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
 OBJ_DIR := $(OBJ_DIR)/drivers
 
-include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
+include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 
 .PHONY: all
 all: build

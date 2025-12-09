@@ -18,12 +18,10 @@
 #include <stdint.h>
 
 #include <core/kentry.h>
-#include <core/pfa.h>
 
 struct boot_context_t boot_context;
 
 void kentry() {
-	pfa_init(boot_context.memmap, boot_context.num_memmap);
 
 	while (1) {}
 }

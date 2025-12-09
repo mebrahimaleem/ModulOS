@@ -1,4 +1,4 @@
-/* earlymemory.h - early kernel memory interface */
+/* mm.h - memory manager interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,17 +15,25 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_EARLYMEMORY_H
-#define CORE_EARLYMEMORY_H
+#ifndef CORE_MM_H
+#define CORE_MM_H
 
+#include <stdint.h>
 #include <stddef.h>
 
-extern void* kheap_base;
+#define MM_INITIAL_ALLOC_SIZE	0x200000
 
-extern void memory_init_early(void);
+struct mem_segment_handle_t;
 
-extern void* kmalloc_early(size_t size);
+extern void mm_init(
+		void (*next_segment)(struct mem_segment_handle_t** handle),
+		struct mem_segment_handle_t* (*first_segment)(void),
+		uint64_t (*get_base)(struct mem_segment_handle_t*),
+		size_t (*get_size)(struct mem_segment_handle_t*),
+		void (*set_base)(struct mem_segment_handle_t*, uint64_t),
+		void (*set_size)(struct mem_segment_handle_t*, size_t));
 
-extern void kfree_early(void* ptr);
+extern uint64_t mm_alloc_pv(size_t size);
 
-#endif /* CORE_EARLYMEMORY_H */
+#endif /* CORE_MM_H */
+

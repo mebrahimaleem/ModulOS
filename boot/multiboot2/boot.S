@@ -272,6 +272,8 @@ gdt_ptr64.addr:
 	/* Paging structures */
 	.align 0x1000
 
+.globl kernel_pml4
+kernel_pml4:
 PML4:
 	.quad PDPT_0 + KERNEL_PAGE_FLAGS
 .rept 0x200 - 2

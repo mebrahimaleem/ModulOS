@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-CFLAGS := $(CDEBUG) $(CWARN) -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostartfiles \
+CFLAGS := $(CWARN) -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostartfiles \
 	-nodefaultlibs -nostdlib -fno-asynchronous-unwind-tables -fomit-frame-pointer -mcmodel=kernel \
 	-ffreestanding -F dwarf -static -D_MODULOS $(DEFINES) $(CDEBUG) -I include/ \
 	-I $(SRC_TREE_ROOT)/kernel/include/ -MMD -MP -c

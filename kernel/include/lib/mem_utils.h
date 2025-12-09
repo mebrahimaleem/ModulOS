@@ -1,4 +1,4 @@
-/* kentry.h - kernel entry point interface */
+/* mem_utils.h - library memory utility interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,27 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_KENTRY_H
-#define CORE_KENTRY_H
-
 #include <stdint.h>
 #include <stddef.h>
 
-#include <core/acpitables.h>
+extern void* memset(void* ptr, uint64_t v, size_t c);
+extern void* memsetb(void* ptr, uint8_t v, size_t c);
+extern void* memsetw(void* ptr, uint16_t v, size_t c);
+extern void* memsetd(void* ptr, uint32_t v, size_t c);
+extern void* memsetq(void* ptr, uint64_t v, size_t c);
 
-#ifdef GRAPHICSBASE
-#include <graphicsbase/framebuffer.h>
-#endif /* GRAPHICSBASE */
-
-struct boot_context_t {
-	size_t num_memmap;
-	struct memmap_t* memmap;
-	struct RSDP_t rsdp;
-#ifdef GRAPHICSBASE
-	struct framebuffer_t framebuffer;
-#endif /* GRAPHICSBASE */
-};
-
-extern void kentry(void) __attribute__((noreturn));
-
-#endif /* CORE_KENTRY_H */
+extern void* memcpy(void* dest, uint64_t src, size_t c);
+extern void* memcpyb(void* dest, uint64_t src, size_t c);
+extern void* memcpyw(void* dest, uint64_t src, size_t c);
+extern void* memcpyd(void* dest, uint64_t src, size_t c);
+extern void* memcpyq(void* dest, uint64_t src, size_t c);

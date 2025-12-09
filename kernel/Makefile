@@ -23,13 +23,14 @@ AR := $(KERNEL_TOOLCHAIN_PREFIX)ar
 OBJ_DIR := $(OBJ_DIR)/kernel
 
 $(call add_directory,core,CORE)
+$(call add_directory,lib,LIB)
 
 ifdef BUILD_KERNEL_GRAPHICSBASE
 $(call add_directory,graphicsbase,GRAPHICSBASE)
 endif
 
-include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
+include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 
 .PHONY: all
 all: build

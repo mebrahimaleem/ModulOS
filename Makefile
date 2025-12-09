@@ -19,16 +19,30 @@
 
 DEBUG := 1
 
-# Boot options
+# Global options
+
+BUILD_GRAPHICSBASE := 1
+
+# Optional boot modules
 
 BUILD_BOOT_MULTIBOOT2 := 1
 
+
 # Optional core modules
 
-BUILD_KERNEL_GRAPHICSBASE := 1
 
 # Optional driver modules
 
+
+# Auto include modules
+
+ifdef BUILD_GRAPHICSBASE
+BUILD_BOOT_GRAPHICSBASE := 1
+endif
+
+ifdef BUILD_GRAPHICSBASE
+BUILD_KERNEL_GRAPHICSBASE := 1
+endif
 
 # End of options
 

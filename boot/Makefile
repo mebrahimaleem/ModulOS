@@ -25,12 +25,16 @@ ifdef BUILD_BOOT_MULTIBOOT2
 $(call add_directory,multiboot2,MULTIBOOT2)
 endif
 
+ifdef BUILD_BOOT_GRAPHICSBASE
+DEFINES := $(DEFINES) -DGRAPHICSBASE
+endif
+
 ifneq ($(words $(SRC_DIRS)), 1)
 $(error Exactly a single bootloader can be built)
 endif
 
-include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
+include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 
 .PHONY: all
 all: build
