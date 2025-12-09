@@ -20,6 +20,8 @@
 
 #include <core/mm.h>
 #include <core/paging.h>
+#include <core/panic.h>
+
 #include <lib/mem_utils.h>
 
 #define PAGE_SIZE				0x1000
@@ -91,7 +93,7 @@ void mm_init(
 		paging_init(paging_base);
 	}
 	else {
-		// TODO: panic
+		panic(PANIC_NO_MEM);
 	}
 
 	uint64_t reclaim_base_fr = 0;
@@ -119,7 +121,7 @@ void mm_init(
 	}
 
 	if (!max_base) {
-		// TODO: panic
+		panic(PANIC_NO_MEM);
 	}
 
 	// roundup to page
@@ -137,7 +139,7 @@ void mm_init(
 	}
 
 	if (max_size < frames_size) {
-		// TODO panic
+		panic(PANIC_NO_MEM);
 	}
 
 	page_array = (struct page_frame_t*)mm_alloc_pv(frames_size);
@@ -148,7 +150,6 @@ void mm_init(
 
 	memset(page_array, 0, frames_size);
 
-	// TODO: init page array
 	handle = first_segment();
 	while (handle != 0) {
 		base = get_base(handle);

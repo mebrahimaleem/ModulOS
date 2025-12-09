@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifndef LIB_MEM_UTILS_H
+#define LIB_MEM_UTILS_H
+
 extern void* memset(void* ptr, uint64_t v, size_t c);
 extern void* memsetb(void* ptr, uint8_t v, size_t c);
 extern void* memsetw(void* ptr, uint16_t v, size_t c);
@@ -29,3 +32,5 @@ extern void* memcpyb(void* dest, uint64_t src, size_t c);
 extern void* memcpyw(void* dest, uint64_t src, size_t c);
 extern void* memcpyd(void* dest, uint64_t src, size_t c);
 extern void* memcpyq(void* dest, uint64_t src, size_t c);
+
+#endif /* LIB_MEM_UTILS_H */

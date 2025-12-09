@@ -1,4 +1,4 @@
-/* paging.h - paging managger interface */
+/* panic.h - kernel panic interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,17 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PAGING_H
-#define CORE_PAGING_H
+#ifndef CORE_PANIC_H
+#define CORE_PANIC_H
 
-#include <stdint.h>
-#include <stddef.h>
+enum panic_code_t {
+	PANIC_UNK,
+	PANIC_PAGING,
+	PANIC_NO_MEM,
+};
 
-#define PAGE_PRESENT	0x1
-#define PAGE_RW				0x2
+extern void panic(enum panic_code_t code) __attribute__((noreturn));
 
-extern void paging_init(uint64_t paging_base);
-
-extern void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
-
-#endif /* CORE_PAGING_H */
+#endif /* CORE_PANIC_H */

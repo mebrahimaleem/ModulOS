@@ -20,6 +20,8 @@
 
 #include <core/paging.h>
 #include <core/mm.h>
+#include <core/panic.h>
+
 #include <lib/mem_utils.h>
 
 #define PAGE_PS 			0x80
@@ -74,6 +76,7 @@ static uint64_t alloc_page(void) {
 	}
 
 	// TODO: handle hint reached limit
+	panic(PANIC_PAGING);
 	return 0;
 }
 
@@ -82,7 +85,7 @@ void paging_init(uint64_t paging_base) {
 
 	// only support in last pdpt
 	if (GET_PML4_INDEX(pool_base) != 511) {
-		// TODO: panic
+		panic(PANIC_PAGING);
 	}
 
 	GET_TABLE(kernel_pml4
@@ -116,7 +119,7 @@ void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)];
 
 	if ((pd & PAGE_PS) == PAGE_PS) {
-		// TODO: panic
+		panic(PANIC_PAGING);
 	}
 
 	if ((pd & PAGE_PRESENT) != PAGE_PRESENT) {
@@ -127,7 +130,7 @@ void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	const uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
 
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
-		// TODO: panic
+		panic(PANIC_PAGING);
 	}
 
 
