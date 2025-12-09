@@ -35,6 +35,8 @@ extern void mm_init(
 
 extern uint64_t mm_alloc_frame(void);
 
+extern uint64_t mm_alloc_frame_cont(size_t count, uint64_t align);
+
 extern void mm_free_frame(uint64_t addr);
 
 extern uint64_t mm_alloc_pv(size_t size);

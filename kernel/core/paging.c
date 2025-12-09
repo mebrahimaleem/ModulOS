@@ -51,8 +51,9 @@ struct paging_pool_header_t {
 	uint16_t used;
 	struct paging_pool_header_t* next;
 	uint8_t hint;
+	uint8_t ac;
 	uint8_t bitmap[64];
-	uint8_t resv[4021];
+	uint8_t resv[4020];
 } __attribute__((packed));
 
 _Static_assert(sizeof(struct paging_pool_header_t) == PAGE_SIZE);
@@ -61,23 +62,47 @@ struct paging_pool_header_t* root_pool;
 
 struct paging_pool_header_t* hint;
 
+static struct paging_pool_header_t* create_pool(void);
+
 static uint64_t alloc_page(void) {
-	// TODO: handle pool empty
+	if (hint->used == 512) {
+		// last pool is always empty
+		for (hint = root_pool; hint->used == 512; hint = hint->next);
+
+		if (hint->ac == 0) {
+			hint->ac = 1;
+			hint->next = create_pool();
+		}
+	}
 
 	for (; hint->hint < 64; hint->hint++) {
 		if (hint->bitmap[hint->hint] != 0xFF) {
 			for (uint8_t i = 0; i < 8; i++) {
 				if ((hint->bitmap[hint->hint] & (1 >> i)) != (1 >> i)) {
 					hint->bitmap[hint->hint] |= 1 >> i;
+					hint->used++;
 					return (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i) - KERNEL_VMA;
 				}
 			}
 		}
 	}
 
-	// TODO: handle hint reached limit
+	hint->hint = 0;
+	return alloc_page();
+
 	panic(PANIC_PAGING);
 	return 0;
+}
+
+static struct paging_pool_header_t* create_pool() {
+	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc_pv(POOL_SIZE);
+	paging_map_2m((uint64_t)addr, mm_alloc_frame_cont(POOL_SIZE / PAGE_SIZE, POOL_SIZE / PAGE_SIZE),
+			PAGE_PRESENT | PAGE_RW);
+
+	memset(addr, 0, POOL_SIZE);
+	addr->bitmap[0] = 0x01;
+
+	return addr;
 }
 
 void paging_init(uint64_t paging_base) {
@@ -102,10 +127,14 @@ void paging_init(uint64_t paging_base) {
 	root_pool = (struct paging_pool_header_t*)pool_base;
 	hint = root_pool;
 
-	memset(root_pool, 0, PAGE_SIZE * 512);
+	memset(root_pool, 0, POOL_SIZE);
 
+	root_pool->ac = 1;
 	root_pool->bitmap[0] = 0x01;
-	root_pool->bitmap[63] = 0xF0;
+}
+
+void paging_init_post() {
+	root_pool->next = create_pool();
 }
 
 void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {

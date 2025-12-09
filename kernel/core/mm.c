@@ -194,6 +194,8 @@ void mm_init(
 	}
 
 	frame_hint = (uint64_t)&_kernel_pend / PAGE_SIZE;
+
+	paging_init_post();
 }
 
 uint64_t mm_alloc_frame() {
@@ -211,6 +213,30 @@ uint64_t mm_alloc_frame() {
 		if ((page_array[frame_hint].flg & FRAME_FREE) == FRAME_FREE) {
 			page_array[frame_hint].flg ^= FRAME_FREE;
 			return frame_hint * PAGE_SIZE;
+		}
+	}
+
+	panic(PANIC_NO_MEM);
+}
+
+uint64_t mm_alloc_frame_cont(size_t count, uint64_t align) {
+	size_t consec = 0;
+	for (uint64_t i = 0; i < frame_count - count; i++) {
+		if ((page_array[i].flg & FRAME_FREE) == FRAME_FREE) {
+			if (consec > 0 || i % align == 0) {
+				consec++;
+			}
+		}
+		else {
+			consec = 0;
+		}
+
+		if (consec == count) {
+			for (size_t j = i; j > i - count; j--) {
+				page_array[j].flg ^= FRAME_FREE;
+			}
+
+			return (i - count + 1) * PAGE_SIZE;
 		}
 	}
 
