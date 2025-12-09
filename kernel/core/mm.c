@@ -39,6 +39,8 @@ struct page_frame_t {
 	uint8_t flg;
 } __attribute__((packed));
 
+extern uint8_t _kernel_pend;
+
 static struct page_frame_t* page_array;
 
 static uint64_t virt_limit; // pv start
@@ -147,6 +149,27 @@ void mm_init(
 	memset(page_array, 0, frames_size);
 
 	// TODO: init page array
+	handle = first_segment();
+	while (handle != 0) {
+		base = get_base(handle);
+		size = get_size(handle);
+
+		if (base % PAGE_SIZE != 0) {
+			size -= PAGE_SIZE - (base % PAGE_SIZE);
+			base += PAGE_SIZE - (base % PAGE_SIZE);
+		}
+
+		for (uint64_t i = base / PAGE_SIZE; size >= PAGE_SIZE; i++) {
+			if (i < (uint64_t)&_kernel_pend / PAGE_SIZE) {
+				continue;
+			}
+
+			page_array[i].flg |= FRAME_FREE;
+			size -= PAGE_SIZE;
+		}
+
+		next_segment(&handle);
+	}
 }
 
 uint64_t mm_alloc_pv(size_t size) {
