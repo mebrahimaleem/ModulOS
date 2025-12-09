@@ -33,6 +33,10 @@ extern void mm_init(
 		void (*set_base)(struct mem_segment_handle_t*, uint64_t),
 		void (*set_size)(struct mem_segment_handle_t*, size_t));
 
+extern uint64_t mm_alloc_frame(void);
+
+extern void mm_free_frame(uint64_t addr);
+
 extern uint64_t mm_alloc_pv(size_t size);
 
 #endif /* CORE_MM_H */

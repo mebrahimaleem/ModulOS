@@ -32,9 +32,7 @@
 #define FRAME_FREE	0x1
 
 #define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
-
-#define INITIAL_ALLOC_SIZE	0x200000
-
+#define INITIAL_ALLOC_SIZE		0x200000
 #define MAX_SUPPORTED_FRAMES	0x3F800000
 
 struct page_frame_t {
@@ -45,7 +43,10 @@ extern uint8_t _kernel_pend;
 
 static struct page_frame_t* page_array;
 
-static uint64_t virt_limit; // pv start
+static uint64_t virt_limit; // pv start, alloc backwards
+
+static uint64_t frame_hint;
+static uint64_t frame_count;
 
 void mm_init(
 		void (*next_segment)(struct mem_segment_handle_t**),
@@ -96,9 +97,6 @@ void mm_init(
 		panic(PANIC_NO_MEM);
 	}
 
-	uint64_t reclaim_base_fr = 0;
-	uint64_t reclaim_size_fr;
-
 	uint64_t max_base = 0;
 	uint64_t max_size = 0;
 	uint64_t mem_limit = 0;
@@ -125,7 +123,8 @@ void mm_init(
 	}
 
 	// roundup to page
-	uint64_t frames_size = sizeof(struct page_frame_t) * ((mem_limit + PAGE_SIZE - 1) / PAGE_SIZE);
+	frame_count = (mem_limit + PAGE_SIZE - 1) / PAGE_SIZE;
+	uint64_t frames_size = sizeof(struct page_frame_t) * frame_count;
 
 	if (frames_size > MAX_SUPPORTED_FRAMES) {
 		// TODO: maybe support more memory
@@ -150,6 +149,9 @@ void mm_init(
 
 	memset(page_array, 0, frames_size);
 
+	uint64_t i;
+
+	// set bitmap
 	handle = first_segment();
 	while (handle != 0) {
 		base = get_base(handle);
@@ -160,7 +162,7 @@ void mm_init(
 			base += PAGE_SIZE - (base % PAGE_SIZE);
 		}
 
-		for (uint64_t i = base / PAGE_SIZE; size >= PAGE_SIZE; i++) {
+		for (i = base / PAGE_SIZE; size >= PAGE_SIZE; i++) {
 			if (i < (uint64_t)&_kernel_pend / PAGE_SIZE) {
 				continue;
 			}
@@ -171,9 +173,64 @@ void mm_init(
 
 		next_segment(&handle);
 	}
+
+	// add reclaimable
+	if (reclaim_base_pg) {
+		if (reclaim_base_pg % PAGE_SIZE != 0) {
+			reclaim_size_pg -= PAGE_SIZE - (reclaim_base_pg % PAGE_SIZE);
+			reclaim_base_pg += PAGE_SIZE - (reclaim_base_pg % PAGE_SIZE);
+		}
+
+		for (i = reclaim_base_pg / PAGE_SIZE; reclaim_size_pg >= PAGE_SIZE; i++) {
+			page_array[i].flg |= FRAME_FREE;
+			reclaim_size_pg -= PAGE_SIZE;
+		}
+	}
+
+	// mark bitmap as used
+	for (i = max_base / PAGE_SIZE; frames_size >= PAGE_SIZE; i++) {
+		page_array[i].flg ^= FRAME_FREE;
+		frames_size -= PAGE_SIZE;
+	}
+
+	frame_hint = (uint64_t)&_kernel_pend / PAGE_SIZE;
+}
+
+uint64_t mm_alloc_frame() {
+	// TODO: optimize
+	uint64_t start = frame_hint;
+
+	for (; frame_hint < frame_count; frame_hint++) {
+		if ((page_array[frame_hint].flg & FRAME_FREE) == FRAME_FREE) {
+			page_array[frame_hint].flg ^= FRAME_FREE;
+			return frame_hint * PAGE_SIZE;
+		}
+	}
+
+	for (frame_hint = 0; frame_hint < start; frame_hint++) {
+		if ((page_array[frame_hint].flg & FRAME_FREE) == FRAME_FREE) {
+			page_array[frame_hint].flg ^= FRAME_FREE;
+			return frame_hint * PAGE_SIZE;
+		}
+	}
+
+	panic(PANIC_NO_MEM);
+}
+
+void mm_free_frame(uint64_t addr) {
+	// TODO: log double free
+	const uint64_t i = addr / PAGE_SIZE;
+
+	if ((page_array[i].flg & FRAME_FREE) == FRAME_USED) {
+		page_array[i].flg ^= FRAME_FREE;
+	}
 }
 
 uint64_t mm_alloc_pv(size_t size) {
+	if (size % INITIAL_ALLOC_SIZE != 0) {
+		size += INITIAL_ALLOC_SIZE - (size % INITIAL_ALLOC_SIZE);
+	}
+
 	virt_limit -= size;
 	return virt_limit;
 
