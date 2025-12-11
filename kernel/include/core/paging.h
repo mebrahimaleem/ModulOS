@@ -26,8 +26,6 @@
 
 extern void paging_init(uint64_t paging_base);
 
-extern void paging_init_post(void);
-
-extern void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
+extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
 
 #endif /* CORE_PAGING_H */

@@ -31,24 +31,25 @@
 #define FRAME_USED	0x0
 #define FRAME_FREE	0x1
 
-#define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
 #define INITIAL_ALLOC_SIZE		0x200000
 #define MAX_SUPPORTED_FRAMES	0x3F800000
 
-struct page_frame_t {
-	uint8_t flg;
-} __attribute__((packed));
+#define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
 
 extern uint8_t _kernel_pend;
 
-static struct page_frame_t* page_array;
+uint64_t page_frames_num;
+struct page_frame_t* page_frames;
 
+static uint64_t max_base; // for early alloc
 static uint64_t virt_limit; // pv start, alloc backwards
 
-static uint64_t frame_hint;
-static uint64_t frame_count;
+void mm_init_virt() {
+	// permanent virtual addresses are useful for early memory/paging
+	virt_limit = INITIAL_VIRTUAL_LIMIT;
+}
 
-void mm_init(
+void mm_init_post(
 		void (*next_segment)(struct mem_segment_handle_t**),
 		struct mem_segment_handle_t* (*first_segment)(void),
 		uint64_t (*get_base)(struct mem_segment_handle_t*),
@@ -56,8 +57,8 @@ void mm_init(
 		void (*set_base)(struct mem_segment_handle_t*, uint64_t),
 		void (*set_size)(struct mem_segment_handle_t*, size_t)) {
 
-	virt_limit = INITIAL_VIRTUAL_LIMIT;
 
+	/*
 	uint64_t base;
 	uint64_t size;
 
@@ -97,7 +98,7 @@ void mm_init(
 		panic(PANIC_NO_MEM);
 	}
 
-	uint64_t max_base = 0;
+	max_base = 0;
 	uint64_t max_size = 0;
 	uint64_t mem_limit = 0;
 
@@ -123,7 +124,7 @@ void mm_init(
 	}
 
 	// roundup to page
-	frame_count = (mem_limit + PAGE_SIZE - 1) / PAGE_SIZE;
+	uint64_t frame_count = (mem_limit + PAGE_SIZE - 1) / PAGE_SIZE;
 	uint64_t frames_size = sizeof(struct page_frame_t) * frame_count;
 
 	if (frames_size > MAX_SUPPORTED_FRAMES) {
@@ -193,63 +194,26 @@ void mm_init(
 		frames_size -= PAGE_SIZE;
 	}
 
-	frame_hint = (uint64_t)&_kernel_pend / PAGE_SIZE;
-
 	paging_init_post();
+	*/
 }
 
 uint64_t mm_alloc_frame() {
-	// TODO: optimize
-	uint64_t start = frame_hint;
-
-	for (; frame_hint < frame_count; frame_hint++) {
-		if ((page_array[frame_hint].flg & FRAME_FREE) == FRAME_FREE) {
-			page_array[frame_hint].flg ^= FRAME_FREE;
-			return frame_hint * PAGE_SIZE;
-		}
-	}
-
-	for (frame_hint = 0; frame_hint < start; frame_hint++) {
-		if ((page_array[frame_hint].flg & FRAME_FREE) == FRAME_FREE) {
-			page_array[frame_hint].flg ^= FRAME_FREE;
-			return frame_hint * PAGE_SIZE;
-		}
-	}
+	// TODO
 
 	panic(PANIC_NO_MEM);
 }
 
 uint64_t mm_alloc_frame_cont(size_t count, uint64_t align) {
-	size_t consec = 0;
-	for (uint64_t i = 0; i < frame_count - count; i++) {
-		if ((page_array[i].flg & FRAME_FREE) == FRAME_FREE) {
-			if (consec > 0 || i % align == 0) {
-				consec++;
-			}
-		}
-		else {
-			consec = 0;
-		}
-
-		if (consec == count) {
-			for (size_t j = i; j > i - count; j--) {
-				page_array[j].flg ^= FRAME_FREE;
-			}
-
-			return (i - count + 1) * PAGE_SIZE;
-		}
-	}
+	// TODO
 
 	panic(PANIC_NO_MEM);
 }
 
 void mm_free_frame(uint64_t addr) {
-	// TODO: log double free
-	const uint64_t i = addr / PAGE_SIZE;
+	// TODO
 
-	if ((page_array[i].flg & FRAME_FREE) == FRAME_USED) {
-		page_array[i].flg ^= FRAME_FREE;
-	}
+	panic(PANIC_NO_MEM);
 }
 
 uint64_t mm_alloc_pv(size_t size) {

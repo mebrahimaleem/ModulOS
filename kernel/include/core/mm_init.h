@@ -1,4 +1,4 @@
-/* mm.h - memory manager interface */
+/* mm_init.h - memory manager initialization interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,29 +15,26 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_MM_H
-#define CORE_MM_H
+#ifndef CORE_MM_INIT_H
+#define CORE_MM_INIT_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-#define MM_INITIAL_ALLOC_SIZE	0x200000
+struct mem_segment_t {
+	uint64_t base;
+	size_t size;
+	enum {
+		MEM_AVL,
+		MEM_CLM,
+		MEM_PRS
+	} type;
+};
 
-struct page_frame_t {
-	uint8_t flg;
-} __attribute__((packed));
+extern void mm_init(
+		void (*first_segment)(uint64_t* handle),
+		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg));
 
-struct mem_segment_handle_t;
+extern uint64_t mm_early_alloc_2m(void);
 
-void mm_init_virt(void);
-
-extern uint64_t mm_alloc_frame(void);
-
-extern uint64_t mm_alloc_frame_cont(size_t count, uint64_t align);
-
-extern void mm_free_frame(uint64_t addr);
-
-extern uint64_t mm_alloc_pv(size_t size);
-
-#endif /* CORE_MM_H */
-
+#endif /* CORE_MM_INIT_H */

@@ -48,7 +48,7 @@ SECTIONS {
 
 	ASSERT(. <= KERNEL_VMA + 4M, "Error: Kernel exceeds 4MiB limit")
 
-	. = ALIGN(4K);
+	. = ALIGN(2M);
 	_kernel_pend = . - KERNEL_VMA;
 	_kernel_heap_base = .;
 

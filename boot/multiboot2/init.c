@@ -21,7 +21,7 @@
 
 #include <core/kentry.h>
 #include <core/acpitables.h>
-#include <core/mm.h>
+#include <core/mm_init.h>
 
 #define MOD8_MASK	(uint64_t)0x7
 
@@ -83,13 +83,6 @@ struct mb2_tag_t {
 	} tag;
 } __attribute__((packed));
 
-struct mem_segment_handle_t {
-	uint64_t entry_size;
-	uint64_t limit;
-	uint64_t current;
-	struct mb2_tag_memmap_entry_t* entries;
-};
-
 struct mb2_info_t {
 	const uint32_t total_size;
 	const uint32_t reserved;
@@ -97,48 +90,40 @@ struct mb2_info_t {
 
 extern struct boot_context_t boot_context;
 
-static struct mem_segment_handle_t mem_handle;
+static struct mb2_tag_t* memmap_tag;
 
-static void next_segment(struct mem_segment_handle_t** handle) {
-	do {
-		(*handle)->current += (*handle)->entry_size;
-		if ((*handle)->current >= (*handle)->limit) {
-			*handle = 0;
-			return;
-		}
-	} while (((struct mb2_tag_memmap_entry_t*)(*handle)->current)->type != MB2_MEMTYPE_AVLB);
-	// TODO: handle other types
+static void first_segment(uint64_t* handle) {
+	*handle = 0;
 }
 
-static struct mem_segment_handle_t* first_segment(void) {
-	// always will be at least one entry
-	mem_handle.current = (uint64_t)mem_handle.entries;
-
-	// TODO: handle other types
-	while (((struct mb2_tag_memmap_entry_t*)mem_handle.current)->type != MB2_MEMTYPE_AVLB) {
-		mem_handle.current += mem_handle.entry_size;
-		if (mem_handle.current >= mem_handle.limit) {
-			return 0;
-		}
+static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
+	uint64_t addr = (uint64_t)&memmap_tag->tag.memmap.entries + *handle * memmap_tag->tag.memmap.entry_size;
+	if (addr >= (uint64_t)&memmap_tag + memmap_tag->size) {
+		seg->base = 0;
+		seg->size = 0;
+		return;
 	}
-	return &mem_handle;
+
+	struct mb2_tag_memmap_entry_t* entry = (struct mb2_tag_memmap_entry_t*)addr;
+	seg->base = entry->base;
+	seg->size = entry->length;
+
+	switch (entry->type) {
+		case MB2_MEMTYPE_AVLB:
+			seg->type = MEM_AVL;
+			break;
+		case MB2_MEMTYPE_ACPI:
+		case MB2_MEMTYPE_PRES:
+			seg->type = MEM_PRS;
+			break;
+		default:
+			seg->type = MEM_CLM;
+			break;
+	}
+
+	(*handle)++;
 }
 
-static uint64_t get_base(struct mem_segment_handle_t* handle) {
-	return ((struct mb2_tag_memmap_entry_t*)handle->current)->base;
-}
-
-static size_t get_size(struct mem_segment_handle_t* handle) {
-	return ((struct mb2_tag_memmap_entry_t*)handle->current)->length;
-}
-
-static void set_base(struct mem_segment_handle_t* handle, uint64_t base) {
-	((struct mb2_tag_memmap_entry_t*)handle->current)->base = base;
-}
-
-static void set_size(struct mem_segment_handle_t* handle, size_t size) {
-	((struct mb2_tag_memmap_entry_t*)handle->current)->length = size;
-}
 
 void multiboot2_init(struct mb2_info_t* info) {
 	// parse bootInformation
@@ -149,14 +134,9 @@ void multiboot2_init(struct mb2_info_t* info) {
 		struct mb2_tag_t* tag = (struct mb2_tag_t*)(((uint8_t*)info) + i);
 		switch (tag->type) {
 			case MBITAG_TYPE_MEMMAP:
-				mem_handle = (struct mem_segment_handle_t){
-					.entry_size = tag->tag.memmap.entry_size,
-					.limit = (uint64_t)tag + tag->size,
-					.current = (uint64_t)&tag->tag.memmap.entries,
-					.entries = &tag->tag.memmap.entries
-				};
+				memmap_tag = tag;
 
-				mm_init(next_segment, first_segment, get_base, get_size, set_base, set_size);
+				mm_init(first_segment, next_segment);
 				break;
 			case MBITAG_TYPE_RSDPV2:
 				boot_context.rsdp = tag->tag.rsdpv2.rsdp;

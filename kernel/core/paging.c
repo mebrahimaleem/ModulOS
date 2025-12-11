@@ -20,6 +20,7 @@
 
 #include <core/paging.h>
 #include <core/mm.h>
+#include <core/mm_init.h>
 #include <core/panic.h>
 
 #include <lib/mem_utils.h>
@@ -62,16 +63,16 @@ struct paging_pool_header_t* root_pool;
 
 struct paging_pool_header_t* hint;
 
-static struct paging_pool_header_t* create_pool(void);
+static struct paging_pool_header_t* early_create_pool(void);
 
-static uint64_t alloc_page(void) {
+static uint64_t early_alloc_page(void) {
 	if (hint->used == 512) {
 		// last pool is always empty
 		for (hint = root_pool; hint->used == 512; hint = hint->next);
 
 		if (hint->ac == 0) {
 			hint->ac = 1;
-			hint->next = create_pool();
+			hint->next = early_create_pool();
 		}
 	}
 
@@ -88,16 +89,12 @@ static uint64_t alloc_page(void) {
 	}
 
 	hint->hint = 0;
-	return alloc_page();
-
-	panic(PANIC_PAGING);
-	return 0;
+	return early_alloc_page();
 }
 
-static struct paging_pool_header_t* create_pool() {
+static struct paging_pool_header_t* early_create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc_pv(POOL_SIZE);
-	paging_map_2m((uint64_t)addr, mm_alloc_frame_cont(POOL_SIZE / PAGE_SIZE, POOL_SIZE / PAGE_SIZE),
-			PAGE_PRESENT | PAGE_RW);
+	paging_early_map_2m((uint64_t)addr, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
 
 	memset(addr, 0, POOL_SIZE);
 	addr->bitmap[0] = 0x01;
@@ -131,17 +128,14 @@ void paging_init(uint64_t paging_base) {
 
 	root_pool->ac = 1;
 	root_pool->bitmap[0] = 0x01;
+	root_pool->next = early_create_pool();
 }
 
-void paging_init_post() {
-	root_pool->next = create_pool();
-}
-
-void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
+void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(vaddr)];
 
 	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
-		pdpt = alloc_page() | flg;
+		pdpt = early_alloc_page() | flg;
 		kernel_pml4[GET_PML4_INDEX(vaddr)] = pdpt;
 	}
 
@@ -152,8 +146,8 @@ void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	}
 
 	if ((pd & PAGE_PRESENT) != PAGE_PRESENT) {
-		pd = alloc_page() | flg;
-		GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)] = alloc_page() | flg;
+		pd = early_alloc_page() | flg;
+		GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)] = pd;
 	}
 
 	const uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
@@ -161,7 +155,6 @@ void paging_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
 		panic(PANIC_PAGING);
 	}
-
 
 	GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = paddr | flg | PAGE_PS;
 }
