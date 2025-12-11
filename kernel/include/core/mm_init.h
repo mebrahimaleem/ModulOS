@@ -37,4 +37,6 @@ extern void mm_init(
 
 extern uint64_t mm_early_alloc_2m(void);
 
+extern uint64_t mm_early_alloc_dv(size_t size);
+
 #endif /* CORE_MM_INIT_H */

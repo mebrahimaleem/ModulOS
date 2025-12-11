@@ -27,15 +27,7 @@ struct page_frame_t {
 	uint8_t flg;
 } __attribute__((packed));
 
-struct mem_segment_handle_t;
-
 void mm_init_virt(void);
-
-extern uint64_t mm_alloc_frame(void);
-
-extern uint64_t mm_alloc_frame_cont(size_t count, uint64_t align);
-
-extern void mm_free_frame(uint64_t addr);
 
 extern uint64_t mm_alloc_pv(size_t size);
 

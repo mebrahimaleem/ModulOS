@@ -32,188 +32,17 @@
 #define FRAME_FREE	0x1
 
 #define INITIAL_ALLOC_SIZE		0x200000
-#define MAX_SUPPORTED_FRAMES	0x3F800000
 
 #define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
-
-extern uint8_t _kernel_pend;
 
 uint64_t page_frames_num;
 struct page_frame_t* page_frames;
 
-static uint64_t max_base; // for early alloc
 static uint64_t virt_limit; // pv start, alloc backwards
 
 void mm_init_virt() {
 	// permanent virtual addresses are useful for early memory/paging
 	virt_limit = INITIAL_VIRTUAL_LIMIT;
-}
-
-void mm_init_post(
-		void (*next_segment)(struct mem_segment_handle_t**),
-		struct mem_segment_handle_t* (*first_segment)(void),
-		uint64_t (*get_base)(struct mem_segment_handle_t*),
-		size_t (*get_size)(struct mem_segment_handle_t*),
-		void (*set_base)(struct mem_segment_handle_t*, uint64_t),
-		void (*set_size)(struct mem_segment_handle_t*, size_t)) {
-
-
-	/*
-	uint64_t base;
-	uint64_t size;
-
-	uint64_t reclaim_base_pg = 0;
-	uint64_t reclaim_size_pg;
-
-	uint64_t paging_base = 0;
-
-	struct mem_segment_handle_t* handle = first_segment();
-	while (handle != 0) {
-		base = get_base(handle);
-		size = get_size(handle);
-
-		if (base % INITIAL_ALLOC_SIZE == 0 && size >= INITIAL_ALLOC_SIZE) {
-			paging_base = base;
-			set_base(handle, base + INITIAL_ALLOC_SIZE);
-			set_size(handle, size - INITIAL_ALLOC_SIZE);
-			break;
-		}
-
-		reclaim_size_pg = INITIAL_ALLOC_SIZE - (base % INITIAL_ALLOC_SIZE);
-		if (size >= INITIAL_ALLOC_SIZE + reclaim_size_pg) {
-			reclaim_base_pg = base;
-			paging_base = base + reclaim_size_pg;
-			set_base(handle, base + reclaim_size_pg + INITIAL_ALLOC_SIZE);
-			set_size(handle, size - reclaim_size_pg - INITIAL_ALLOC_SIZE);
-			break;
-		}
-
-		next_segment(&handle);
-	}
-
-	if (paging_base) {
-		paging_init(paging_base);
-	}
-	else {
-		panic(PANIC_NO_MEM);
-	}
-
-	max_base = 0;
-	uint64_t max_size = 0;
-	uint64_t mem_limit = 0;
-
-	handle = first_segment();
-	while (handle != 0) {
-		base = get_base(handle);
-		size = get_size(handle);
-
-		if (base + size > mem_limit) {
-			mem_limit = base + size;
-		}
-
-		if (size > max_size) {
-			max_base = base;
-			max_size = size;
-		}
-
-		next_segment(&handle);
-	}
-
-	if (!max_base) {
-		panic(PANIC_NO_MEM);
-	}
-
-	// roundup to page
-	uint64_t frame_count = (mem_limit + PAGE_SIZE - 1) / PAGE_SIZE;
-	uint64_t frames_size = sizeof(struct page_frame_t) * frame_count;
-
-	if (frames_size > MAX_SUPPORTED_FRAMES) {
-		// TODO: maybe support more memory
-		frames_size = MAX_SUPPORTED_FRAMES;
-	}
-
-	// align to boundary
-	if (max_base % INITIAL_ALLOC_SIZE != 0) {
-		max_size -= INITIAL_ALLOC_SIZE - (max_base % INITIAL_ALLOC_SIZE);
-		max_base += INITIAL_ALLOC_SIZE - (max_base % INITIAL_ALLOC_SIZE);
-	}
-
-	if (max_size < frames_size) {
-		panic(PANIC_NO_MEM);
-	}
-
-	page_array = (struct page_frame_t*)mm_alloc_pv(frames_size);
-
-	for (uint64_t i = 0; i < frames_size; i += INITIAL_ALLOC_SIZE) {
-		paging_map_2m((uint64_t)page_array + i, max_base + i, PAGE_PRESENT | PAGE_RW);
-	}
-
-	memset(page_array, 0, frames_size);
-
-	uint64_t i;
-
-	// set bitmap
-	handle = first_segment();
-	while (handle != 0) {
-		base = get_base(handle);
-		size = get_size(handle);
-
-		if (base % PAGE_SIZE != 0) {
-			size -= PAGE_SIZE - (base % PAGE_SIZE);
-			base += PAGE_SIZE - (base % PAGE_SIZE);
-		}
-
-		for (i = base / PAGE_SIZE; size >= PAGE_SIZE; i++) {
-			if (i < (uint64_t)&_kernel_pend / PAGE_SIZE) {
-				continue;
-			}
-
-			page_array[i].flg |= FRAME_FREE;
-			size -= PAGE_SIZE;
-		}
-
-		next_segment(&handle);
-	}
-
-	// add reclaimable
-	if (reclaim_base_pg) {
-		if (reclaim_base_pg % PAGE_SIZE != 0) {
-			reclaim_size_pg -= PAGE_SIZE - (reclaim_base_pg % PAGE_SIZE);
-			reclaim_base_pg += PAGE_SIZE - (reclaim_base_pg % PAGE_SIZE);
-		}
-
-		for (i = reclaim_base_pg / PAGE_SIZE; reclaim_size_pg >= PAGE_SIZE; i++) {
-			page_array[i].flg |= FRAME_FREE;
-			reclaim_size_pg -= PAGE_SIZE;
-		}
-	}
-
-	// mark bitmap as used
-	for (i = max_base / PAGE_SIZE; frames_size >= PAGE_SIZE; i++) {
-		page_array[i].flg ^= FRAME_FREE;
-		frames_size -= PAGE_SIZE;
-	}
-
-	paging_init_post();
-	*/
-}
-
-uint64_t mm_alloc_frame() {
-	// TODO
-
-	panic(PANIC_NO_MEM);
-}
-
-uint64_t mm_alloc_frame_cont(size_t count, uint64_t align) {
-	// TODO
-
-	panic(PANIC_NO_MEM);
-}
-
-void mm_free_frame(uint64_t addr) {
-	// TODO
-
-	panic(PANIC_NO_MEM);
 }
 
 uint64_t mm_alloc_pv(size_t size) {
@@ -223,6 +52,4 @@ uint64_t mm_alloc_pv(size_t size) {
 
 	virt_limit -= size;
 	return virt_limit;
-
-	// TODO: check pv-dv collision
 }

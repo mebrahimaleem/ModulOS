@@ -102,7 +102,8 @@ static struct paging_pool_header_t* early_create_pool(void) {
 	return addr;
 }
 
-void paging_init(uint64_t paging_base) {
+void paging_init() {
+	const uint64_t paging_base = mm_early_alloc_2m();
 	const uint64_t pool_base = mm_alloc_pv(POOL_SIZE);
 
 	// only support in last pdpt
@@ -157,4 +158,32 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	}
 
 	GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = paddr | flg | PAGE_PS;
+}
+
+void paging_unmap_2m(uint64_t vaddr) {
+	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(vaddr)];
+
+	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
+		return;
+	}
+
+	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)];
+
+	if ((pd & PAGE_PS) == PAGE_PS) {
+		panic(PANIC_PAGING);
+	}
+
+	if ((pd & PAGE_PRESENT) != PAGE_PRESENT) {
+		return;
+	}
+
+	const uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
+
+	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
+		panic(PANIC_PAGING);
+	}
+
+	GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = 0;
+
+	// TODO: release page pool entry
 }

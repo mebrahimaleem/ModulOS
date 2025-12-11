@@ -1,4 +1,4 @@
-/* paging.h - paging managger interface */
+/* early_mem.h - early memory allocator interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,19 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PAGING_H
-#define CORE_PAGING_H
+#ifndef CORE_EARLY_MEM_H
+#define CORE_EARLY_MEM_H
 
-#include <stdint.h>
 #include <stddef.h>
 
-#define PAGE_PRESENT	0x1
-#define PAGE_RW				0x2
+extern void early_mem_init(void);
 
-extern void paging_init(void);
+extern void* early_kmalloc(size_t size);
 
-extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
+extern void early_mem_discard(void);
 
-extern void paging_unmap_2m(uint64_t vaddr);
-
-#endif /* CORE_PAGING_H */
+#endif /* CORE_EARLY_MEM_H */
