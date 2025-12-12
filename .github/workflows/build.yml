@@ -18,9 +18,9 @@ jobs:
 
       - name: Setup environment
         run: |
-          echo "PREFIX=/opt/x86_64-elf/" >> $GITHUB_ENV
-          mkdir -p /opt/x86_64-elf
-          echo "/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
+          echo "PREFIX=$GITHUB_WORKSPACE/opt/x86_64-elf/" >> $GITHUB_ENV
+          mkdir -p $GITHUB_WORKSPACE/opt/x86_64-elf/
+          echo "$GITHUB_WORKSPACE/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
 
       - name: Get GNU keyring
         run: |
@@ -43,25 +43,34 @@ jobs:
           patch -s -p0 < contrib/noredzone.patch
           mkdir build-gcc
 
-      - name: Build binutils
+      - name: Toolchain cache
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/opt/x86_64-elf/
+          key: ${{ runner.os }}-toolchain }}
+
+      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
+        name: Build binutils
         working-directory: build-binutils
         run: |
           ../binutils-2.45/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
-          make -j5
-          sudo make install
+          make -j$(nproc)
+          make install
 
-      - name: Build gcc
+      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
+        name: Build gcc
         working-directory: build-gcc
         run: |
           ../gcc-15.2.0/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
-          make -j5 all-gcc
-          sudo make install-gcc
+          make -j$(nproc) all-gcc
+          make install-gcc
           make all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel' || true
           sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc/Makefile
           sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc-noredzone/libgcc/Makefile
-          make -j5 all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel'
-          sudo make install-target-libgcc
+          make -j$(nproc) all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel'
+          make install-target-libgcc
 
       - name: Build ModulOS
         run: |
-          make -j5
+          make -j$(nproc)

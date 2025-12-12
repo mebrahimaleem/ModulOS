@@ -17,15 +17,15 @@
 
 # Debug options
 
-DEBUG := 1
+export DEBUG = 1
 
 # Global options
 
-BUILD_GRAPHICSBASE := 1
+export BUILD_GRAPHICSBASE = 1
 
 # Optional boot modules
 
-BUILD_BOOT_MULTIBOOT2 := 1
+export BUILD_BOOT_MULTIBOOT2 = 1
 
 
 # Optional core modules
@@ -37,21 +37,19 @@ BUILD_BOOT_MULTIBOOT2 := 1
 # Auto include modules
 
 ifdef BUILD_GRAPHICSBASE
-BUILD_BOOT_GRAPHICSBASE := 1
+export BUILD_BOOT_GRAPHICSBASE = 1
 endif
 
 ifdef BUILD_GRAPHICSBASE
-BUILD_KERNEL_GRAPHICSBASE := 1
+export BUILD_KERNEL_GRAPHICSBASE = 1
 endif
 
 # End of options
 
-SRC_TREE_ROOT := .
-OBJ_DIR := build
+export SRC_TREE_ROOT = .
+export OBJ_DIR = build
 
-KERNEL_TOOLCHAIN_PREFIX := x86_64-elf-
-
-export
+export KERNEL_TOOLCHAIN_PREFIX = x86_64-elf-
 
 KERNEL_CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
 KERNEL_LD := $(KERNEL_TOOLCHAIN_PREFIX)ld
