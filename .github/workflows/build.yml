@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/opt/x86_64-elf/
-          key: ${{ runner.os }}-toolchain }}
+          key: ${{ runner.os }}-toolchain
 
       - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
         name: Build binutils
@@ -74,3 +74,10 @@ jobs:
       - name: Build ModulOS
         run: |
           make -j$(nproc)
+
+      - name: Archive debugging symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbg-symbols
+          path: build/modulos-dbg
+          retention-days: 2
