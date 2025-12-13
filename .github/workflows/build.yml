@@ -11,6 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Toolchain cache
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/opt/x86_64-elf/
+          key: ${{ runner.os }}-toolchain
+
       - name: Install apt packages
         run: |
           sudo apt update
@@ -22,11 +29,13 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/opt/x86_64-elf/
           echo "$GITHUB_WORKSPACE/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
 
-      - name: Get GNU keyring
+      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
+        name: Get GNU keyring
         run: |
            wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
 
-      - name: Download binutils
+      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
+        name: Download binutils
         run: |
           wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.45.tar.gz.sig
           wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.45.tar.gz
@@ -34,7 +43,8 @@ jobs:
           tar xf binutils-2.45.tar.gz
           mkdir build-binutils
 
-      - name: Download gcc
+      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
+        name: Download gcc
         run: |
           wget https://ftpmirror.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz.sig
           wget https://ftpmirror.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz
@@ -42,13 +52,6 @@ jobs:
           tar xf gcc-15.2.0.tar.gz
           patch -s -p0 < contrib/noredzone.patch
           mkdir build-gcc
-
-      - name: Toolchain cache
-        id: cache-toolchain
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/opt/x86_64-elf/
-          key: ${{ runner.os }}-toolchain
 
       - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
         name: Build binutils
