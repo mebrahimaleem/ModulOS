@@ -37,6 +37,9 @@
 
 #define GET_TABLE(entry) ((uint64_t*)((uint64_t)entry & TABLE_PADDR_MASK))
 
+#define PDPT_PADDR_MASK	0xFFFFFFFFC0000000
+#define PD_PADDR_MASK		0xFFFFFFFFFFE00000
+
 #define GET_PT_INDEX(addr) 		((addr & 0x1FF000) >> 12)
 #define GET_PD_INDEX(addr) 		((addr & 0x3FE00000) >> 21)
 #define GET_PDPT_INDEX(addr)	((addr & 0x7FC0000000) >> 30)
@@ -116,10 +119,14 @@ void paging_init() {
 	}
 
 
-	GET_TABLE(pdpt)[GET_PDPT_INDEX(pool_base)] = ((uint64_t)&bootstrap_pd[0] - KERNEL_VMA) |
-		PAGE_PRESENT | PAGE_RW;
+	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(pool_base)];
 
-	bootstrap_pd[GET_PD_INDEX(pool_base)] = pool_base | PAGE_PRESENT | PAGE_RW | PAGE_PS;
+	if ((pd & PAGE_PS) != PAGE_PS) {
+		GET_TABLE(pdpt)[GET_PDPT_INDEX(pool_base)] = ((uint64_t)&bootstrap_pd[0] - KERNEL_VMA) |
+			PAGE_PRESENT | PAGE_RW;
+
+		bootstrap_pd[GET_PD_INDEX(pool_base)] = pool_base | PAGE_PRESENT | PAGE_RW | PAGE_PS;
+	}
 
 	root_pool = (struct paging_pool_header_t*)pool_base;
 	hint = root_pool;
@@ -142,6 +149,10 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)];
 
 	if ((pd & PAGE_PS) == PAGE_PS) {
+		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
+			return;
+		}
+
 		panic(PANIC_PAGING);
 	}
 
@@ -153,6 +164,10 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	const uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
 
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
+		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
+			return;
+		}
+
 		panic(PANIC_PAGING);
 	}
 

@@ -21,8 +21,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define MM_MAX_ORDER MM_ORDER_2M
-
 enum mm_order_t {
 	MM_ORDER_4K,
 	MM_ORDER_8K,
@@ -33,7 +31,8 @@ enum mm_order_t {
 	MM_ORDER_256K,
 	MM_ORDER_512K,
 	MM_ORDER_1M,
-	MM_ORDER_2M
+	MM_ORDER_2M,
+	MM_MAX_ORDER
 };
 
 struct page_frame_t {
