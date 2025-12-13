@@ -46,6 +46,7 @@ struct page_table_t;
 
 extern uint64_t kernel_pml4[512];
 
+static uint64_t bootstrap_pdpt[512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t bootstrap_pd[512] __attribute__((aligned(PAGE_SIZE)));
 
 struct paging_pool_header_t {
@@ -79,10 +80,12 @@ static uint64_t early_alloc_page(void) {
 	for (; hint->hint < 64; hint->hint++) {
 		if (hint->bitmap[hint->hint] != 0xFF) {
 			for (uint8_t i = 0; i < 8; i++) {
-				if ((hint->bitmap[hint->hint] & (1 >> i)) != (1 >> i)) {
-					hint->bitmap[hint->hint] |= 1 >> i;
+				if (((hint->bitmap[hint->hint] & (1 << i))) != (1 << i)) {
+					hint->bitmap[hint->hint] |= 1 << i;
 					hint->used++;
-					return (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i) - KERNEL_VMA;
+					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
+					memset((void*)addr, 0, PAGE_SIZE);
+					return addr;
 				}
 			}
 		}
@@ -93,8 +96,8 @@ static uint64_t early_alloc_page(void) {
 }
 
 static struct paging_pool_header_t* early_create_pool(void) {
-	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc_pv(POOL_SIZE);
-	paging_early_map_2m((uint64_t)addr, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
+	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_early_alloc_2m();
+	paging_early_map_2m((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW);
 
 	memset(addr, 0, POOL_SIZE);
 	addr->bitmap[0] = 0x01;
@@ -103,24 +106,20 @@ static struct paging_pool_header_t* early_create_pool(void) {
 }
 
 void paging_init() {
-	const uint64_t paging_base = mm_early_alloc_2m();
-	const uint64_t pool_base = mm_alloc_pv(POOL_SIZE);
+	const uint64_t pool_base = mm_early_alloc_2m();
 
-	// only support in last pdpt
-	if (GET_PML4_INDEX(pool_base) != 511) {
-		panic(PANIC_PAGING);
+	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(pool_base)];
+
+	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
+		pdpt = ((uint64_t)&bootstrap_pdpt[0] - KERNEL_VMA) | PAGE_PRESENT | PAGE_RW;
+		kernel_pml4[GET_PML4_INDEX(pool_base)] = pdpt;
 	}
 
-	GET_TABLE(kernel_pml4
-		[511])
-		[GET_PDPT_INDEX(pool_base)] =
-			((uint64_t)&bootstrap_pd[0] - KERNEL_VMA) | PAGE_PRESENT | PAGE_RW;
 
-	GET_TABLE(GET_TABLE(kernel_pml4
-		[511])
-		[GET_PDPT_INDEX(pool_base)])
-		[GET_PD_INDEX(pool_base)] =
-			paging_base | PAGE_PRESENT | PAGE_RW | PAGE_PS;
+	GET_TABLE(pdpt)[GET_PDPT_INDEX(pool_base)] = ((uint64_t)&bootstrap_pd[0] - KERNEL_VMA) |
+		PAGE_PRESENT | PAGE_RW;
+
+	bootstrap_pd[GET_PD_INDEX(pool_base)] = pool_base | PAGE_PRESENT | PAGE_RW | PAGE_PS;
 
 	root_pool = (struct paging_pool_header_t*)pool_base;
 	hint = root_pool;
@@ -158,32 +157,4 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 	}
 
 	GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = paddr | flg | PAGE_PS;
-}
-
-void paging_unmap_2m(uint64_t vaddr) {
-	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(vaddr)];
-
-	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
-		return;
-	}
-
-	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)];
-
-	if ((pd & PAGE_PS) == PAGE_PS) {
-		panic(PANIC_PAGING);
-	}
-
-	if ((pd & PAGE_PRESENT) != PAGE_PRESENT) {
-		return;
-	}
-
-	const uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
-
-	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
-		panic(PANIC_PAGING);
-	}
-
-	GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = 0;
-
-	// TODO: release page pool entry
 }

@@ -2,9 +2,9 @@
 
 The ModulOS image can be built by running the `make` command in the root directory of the source tree. This will create the `obj/modulos.img` which can be copied to a drive. Optionally, debugging symbols can be found in `obj/modulos-dbg`.
 
-By default, debugging related logging is disabled and optimizations are enabled. This can be changed by uncommenting the line `#DEBUG := 1` in the top level Makefile.
+By default, debugging related logging is disabled and optimizations are enabled. This can be changed by uncommenting the line `#export DEBUG = 1` in the top level Makefile.
 
-The built modules can be customized by commenting/uncommenting the various BUILD_<MODULENAME> lines near the beginning of the top level Makefile
+The built modules can be customized by commenting/uncommenting the various `export BUILD_<MODULENAME> = 1` lines near the beginning of the top level Makefile
 
 ## Cross Compilation Instructions
 

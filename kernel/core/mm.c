@@ -31,23 +31,18 @@
 #define FRAME_USED	0x0
 #define FRAME_FREE	0x1
 
-#define INITIAL_ALLOC_SIZE		0x200000
-
-#define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
+#define PV_ALLOC_ALIGN	0x200000
 
 uint64_t page_frames_num;
 struct page_frame_t* page_frames;
 
-static uint64_t virt_limit; // pv start, alloc backwards
+uint64_t virt_limit; // pv start, alloc backwards
 
-void mm_init_virt() {
-	// permanent virtual addresses are useful for early memory/paging
-	virt_limit = INITIAL_VIRTUAL_LIMIT;
-}
+struct mm_order_entry_t order_entries[MM_MAX_ORDER];
 
 uint64_t mm_alloc_pv(size_t size) {
-	if (size % INITIAL_ALLOC_SIZE != 0) {
-		size += INITIAL_ALLOC_SIZE - (size % INITIAL_ALLOC_SIZE);
+	if (size % PV_ALLOC_ALIGN != 0) {
+		size += PV_ALLOC_ALIGN - (size % PV_ALLOC_ALIGN);
 	}
 
 	virt_limit -= size;

@@ -28,6 +28,4 @@ extern void paging_init(void);
 
 extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
 
-extern void paging_unmap_2m(uint64_t vaddr);
-
 #endif /* CORE_PAGING_H */

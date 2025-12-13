@@ -24,6 +24,8 @@
 #include <core/early_mem.h>
 #include <core/panic.h>
 
+#include <lib/mem_utils.h>
+
 #define ALLOCATION_UNIT	0x200000
 #define PAGE_SIZE 			0x1000
 
@@ -31,9 +33,12 @@
 #define MAX_BOOTSTRAP	2048
 
 #define INITIAL_VIRUTAL_BASE	0x80000000
+#define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
 
 extern uint64_t page_frames_num;
 extern struct page_frame_t* page_frames;
+extern uint64_t virt_limit;
+extern struct mm_order_entry_t order_entries[MM_MAX_ORDER];
 
 static uint64_t used[MAX_BOOTSTRAP];
 
@@ -51,7 +56,8 @@ void mm_init(
 	early_next_segment = next_segment;
 	early_skip = 0;
 
-	mm_init_virt();
+	// permanent virtual addresses are useful for early memory/paging
+	virt_limit = INITIAL_VIRTUAL_LIMIT;
 
 	paging_init();
 
@@ -78,13 +84,22 @@ void mm_init(
 		paging_early_map_2m(i, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
 	}
 
-	early_dv_base = INITIAL_VIRUTAL_BASE;
+	early_dv_base = mem_limit;
+	if (early_dv_base % ALLOCATION_UNIT != 0) {
+		early_dv_base += ALLOCATION_UNIT - (early_dv_base % ALLOCATION_UNIT);
+	}
 
 	early_mem_init();
 
 	// now bootstrapping mm, paging, and heap is setup
 
-	// setup page frame array
+	// setup order entries and frame array
+	for (i = 0; i < MM_MAX_ORDER; i++) {
+		order_entries[i].free = 0;
+		order_entries[i].bitmap = early_kmalloc(page_frames_num / (uint64_t)(8 * (1 << i)));
+		memset(order_entries[i].bitmap, 0, page_frames_num / (uint64_t)(8 * ( 1 << i)));
+	}
+
 	first_segment(&handle);
 	for (early_next_segment(&handle, &seg); seg.size || seg.base; next_segment(&handle, &seg)) {
 		// TODO
@@ -104,16 +119,21 @@ uint64_t mm_early_alloc_2m() {
 	for (early_next_segment(&handle, &seg); seg.size || seg.base; ) {
 		// ensuring twice the size makes math a lot easier
 		if (seg.type == MEM_AVL && seg.size >= 2 * ALLOCATION_UNIT) {
+				if (seg.base <= INITIAL_VIRUTAL_BASE) {
+					seg.base += ALLOCATION_UNIT;
+					seg.size -= ALLOCATION_UNIT;
+					continue;
+				}
+
 				if (i--) {
 					seg.base += ALLOCATION_UNIT;
 					seg.size -= ALLOCATION_UNIT;
 					continue;
 				}
-				else {
-					used[early_skip++] = seg.base;
-					if (seg.base % ALLOCATION_UNIT == 0) return seg.base;
-					else return seg.base + ALLOCATION_UNIT - (seg.base % ALLOCATION_UNIT);
-				}
+
+				used[early_skip++] = seg.base;
+				if (seg.base % ALLOCATION_UNIT == 0) return seg.base;
+				else return seg.base + ALLOCATION_UNIT - (seg.base % ALLOCATION_UNIT);
 		}
 
 		early_next_segment(&handle, &seg);

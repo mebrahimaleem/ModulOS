@@ -21,13 +21,34 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define MM_INITIAL_ALLOC_SIZE	0x200000
+#define MM_MAX_ORDER MM_ORDER_2M
+
+enum mm_order_t {
+	MM_ORDER_4K,
+	MM_ORDER_8K,
+	MM_ORDER_16K,
+	MM_ORDER_32K,
+	MM_ORDER_64K,
+	MM_ORDER_128K,
+	MM_ORDER_256K,
+	MM_ORDER_512K,
+	MM_ORDER_1M,
+	MM_ORDER_2M
+};
 
 struct page_frame_t {
 	uint8_t flg;
 } __attribute__((packed));
 
-void mm_init_virt(void);
+struct mm_free_buddy_t {
+	uint64_t base;
+	struct mm_free_buddy_t* next;
+};
+
+struct mm_order_entry_t {
+	struct mm_free_buddy_t* free;
+	uint8_t* bitmap;
+};
 
 extern uint64_t mm_alloc_pv(size_t size);
 

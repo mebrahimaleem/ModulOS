@@ -56,7 +56,7 @@ void* early_kmalloc(size_t size) {
 	}
 
 	mem_offset += size;
-	return (void*)(mem_offset - size);
+	return (void*)(mem_offset - size + mem_list->base);
 }
 
 void early_mem_discard(void) {

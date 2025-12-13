@@ -1,8 +1,10 @@
-*.
+.*
 
 build/
 
 cscope.*
 tags
+
+compile_commands.json
 
 !.gitignore
