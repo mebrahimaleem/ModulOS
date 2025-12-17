@@ -8,9 +8,12 @@ The built modules can be customized by commenting/uncommenting the various `expo
 
 ## Cross Compilation Instructions
 
-- binutils 2.45 was build with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --with-sysroot --disable-nls --disable-werror`
+- binutils 2.45 was built with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --with-sysroot --disable-nls --disable-werror`
 
-- gcc 15.2.0 was build with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --disable-nls --enable-languages=c --without-headers`
+- gcc 15.2.0 was built with the following configuration: `--target=x86_64-elf --program-prefix=x86_64-elf- --disable-nls --enable-languages=c --without-headers`
+
+- grub 2.06 was built with the following configuration: `--with-platform=efi --target=x86_64 --program-prefix=x86_64-elf- --with-sysroot --disable-nls --disable-werror CFLAGS='-std=gnu99'`
+
 
 - Patch files can be found in `contrib/`
 
@@ -24,4 +27,5 @@ The compiler and binutils should be built in the following order:
 6. Patch gcc `objdir/x86_64-elf/libgcc-noredzone/libgcc/Makefile`: `sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc-noredzone/libgcc/Makefile`
 7. Rebuild and install libgcc: `make all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel' && make install-target-libgcc`
 
+Grub can be built the same way as binutils
 Optionally, gdb can be built the same way as binutils

@@ -32,7 +32,7 @@ $(OBJ_DIR)/esp.img: grub.cfg | $(OBJ_DIR)/
 	mformat -F -i $@
 	mmd -i $@ ::/EFI
 	mmd -i $@ ::/EFI/BOOT
-	grub-mkstandalone \
+	x86_64-elf-grub-mkstandalone \
 		--format=x86_64-efi \
 		--install-modules="normal part_gpt ext2 search multiboot2 efi_gop video" \
 		--output=$(OBJ_DIR)/BOOTX64.EFI \
