@@ -1,7 +1,10 @@
+.*
+
 build/
-test/
 
-*.swp
-
-cscope*
+cscope.*
 tags
+
+compile_commands.json
+
+!.gitignore

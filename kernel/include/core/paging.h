@@ -1,4 +1,4 @@
-/* init.h - multiboot2 kernel init interface */
+/* paging.h - paging managger interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef MULTIBOOT2_INIT_H
-#define MULTIBOOT2_INIT_H
+#ifndef CORE_PAGING_H
+#define CORE_PAGING_H
 
-#define MBITAG_TYPE_MEMMAP	6
-#ifdef GRAPHICSBASE
-#define MBITAG_TYPE_FRMBUF	8
-#endif /* GRAPHICSBASE */
-#define MBITAG_TYPE_RSDPV2	15
+#include <stdint.h>
+#include <stddef.h>
 
-#ifndef _ASM
+#define PAGE_PRESENT	0x1
+#define PAGE_RW				0x2
 
-struct mb2_info_t;
+extern void paging_init(void);
 
-extern void multiboot2_init(volatile struct mb2_info_t* info);
+extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
 
-#endif /* _ASM */
-
-#endif /* MULTIBOOT2_INIT_H */
+#endif /* CORE_PAGING_H */

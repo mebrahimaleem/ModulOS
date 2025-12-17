@@ -1,0 +1,40 @@
+# Makefile - makefile header template
+# Copyright (C) 2025  Ebrahim Aleem
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>
+
+OBJ_DIR := ../$(OBJ_DIR)
+
+SRC_DIRS :=
+DEFINES :=
+BUILD_DIRS :=
+
+define add_directory
+$(eval SRC_DIRS := $(SRC_DIRS) $(1))
+$(eval DEFINES := $(DEFINES) -D$(2))
+$(eval BUILD_DIRS := $(BUILD_DIRS) $(OBJ_DIR)/$(1)/)
+endef
+
+SRC_DIRS :=
+DEFINES :=
+BUILD_DIRS :=
+
+CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
+	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
+	-Wstrict-prototypes
+ifdef DEBUG
+CDEBUG := -DDEBUG -Og -g3
+else
+CDEBUG := -O2 -g
+endif

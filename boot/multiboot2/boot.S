@@ -229,6 +229,7 @@ ktransfer:
 	addq $KERNEL_VMA, gdt_ptr64.addr
 	lgdt gdt_ptr64
 	addq $KERNEL_VMA, %rsp
+	pushq 0
 	call multiboot2_init
 	call kentry
 
@@ -272,6 +273,8 @@ gdt_ptr64.addr:
 	/* Paging structures */
 	.align 0x1000
 
+.globl kernel_pml4
+kernel_pml4:
 PML4:
 	.quad PDPT_0 + KERNEL_PAGE_FLAGS
 .rept 0x200 - 2

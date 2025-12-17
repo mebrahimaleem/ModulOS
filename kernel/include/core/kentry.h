@@ -21,8 +21,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <core/memory.h>
-#include <core/acpiTables.h>
+#include <core/acpitables.h>
 
 #ifdef GRAPHICSBASE
 #include <graphicsbase/framebuffer.h>

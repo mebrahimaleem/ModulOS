@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* mm.h - memory manager interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,41 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_MM_H
+#define CORE_MM_H
+
 #include <stdint.h>
+#include <stddef.h>
 
-#include <core/kentry.h>
+enum mm_order_t {
+	MM_ORDER_4K,
+	MM_ORDER_8K,
+	MM_ORDER_16K,
+	MM_ORDER_32K,
+	MM_ORDER_64K,
+	MM_ORDER_128K,
+	MM_ORDER_256K,
+	MM_ORDER_512K,
+	MM_ORDER_1M,
+	MM_ORDER_2M,
+	MM_MAX_ORDER
+};
 
-struct boot_context_t boot_context;
+struct page_frame_t {
+	uint8_t flg;
+} __attribute__((packed));
 
-void kentry() {
-	while (1) {}
-}
+struct mm_free_buddy_t {
+	uint64_t base;
+	struct mm_free_buddy_t* next;
+};
+
+struct mm_order_entry_t {
+	struct mm_free_buddy_t* free;
+	uint8_t* bitmap;
+};
+
+extern uint64_t mm_alloc_pv(size_t size);
+
+#endif /* CORE_MM_H */
+

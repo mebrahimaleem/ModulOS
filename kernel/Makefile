@@ -1,4 +1,4 @@
-# grub.cfg - grub configuration file
+# Makefile - kernel build makefile
 # Copyright (C) 2025  Ebrahim Aleem
 #
 # This program is free software: you can redistribute it and/or modify
@@ -13,17 +13,31 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
-#
 
-set timeout=2
-set default=0
+SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
+include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-menuentry "ModulOS" {
-	insmod part_gpt
-	insmod ext2
-	insmod efi_gop
-	insmod video
-	search --label rootfs --set=root
-	multiboot2 /boot/modulos
-	boot
-}
+CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
+AR := $(KERNEL_TOOLCHAIN_PREFIX)ar
+
+OBJ_DIR := $(OBJ_DIR)/kernel
+
+$(call add_directory,core,CORE)
+$(call add_directory,lib,LIB)
+
+ifdef BUILD_KERNEL_GRAPHICSBASE
+$(call add_directory,graphicsbase,GRAPHICSBASE)
+endif
+
+include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
+include $(SRC_TREE_ROOT)/scripts/Makefile.targets
+
+.PHONY: all
+all: build
+
+.PHONY: build
+build: $(OBJ_DIR)/../kernel.a $(LDS)
+
+$(OBJ_DIR)/kernel.a: $(TARGETS) | $(BUILD_DIRS)
+	rm -f $@
+	$(AR) rcs $@ $(TARGETS)
