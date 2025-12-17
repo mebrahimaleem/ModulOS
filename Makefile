@@ -56,13 +56,10 @@ KERNEL_LD := $(KERNEL_TOOLCHAIN_PREFIX)ld
 KERNEL_STRIP := $(KERNEL_TOOLCHAIN_PREFIX)strip
 
 SUBDIRS := kernel boot drivers
-SUBDIR_TARGETS := $(OBJ_DIR)/kernel.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/bootstub.img
+SUBDIR_TARGETS := $(OBJ_DIR)/kernel.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/esp.img
 
 COPY_DOC_TO := $(OBJ_DIR)/rootfs/doc/ModulOS/
 COPY_DOC := $(COPY_DOC_TO)COPYING
-
-COPY_BOOT_TO := $(OBJ_DIR)/rootfs/boot/
-COPY_BOOT := $(COPY_BOOT_TO)modulos
 
 TEST_RUNTIME_DIR := $(OBJ_DIR)/test
 
@@ -98,15 +95,14 @@ $(SUBDIR_TARGETS): %: $(SUBDIRS)
 $(COPY_DOC): $(COPY_DOC_TO)%: % | $(COPY_DOC_TO)
 	cp $< $|
 
-$(COPY_BOOT): $(COPY_BOOT_TO)%: $(OBJ_DIR)/% | $(COPY_BOOT_TO)
-	cp $< $|
-
-$(OBJ_DIR)/fs.img: $(COPY_DOC) $(COPY_BOOT)
+$(OBJ_DIR)/fs.img: $(COPY_DOC)
 	truncate -s 4040M $@
 	yes | mke2fs -L rootfs -d $(OBJ_DIR)/rootfs/ -t ext4 $@
 
-$(OBJ_DIR)/modulos.img: $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/fs.img
+$(OBJ_DIR)/modulos.img: $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/fs.img $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos
 	cp $< $@
+	mcopy -i $(OBJ_DIR)/boot/esp.img $(OBJ_DIR)/modulos ::/
+	dd if=$(OBJ_DIR)/boot/esp.img of=$@ seek=1 count=12 bs=4M conv=notrunc
 	dd if=$(OBJ_DIR)/fs.img of=$@ seek=13 count=1010 bs=4M conv=notrunc
 
 $(OBJ_DIR)/modulos.ld: $(SUBDIRS)

@@ -17,7 +17,15 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-$(info $(SRC_TREE_ROOT) $(OBJ_DIR))
+GRUB_MODS := multiboot2 fat normal part_gpt search
+
+ifdef DEBUG
+GRUB_MODS := $(GRUB_MODS) acpi backtrace cat echo lsmmap ls lspci minicmd probe read rdmsr search_fs_file search_fs_uuid search_label serial test wrmsr
+endif
+
+ifdef BUILD_BOOT_GRAPHICSBASE
+GRUB_MODS := $(GRUB_MODS) efi_gop video
+endif
 
 $(OBJ_DIR)/gpt.img: | $(OBJ_DIR)/
 	truncate -s 4G $@
@@ -29,12 +37,12 @@ $(OBJ_DIR)/gpt.img: | $(OBJ_DIR)/
 
 $(OBJ_DIR)/esp.img: grub.cfg | $(OBJ_DIR)/
 	truncate -s 48M $@
-	mformat -F -i $@
+	mformat -v ESP_MODULOS -F -i $@
 	mmd -i $@ ::/EFI
 	mmd -i $@ ::/EFI/BOOT
 	x86_64-elf-grub-mkstandalone \
 		--format=x86_64-efi \
-		--install-modules="normal part_gpt ext2 search multiboot2 efi_gop video" \
+		--install-modules="$(GRUB_MODS)" \
 		--output=$(OBJ_DIR)/BOOTX64.EFI \
 		"boot/grub/grub.cfg=$<"
 	mcopy -i $@ $(OBJ_DIR)/BOOTX64.EFI ::/EFI/BOOT/

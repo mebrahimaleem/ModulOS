@@ -45,7 +45,6 @@ build: $(OBJ_DIR)/../boot.a $(LDS) $(OBJ_DIR)/../bootstub.img
 $(OBJ_DIR)/../bootstub.img: $(OBJ_DIR)/gpt.img $(OBJ_DIR)/esp.img
 	truncate -s 4G $@
 	dd if=$(OBJ_DIR)/gpt.img of=$@ seek=0 count=1 bs=4M conv=notrunc
-	dd if=$(OBJ_DIR)/esp.img of=$@ seek=1 count=12 bs=4M conv=notrunc
 	dd if=$(OBJ_DIR)/gpt.img of=$@ skip=1023 seek=1023 count=1 bs=4M conv=notrunc
 
 .PHONY: $(OBJ_DIR)/gpt.img
