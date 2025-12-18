@@ -1,4 +1,4 @@
-/* early_mem.h - early memory allocator interface */
+/* alloc.h - heap allocator interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,15 +15,10 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_EARLY_MEM_H
-#define CORE_EARLY_MEM_H
-
 #include <stddef.h>
 
-extern void early_mem_init(void);
+extern void alloc_init(void);
+
+extern void* kmalloc(size_t size);
 
 extern void* early_kmalloc(size_t size);
-
-extern void early_mem_discard(void);
-
-#endif /* CORE_EARLY_MEM_H */

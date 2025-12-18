@@ -21,8 +21,8 @@
 #include <core/mm_init.h>
 #include <core/mm.h>
 #include <core/paging.h>
-#include <core/early_mem.h>
 #include <core/panic.h>
+#include <core/alloc.h>
 
 #include <lib/mem_utils.h>
 
@@ -49,7 +49,7 @@ static void (*early_next_segment)(uint64_t* handle, struct mem_segment_t* seg);
 static uint64_t early_skip;
 static uint64_t kernel_limit;
 
-static uint64_t early_dv_base;
+extern uint64_t mem_limit;
 
 void mm_init(
 		void (*first_segment)(uint64_t* handle),
@@ -66,7 +66,7 @@ void mm_init(
 	paging_init();
 
 	// find memory limit
-	uint64_t mem_limit = 0;
+	mem_limit = 0;
 
 	uint64_t handle;
 	struct mem_segment_t seg;
@@ -88,12 +88,8 @@ void mm_init(
 		paging_early_map_2m(i, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
 	}
 
-	early_dv_base = mem_limit;
-	if (early_dv_base % ALLOCATION_UNIT != 0) {
-		early_dv_base += ALLOCATION_UNIT - (early_dv_base % ALLOCATION_UNIT);
-	}
-
-	early_mem_init();
+	mm_init_dv();
+	alloc_init();
 
 	// now bootstrapping mm, paging, and heap is setup
 
@@ -218,9 +214,4 @@ uint64_t mm_early_alloc_2m() {
 	}
 
 	panic(PANIC_NO_MEM);
-}
-
-uint64_t mm_early_alloc_dv(size_t size) {
-	early_dv_base += size;
-	return early_dv_base - size;
 }

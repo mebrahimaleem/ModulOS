@@ -101,7 +101,7 @@ $(OBJ_DIR)/fs.img: $(COPY_DOC)
 
 $(OBJ_DIR)/modulos.img: $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/fs.img $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos
 	cp $< $@
-	mcopy -i $(OBJ_DIR)/boot/esp.img $(OBJ_DIR)/modulos ::/
+	mcopy -o -i $(OBJ_DIR)/boot/esp.img $(OBJ_DIR)/modulos ::/
 	dd if=$(OBJ_DIR)/boot/esp.img of=$@ seek=1 count=12 bs=4M conv=notrunc
 	dd if=$(OBJ_DIR)/fs.img of=$@ seek=13 count=1010 bs=4M conv=notrunc
 

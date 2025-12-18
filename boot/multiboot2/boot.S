@@ -229,7 +229,6 @@ ktransfer:
 	addq $KERNEL_VMA, gdt_ptr64.addr
 	lgdt gdt_ptr64
 	addq $KERNEL_VMA, %rsp
-	pushq 0
 	call multiboot2_init
 	call kentry
 

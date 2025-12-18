@@ -49,7 +49,13 @@ struct mm_order_entry_t {
 	uint8_t* bitmap;
 };
 
+extern uint64_t mm_alloc(enum mm_order_t order);
+
 extern uint64_t mm_alloc_pv(size_t size);
+
+extern void mm_init_dv(void);
+
+extern uint64_t mm_alloc_dv(enum mm_order_t order);
 
 #endif /* CORE_MM_H */
 
