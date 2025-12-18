@@ -37,8 +37,26 @@ uint64_t page_frames_num;
 struct page_frame_t* page_frames;
 
 uint64_t virt_limit; // pv start, alloc backwards
+uint64_t mem_limit;
 
 struct mm_order_entry_t order_entries[MM_MAX_ORDER];
+
+static uint64_t dv_base;
+
+uint64_t mm_alloc(enum mm_order_t order) {
+	uint64_t ret;
+
+	if (order_entries[order].free == 0) {
+		// TODO: split
+		return mm_alloc(order + 1);
+	}
+
+	// TODO: set used
+	ret = order_entries[order].free->base;
+	order_entries[order].free = order_entries[order].free->next;
+
+	return ret;
+}
 
 uint64_t mm_alloc_pv(size_t size) {
 	if (size % PV_ALLOC_ALIGN != 0) {
@@ -47,4 +65,20 @@ uint64_t mm_alloc_pv(size_t size) {
 
 	virt_limit -= size;
 	return virt_limit;
+}
+
+void mm_init_dv() {
+	// TODO: create a linked list of free dvs starting from mem_limit
+	dv_base = mem_limit;
+}
+
+uint64_t mm_alloc_dv(enum mm_order_t order) {
+	const uint64_t block = (uint64_t)PAGE_SIZE << (uint64_t)order;
+
+	if (dv_base % block != 0) {
+		dv_base += block - (dv_base % block);
+	}
+
+	dv_base += block;
+	return dv_base - block;
 }
