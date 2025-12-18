@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* pic.h - prgrammable interrupt controller driver interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,24 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <stdint.h>
+#ifndef PIC_8259_PIC_H
+#define PIC_8259_PIC_H
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
+extern void pic_disab(void);
 
-#include <drivers/pic_8259/pic.h>
-
-struct boot_context_t boot_context;
-
-void kentry() {
-	tss_init();
-	idt_init();
-
-	pic_disab();
-
-	cpu_sti();
-
-	while (1);
-}
+#endif /* PIC_8259_PIC_H */

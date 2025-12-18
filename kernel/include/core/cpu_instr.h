@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* cpu_instr.h - cpu instruction interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,24 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_CPU_INSTR_H
+#define CORE_CPU_INSTR_H
+
 #include <stdint.h>
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
+extern void cpu_lidt(uint64_t idt_ptr);
 
-#include <drivers/pic_8259/pic.h>
+extern void cpu_ltr_28(void);
 
-struct boot_context_t boot_context;
+extern void cpu_cli(void);
 
-void kentry() {
-	tss_init();
-	idt_init();
+extern void cpu_sti(void);
 
-	pic_disab();
-
-	cpu_sti();
-
-	while (1);
-}
+#endif /* CORE_CPU_INSTR_H */

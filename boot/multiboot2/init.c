@@ -19,9 +19,10 @@
 
 #include <multiboot2/init.h>
 
-#include <core/kentry.h>
-#include <core/acpitables.h>
-#include <core/mm_init.h>
+#include <kernel/core/kentry.h>
+#include <kernel/core/acpitables.h>
+#include <kernel/core/mm_init.h>
+#include <kernel/core/gdt.h>
 
 #define MOD8_MASK	(uint64_t)0x7
 
@@ -88,7 +89,7 @@ struct mb2_info_t {
 	const uint32_t reserved;
 } __attribute__((packed)) header;
 
-extern struct boot_context_t boot_context;
+extern struct gdt_t gdt[GDT_NUM_ENTRIES];
 
 static struct mb2_tag_t* memmap_tag;
 
@@ -172,5 +173,6 @@ void multiboot2_init(struct mb2_info_t* info) {
 		i = (i + 7) & ~MOD8_MASK;
 	}
 
+	boot_context.gdt = &gdt;
 	return;
 }

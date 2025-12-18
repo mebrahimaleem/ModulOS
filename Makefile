@@ -56,7 +56,12 @@ KERNEL_LD := $(KERNEL_TOOLCHAIN_PREFIX)ld
 KERNEL_STRIP := $(KERNEL_TOOLCHAIN_PREFIX)strip
 
 SUBDIRS := kernel boot drivers
-SUBDIR_TARGETS := $(OBJ_DIR)/kernel.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/esp.img
+SUBDIR_TARGETS := \
+									$(OBJ_DIR)/kernel.a \
+									$(OBJ_DIR)/boot.a \
+									$(OBJ_DIR)/bootstub.img \
+									$(OBJ_DIR)/esp.img \
+									$(OBJ_DIR)/drivers.a
 
 COPY_DOC_TO := $(OBJ_DIR)/rootfs/doc/ModulOS/
 COPY_DOC := $(COPY_DOC_TO)COPYING
@@ -101,8 +106,8 @@ $(OBJ_DIR)/fs.img: $(COPY_DOC)
 
 $(OBJ_DIR)/modulos.img: $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/fs.img $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos
 	cp $< $@
-	mcopy -o -i $(OBJ_DIR)/boot/esp.img $(OBJ_DIR)/modulos ::/
-	dd if=$(OBJ_DIR)/boot/esp.img of=$@ seek=1 count=12 bs=4M conv=notrunc
+	mcopy -o -i $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos ::/
+	dd if=$(OBJ_DIR)/esp.img of=$@ seek=1 count=12 bs=4M conv=notrunc
 	dd if=$(OBJ_DIR)/fs.img of=$@ seek=13 count=1010 bs=4M conv=notrunc
 
 $(OBJ_DIR)/modulos.ld: $(SUBDIRS)
@@ -112,5 +117,8 @@ $(OBJ_DIR)/modulos.ld: $(SUBDIRS)
 $(OBJ_DIR)/modulos: $(OBJ_DIR)/modulos-dbg
 	$(KERNEL_STRIP) -s -o $@ $<
 
-$(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a
-	$(KERNEL_LD) -o $@ -T $^ -L $(KERNEL_LIB_DIR) -lgcc
+$(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
+	$(KERNEL_LD) -z noexecstack -o $@ -T $< \
+		$(OBJ_DIR)/boot.a \
+		--start-group $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a --end-group \
+		-L $(KERNEL_LIB_DIR) -lgcc

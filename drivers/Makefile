@@ -19,6 +19,8 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
 OBJ_DIR := $(OBJ_DIR)/drivers
 
+$(call add_directory,pic_8259,PIC_8259)
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 
@@ -26,4 +28,8 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 all: build
 
 .PHONY: build
-build:
+build: $(OBJ_DIR)/../drivers.a $(LDS)
+
+$(OBJ_DIR)/drivers.a: $(TARGETS) | $(BUILD_DIRS)
+	rm -f $@
+	$(AR) rcs $@ $(TARGETS)

@@ -17,4 +17,4 @@
 CFLAGS := $(CWARN) -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostartfiles \
 	-nodefaultlibs -nostdlib -fno-asynchronous-unwind-tables -fomit-frame-pointer -mcmodel=kernel \
 	-ffreestanding -F dwarf -static -D_MODULOS $(DEFINES) $(CDEBUG) -I include/ \
-	-I $(SRC_TREE_ROOT)/kernel/include/ -MMD -MP -c
+	-I $(SRC_TREE_ROOT)/include/ -MMD -MP -c

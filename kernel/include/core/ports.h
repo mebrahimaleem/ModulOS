@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* pic.c - port io interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,24 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_PORTS_H
+#define CORE_PORTS_H
+
 #include <stdint.h>
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
+extern void io_wait(void);
 
-#include <drivers/pic_8259/pic.h>
+extern void outb(uint8_t port, uint16_t dat);
 
-struct boot_context_t boot_context;
-
-void kentry() {
-	tss_init();
-	idt_init();
-
-	pic_disab();
-
-	cpu_sti();
-
-	while (1);
-}
+#endif /* CORE_PORTS_H */

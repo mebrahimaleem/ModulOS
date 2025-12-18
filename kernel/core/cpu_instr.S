@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* cpu_instr.S - cpu instruction routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,24 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <stdint.h>
+.globl cpu_lidt
+cpu_lidt:
+lidt (%rdx)
+ret
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
+.globl cpu_ltr_28
+cpu_ltr_28:
+mov $0x28, %rax
+ltr %rax
+ret
 
-#include <drivers/pic_8259/pic.h>
+.globl cpu_cli
+cpu_cli:
+cli
+ret
 
-struct boot_context_t boot_context;
-
-void kentry() {
-	tss_init();
-	idt_init();
-
-	pic_disab();
-
-	cpu_sti();
-
-	while (1);
-}
+.globl cpu_sti
+cpu_sti:
+sti
+ret

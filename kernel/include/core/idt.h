@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* idt.h - interrupt descriptor table interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,24 +15,32 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef CORE_IDT_H
+#define CORE_IDT_H
+
 #include <stdint.h>
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
+#define IDT_GATE_INT	0xE
+#define IDT_GATE_TRP	0xF
 
-#include <drivers/pic_8259/pic.h>
+struct idt_entry_t {
+	uint16_t offset0;
+	uint16_t seg_sel;
+	uint8_t ist;
+	uint8_t flgs;
+	uint16_t offset1;
+	uint32_t offset2;
+	uint32_t resv;
+} __attribute__((packed));
 
-struct boot_context_t boot_context;
+extern void idt_init(void);
 
-void kentry() {
-	tss_init();
-	idt_init();
+extern void idt_install(
+		uint8_t v,
+		uint64_t offset,
+		uint16_t seg_sel,
+		uint8_t ist,
+		uint8_t type,
+		uint8_t dpl);
 
-	pic_disab();
-
-	cpu_sti();
-
-	while (1);
-}
+#endif /* CORE_IDT_H */

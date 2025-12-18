@@ -18,6 +18,8 @@
 #ifndef CORE_ACPITABLES_H
 #define CORE_ACPITABLES_H
 
+#include <stdint.h>
+
 struct RSDP_t {
 	uint8_t		Signature[8];
 	uint8_t		Checksum;

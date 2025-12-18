@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* tss.h - task segment state interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,24 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <stdint.h>
+#ifndef CORE_TSS_H
+#define CORE_TSS_H
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
+#define IST_ABORT	1
 
-#include <drivers/pic_8259/pic.h>
+extern void tss_init(void);
 
-struct boot_context_t boot_context;
-
-void kentry() {
-	tss_init();
-	idt_init();
-
-	pic_disab();
-
-	cpu_sti();
-
-	while (1);
-}
+#endif /* CORE_TSS_H */

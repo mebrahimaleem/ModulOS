@@ -21,20 +21,24 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <core/acpitables.h>
+#include <kernel/core/acpitables.h>
+#include <kernel/core/gdt.h>
 
 #ifdef GRAPHICSBASE
-#include <graphicsbase/framebuffer.h>
+#include <kernel/graphicsbase/framebuffer.h>
 #endif /* GRAPHICSBASE */
 
 struct boot_context_t {
 	size_t num_memmap;
 	struct memmap_t* memmap;
 	struct RSDP_t rsdp;
+	struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
 #ifdef GRAPHICSBASE
 	struct framebuffer_t framebuffer;
 #endif /* GRAPHICSBASE */
 };
+
+extern struct boot_context_t boot_context;
 
 extern void kentry(void) __attribute__((noreturn));
 

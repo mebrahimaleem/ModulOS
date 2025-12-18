@@ -1,4 +1,4 @@
-/* boot.ld - boot linker script */
+/* 06_boot.ld - boot linker script */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify

@@ -1,4 +1,4 @@
-/* kernel.ld - kernel linker script */
+/* 15_kernel.ld - kernel linker script */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify

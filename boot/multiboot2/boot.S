@@ -235,6 +235,7 @@ ktransfer:
 	.section .data.boot
 
 	/* GDT */
+	.globl gdt
 	.align	8
 gdt:
 	gdt.nullseg:
@@ -253,8 +254,13 @@ gdt:
 		.byte		GDT_RW + GDT_S + GDT_P	/* access: RW S P */
 		.byte		GDT_G		/* limit 16:19 flag: G */
 		.byte		0x92		/* access: RW S P */
-		.byte		0x80		/* limit 16:19 flag: G */
-		.byte		0x00		/* base 24:31 */
+	gdt.ucodeseg:
+		.quad 0
+	gdt.udataseg:
+		.quad 0
+	gdt.tss:
+		.quad 0
+		.quad 0
 	gdt.end:
 
 	.equ	CODE_SEG, gdt.codeseg - gdt
