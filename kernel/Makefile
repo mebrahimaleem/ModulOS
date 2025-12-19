@@ -17,9 +17,6 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
-AR := $(KERNEL_TOOLCHAIN_PREFIX)ar
-
 OBJ_DIR := $(OBJ_DIR)/kernel
 
 $(call add_directory,core,CORE)

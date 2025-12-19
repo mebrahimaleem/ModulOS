@@ -62,7 +62,7 @@ struct tss_t {
 } __attribute__((packed));
 
 
-void tss_init() {
+void tss_init(void) {
 	volatile struct tss_t* tss = kmalloc(sizeof(struct tss_t));
 
 	memset((void*)tss, 0, sizeof(struct tss_t));

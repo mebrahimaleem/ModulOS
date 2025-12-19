@@ -25,16 +25,16 @@ PHDRS {
 SECTIONS {
 	. = 1M;
 
-	.text.boot BLOCK(4K) : {
+	.text.boot ALIGN(4K) : {
 		KEEP(*(.text.multiboot2))
 		*(.text.boot)
 	} :boottext
 
-	.data.boot BLOCK(4K) : {
+	.data.boot ALIGN(4K) : {
 		*(.data.boot)
 	} :bootdata
 
-	.bss.boot BLOCK(4K) : {
+	.bss.boot ALIGN(4K) : {
 		*(.bss.boot)
 	} :bootdata
 

@@ -23,7 +23,7 @@ ret
 .globl cpu_ltr_28
 cpu_ltr_28:
 mov $0x28, %rax
-ltr %rax
+ltr %ax
 ret
 
 .globl cpu_cli

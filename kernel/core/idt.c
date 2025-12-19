@@ -44,7 +44,7 @@ struct idt_ptr_t {
 static volatile struct idt_entry_t idt[IDT_MAX_ENTRY] __attribute__((aligned(64)));
 static volatile struct idt_ptr_t idt_ptr;
 
-void idt_init() {
+void idt_init(void) {
 	memset((void*)&idt[0], 0, sizeof(idt));
 
 	idt_install(0x00, (uint64_t)isr_00, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);

@@ -29,21 +29,21 @@ SECTIONS {
 
 	KERNEL_START = .;
 
-	.text BLOCK(4K) : AT (ADDR(.text) - KERNEL_VMA) {
-		*(.text)
+	.text ALIGN(4K) : AT (ADDR(.text) - KERNEL_VMA) {
+		*(.text*)
 	} :kerneltext
 
 	. = ALIGN(4K);
 
-	.data BLOCK(4K) : AT (ADDR(.data) - KERNEL_VMA) {
-		*(.data)
+	.data ALIGN(4K) : AT (ADDR(.data) - KERNEL_VMA) {
+		*(.data*)
 		*(.rodata*)
 	} :kerneldata
 
 	. = ALIGN(4K);
 
-	.bss BLOCK(4K) : AT (ADDR(.bss) - KERNEL_VMA) {
-		*(.bss)
+	.bss ALIGN(4K) : AT (ADDR(.bss) - KERNEL_VMA) {
+		*(.bss*)
 	} :kerneldata
 
 	ASSERT(. <= KERNEL_VMA + 4M, "Error: Kernel exceeds 4MiB limit")

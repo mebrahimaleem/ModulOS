@@ -14,7 +14,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-CFLAGS := $(CWARN) -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostartfiles \
-	-nodefaultlibs -nostdlib -fno-asynchronous-unwind-tables -fomit-frame-pointer -mcmodel=kernel \
-	-ffreestanding -F dwarf -static -D_MODULOS $(DEFINES) $(CDEBUG) -I include/ \
-	-I $(SRC_TREE_ROOT)/include/ -MMD -MP -c
+
+LD_FLAGS := -mcmodel=kernel -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
+	-fomit-frame-pointer -nodefaultlibs -nostdlib -mcmodel=kernel \
+	-ffreestanding -fno-unwind-tables -fno-exceptions -fno-rtti \
+	-fno-semantic-interposition -fvisibility=hidden \
+	-fno-stack-protector -fno-builtin -fno-pic -mgeneral-regs-only --target=x86_64-elf \
+	-static -D_MODULOS $(CDEBUG)
+
+ifndef DEBUG
+	LD_FLAGS := $(LD_FLAGS) -flto=thin
+endif
+
+CFLAGS := $(CWARN) $(LD_FLAGS) $(DEFINES) -I include/ -I $(SRC_TREE_ROOT)/include/ -MMD -MP -c
+

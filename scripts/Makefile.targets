@@ -23,6 +23,10 @@ TARGETS_C := $(filter %.o, $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC)))
 TARGETS := $(TARGETS_S) $(TARGETS_C)
 DEPS := $(patsubst $(OBJ_DIR)/%.o,$(DEP_DIR)/%.d,$(TARGETS))
 
+CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
+	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
+	-Wstrict-prototypes
+
 LINKER_SRC := $(shell find $(SRC_DIRS) -type f -name "*.ld")
 LDS := $(patsubst %,$(OBJ_DIR)/../lds/%,$(LINKER_SRC))
 

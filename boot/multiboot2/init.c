@@ -91,7 +91,7 @@ struct mb2_info_t {
 
 extern volatile struct gdt_t gdt[GDT_NUM_ENTRIES];
 
-static struct mb2_tag_t* memmap_tag;
+static volatile struct mb2_tag_t* memmap_tag;
 
 static void first_segment(uint64_t* handle) {
 	*handle = 0;
@@ -99,7 +99,7 @@ static void first_segment(uint64_t* handle) {
 
 static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
 	uint64_t addr = (uint64_t)&memmap_tag->tag.memmap.entries + *handle * memmap_tag->tag.memmap.entry_size;
-	if (addr >= (uint64_t)&memmap_tag + memmap_tag->size) {
+	if (addr >= (uint64_t)memmap_tag + memmap_tag->size) {
 		seg->base = 0;
 		seg->size = 0;
 		return;

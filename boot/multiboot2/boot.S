@@ -200,7 +200,7 @@ _start:
 
 	pushl $CODE_SEG
 	pushl $enter64
-	retfl
+	lret
 
 hang:
 	hlt
@@ -222,7 +222,7 @@ enter64:
 	/* far return to high memory */
 	pushq $CODE_SEG
 	pushq $ktransfer
-	retfq
+	lretq
 
 	.section .text
 ktransfer:

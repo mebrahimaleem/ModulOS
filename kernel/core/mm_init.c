@@ -180,7 +180,7 @@ void mm_init(
 	}
 }
 
-uint64_t mm_early_alloc_2m() {
+uint64_t mm_early_alloc_2m(void) {
 
 	uint64_t handle, i = early_skip;
 	struct mem_segment_t seg;

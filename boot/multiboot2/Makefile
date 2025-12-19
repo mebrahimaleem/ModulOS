@@ -40,7 +40,7 @@ $(OBJ_DIR)/esp.img: grub.cfg | $(OBJ_DIR)/
 	mformat -v ESP_MODULOS -F -i $@
 	mmd -i $@ ::/EFI
 	mmd -i $@ ::/EFI/BOOT
-	$(KERNEL_TOOLCHAIN_PREFIX)grub-mkstandalone \
+	grub-mkstandalone \
 		--format=x86_64-efi \
 		--install-modules="$(GRUB_MODS)" \
 		--output=$(OBJ_DIR)/BOOTX64.EFI \

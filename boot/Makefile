@@ -17,8 +17,6 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
-
 OBJ_DIR := $(OBJ_DIR)/boot
 
 ifdef BUILD_BOOT_MULTIBOOT2

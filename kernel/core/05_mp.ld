@@ -23,12 +23,12 @@ PHDRS {
 SECTIONS {
 	. = 0x1000;
 
-	.text.mpboot BLOCK(4K) : {
+	.text.mpboot ALIGN(4K) : {
 		*(.text.mpboot)
 	} :mptext
 
-	.data.mpboot BLOCK(4K) : {
-		*(.text.mpboot)
+	.data.mpboot ALIGN(4K) : {
+		*(.data.mpboot)
 	} :mpdata
 
 	ASSERT(. <= 0x9fc00, "Kernel has overlap with EBDA")

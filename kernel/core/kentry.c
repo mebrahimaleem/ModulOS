@@ -26,7 +26,7 @@
 
 struct boot_context_t boot_context;
 
-void kentry() {
+void kentry(void) {
 	tss_init();
 	idt_init();
 

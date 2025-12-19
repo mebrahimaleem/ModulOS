@@ -40,12 +40,12 @@ struct arena_t {
 			- sizeof(uint64_t)) / sizeof(uint64_t)];
 };
 
-_Static_assert(sizeof(struct arena_t) == ARENA_SIZE);
+_Static_assert(sizeof(struct arena_t) == ARENA_SIZE, "arena must be 2M");
 
 static struct arena_t* base;
 static struct arena_t* head;
 
-void alloc_init() {
+void alloc_init(void) {
 	base = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
 	head = base;
 	paging_early_map_2m((uint64_t)base, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);

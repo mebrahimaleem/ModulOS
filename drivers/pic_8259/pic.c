@@ -22,7 +22,7 @@
 #define PIC1_DATA	0x21
 #define	PIC2_DATA	0xA1
 
-void pic_disab() {
+void pic_disab(void) {
 	outb(PIC1_DATA, 0xff);
 	io_wait();
 	outb(PIC2_DATA, 0xff);

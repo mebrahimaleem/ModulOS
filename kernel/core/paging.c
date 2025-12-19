@@ -62,7 +62,7 @@ struct paging_pool_header_t {
 	uint8_t resv[4020];
 } __attribute__((packed));
 
-_Static_assert(sizeof(struct paging_pool_header_t) == PAGE_SIZE);
+_Static_assert(sizeof(struct paging_pool_header_t) == PAGE_SIZE, "paging pool header must be 4K");
 
 struct paging_pool_header_t* root_pool;
 
@@ -129,7 +129,7 @@ static uint64_t alloc_page(void) {
 	return alloc_page();
 }
 
-static struct paging_pool_header_t* early_create_pool() {
+static struct paging_pool_header_t* early_create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_early_alloc_2m();
 	paging_early_map_2m((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW);
 
@@ -139,7 +139,7 @@ static struct paging_pool_header_t* early_create_pool() {
 	return addr;
 }
 
-static struct paging_pool_header_t* create_pool() {
+static struct paging_pool_header_t* create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc(MM_ORDER_2M);
 	paging_map((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW, PAGE_2M);
 
@@ -149,7 +149,7 @@ static struct paging_pool_header_t* create_pool() {
 	return addr;
 }
 
-void paging_init() {
+void paging_init(void) {
 	const uint64_t pool_base = mm_early_alloc_2m();
 
 	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(pool_base)];

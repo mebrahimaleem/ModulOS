@@ -30,11 +30,8 @@ SRC_DIRS :=
 DEFINES :=
 BUILD_DIRS :=
 
-CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
-	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
-	-Wstrict-prototypes
 ifdef DEBUG
-CDEBUG := -DDEBUG -Og -g3
+CDEBUG := -DDEBUG -Og -g3 -glldb
 else
 CDEBUG := -O2 -g
 endif

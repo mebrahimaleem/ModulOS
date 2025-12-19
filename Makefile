@@ -49,11 +49,8 @@ endif
 export SRC_TREE_ROOT = .
 export OBJ_DIR = build
 
-export KERNEL_TOOLCHAIN_PREFIX = x86_64-elf-
-
-KERNEL_CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
-KERNEL_LD := $(KERNEL_TOOLCHAIN_PREFIX)ld
-KERNEL_STRIP := $(KERNEL_TOOLCHAIN_PREFIX)strip
+export CC := clang
+export AR := llvm-ar
 
 SUBDIRS := kernel boot drivers
 SUBDIR_TARGETS := \
@@ -70,7 +67,7 @@ TEST_RUNTIME_DIR := $(OBJ_DIR)/test
 
 SRC := $(shell find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \))
 
-KERNEL_LIB_DIR := $(dir $(shell $(KERNEL_CC) -mno-red-zone -print-libgcc-file-name))
+include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 
 .PHONY: build
 build: $(OBJ_DIR)/modulos.img
@@ -115,10 +112,7 @@ $(OBJ_DIR)/modulos.ld: $(SUBDIRS)
 		| cut -d' ' -f2-) > $@
 
 $(OBJ_DIR)/modulos: $(OBJ_DIR)/modulos-dbg
-	$(KERNEL_STRIP) -s -o $@ $<
+	llvm-strip -s -o $@ $<
 
 $(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
-	$(KERNEL_LD) -z noexecstack -o $@ -T $< \
-		$(OBJ_DIR)/boot.a \
-		--start-group $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a --end-group \
-		-L $(KERNEL_LIB_DIR) -lgcc
+	$(CC) -o $@ $(LTO) $(LD_FLAGS) -fuse-ld=lld -T $^

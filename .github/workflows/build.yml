@@ -11,89 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Toolchain cache
-        id: cache-toolchain
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/opt/x86_64-elf/
-          key: ${{ runner.os }}-toolchain
-
       - name: Install apt packages
         run: |
           sudo apt update
-          sudo apt install build-essential bison flex texinfo genext2fs libgmp-dev libmpfr-dev libmpc-dev libisl-dev gettext mtools libdevmapper-dev libfreetype6-dev libfontconfig1-dev liblzma-dev libzstd-dev pkg-config
-
-      - name: Setup environment
-        run: |
-          echo "PREFIX=$GITHUB_WORKSPACE/opt/x86_64-elf/" >> $GITHUB_ENV
-          mkdir -p $GITHUB_WORKSPACE/opt/x86_64-elf/
-          echo "$GITHUB_WORKSPACE/opt/x86_64-elf/bin:$PATH" >> $GITHUB_PATH
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Get GNU keyring
-        run: |
-           wget https://ftp.gnu.org/gnu/gnu-keyring.gpg
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Download binutils
-        run: |
-          wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.45.tar.gz.sig
-          wget https://ftpmirror.gnu.org/gnu/binutils/binutils-2.45.tar.gz
-          gpgv --keyring ./gnu-keyring.gpg binutils-2.45.tar.gz.sig binutils-2.45.tar.gz
-          tar xf binutils-2.45.tar.gz
-          mkdir build-binutils
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Download gcc
-        run: |
-          wget https://ftpmirror.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz.sig
-          wget https://ftpmirror.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz
-          gpgv --keyring ./gnu-keyring.gpg gcc-15.2.0.tar.gz.sig gcc-15.2.0.tar.gz
-          tar xf gcc-15.2.0.tar.gz
-          patch -s -p0 < contrib/noredzone.patch
-          mkdir build-gcc
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Download grub
-        run: |
-          wget https://ftpmirror.gnu.org/gnu/grub/grub-2.06.tar.gz.sig
-          wget https://ftpmirror.gnu.org/gnu/grub/grub-2.06.tar.gz
-          gpgv --keyring ./gnu-keyring.gpg grub-2.06.tar.gz.sig grub-2.06.tar.gz
-          tar xf grub-2.06.tar.gz
-          mkdir build-grub
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Build binutils
-        working-directory: build-binutils
-        run: |
-          ../binutils-2.45/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
-          make -j$(nproc)
-          make install
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Build gcc
-        working-directory: build-gcc
-        run: |
-          ../gcc-15.2.0/configure --target=x86_64-elf --program-prefix=x86_64-elf- --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
-          make -j$(nproc) all-gcc
-          make install-gcc
-          make all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel' || true
-          sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc/Makefile
-          sed -i 's/PICFLAG/DISABLED_PICFLAG/g' x86_64-elf/libgcc-noredzone/libgcc/Makefile
-          make -j$(nproc) all-target-libgcc CFLAGS_FOR_TARGET='-g -O2 -mcmodel=kernel'
-          make install-target-libgcc
-
-      - if: ${{ steps.cache-toolchain.outputs.cache-hit != 'true' }}
-        name: Build grub
-        working-directory: build-binutils
-        run: |
-          ../grub-2.06/configure --prefix=$PREFIX --with-platform=efi --target=x86_64 --program-prefix=x86_64-elf- --with-sysroot --disable-nls --disable-werror CFLAGS='-std=gnu99'
-          make -j$(nproc)
-          make install
+          sudo apt install clang lld llvm grub-efi-amd64-bin mtools
 
       - name: Build ModulOS
         run: |
-          make -j$(nproc)
+          make -j$(nproc) build
 
       - name: Archive debugging symbols
         uses: actions/upload-artifact@v4

@@ -67,7 +67,7 @@ uint64_t mm_alloc_pv(size_t size) {
 	return virt_limit;
 }
 
-void mm_init_dv() {
+void mm_init_dv(void) {
 	// TODO: create a linked list of free dvs starting from mem_limit
 	dv_base = mem_limit;
 }
