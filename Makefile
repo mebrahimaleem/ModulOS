@@ -17,7 +17,7 @@
 
 # Debug options
 
-export DEBUG = 1
+#export DEBUG = 1
 
 # Global options
 

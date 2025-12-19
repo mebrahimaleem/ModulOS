@@ -17,10 +17,10 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-GRUB_MODS := multiboot2 fat normal part_gpt search
+GRUB_MODS := multiboot2 fat normal part_gpt search test
 
 ifdef DEBUG
-GRUB_MODS := $(GRUB_MODS) acpi backtrace cat echo lsmmap ls lspci minicmd probe read rdmsr search_fs_file search_fs_uuid search_label serial test wrmsr
+GRUB_MODS := $(GRUB_MODS) acpi backtrace cat echo lsmmap ls lspci minicmd probe read rdmsr search_fs_file search_fs_uuid search_label serial wrmsr
 endif
 
 ifdef BUILD_BOOT_GRAPHICSBASE

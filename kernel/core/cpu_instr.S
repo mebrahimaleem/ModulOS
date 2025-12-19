@@ -17,7 +17,7 @@
 
 .globl cpu_lidt
 cpu_lidt:
-lidt (%rdx)
+lidt (%rdi)
 ret
 
 .globl cpu_ltr_28

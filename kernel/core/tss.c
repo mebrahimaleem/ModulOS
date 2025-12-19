@@ -63,9 +63,9 @@ struct tss_t {
 
 
 void tss_init() {
-	struct tss_t* tss = kmalloc(sizeof(struct tss_t));
+	volatile struct tss_t* tss = kmalloc(sizeof(struct tss_t));
 
-	memset(tss, 0, sizeof(struct tss_t));
+	memset((void*)tss, 0, sizeof(struct tss_t));
 
 	const uint64_t rsp0 = (uint64_t)kmalloc(RSP_SIZE);
 	tss->rsp0_lo = rsp0 & IST_LO_MASK;

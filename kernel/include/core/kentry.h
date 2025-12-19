@@ -29,10 +29,8 @@
 #endif /* GRAPHICSBASE */
 
 struct boot_context_t {
-	size_t num_memmap;
-	struct memmap_t* memmap;
 	struct RSDP_t rsdp;
-	struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
+	volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
 #ifdef GRAPHICSBASE
 	struct framebuffer_t framebuffer;
 #endif /* GRAPHICSBASE */

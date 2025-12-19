@@ -19,6 +19,7 @@
 
 void panic(enum panic_code_t code) {
 	// TODO: log
+	(void)code;
 
 	while (1);
 }

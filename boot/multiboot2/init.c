@@ -89,7 +89,7 @@ struct mb2_info_t {
 	const uint32_t reserved;
 } __attribute__((packed)) header;
 
-extern struct gdt_t gdt[GDT_NUM_ENTRIES];
+extern volatile struct gdt_t gdt[GDT_NUM_ENTRIES];
 
 static struct mb2_tag_t* memmap_tag;
 
