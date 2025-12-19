@@ -27,15 +27,7 @@ ifdef BUILD_BOOT_GRAPHICSBASE
 GRUB_MODS := $(GRUB_MODS) efi_gop video
 endif
 
-$(OBJ_DIR)/gpt.img: | $(OBJ_DIR)/
-	truncate -s 4G $@
-	parted -s $@ mklabel gpt
-	parted -s $@ mkpart ESP fat32 4MiB 52MiB
-	parted -s $@ set 1 esp on
-	parted -s $@ mkpart rootfs ext4 52MiB 100%
-	dd if=$@ bs=4M skip=1 count=1022 status=none | cmp -n 4286578688 /dev/zero -
-
-$(OBJ_DIR)/esp.img: grub.cfg | $(OBJ_DIR)/
+$(OBJ_DIR)/../esp.img: grub.cfg | $(OBJ_DIR)/
 	truncate -s 48M $@
 	mformat -v ESP_MODULOS -F -i $@
 	mmd -i $@ ::/EFI
