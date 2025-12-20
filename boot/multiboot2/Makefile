@@ -23,7 +23,7 @@ ifdef DEBUG
 GRUB_MODS := $(GRUB_MODS) acpi backtrace cat echo lsmmap ls lspci minicmd probe read rdmsr search_fs_file search_fs_uuid search_label serial wrmsr
 endif
 
-ifdef BUILD_BOOT_GRAPHICSBASE
+ifdef BUILD_KERNEL_GRAPHICSBASE
 GRUB_MODS := $(GRUB_MODS) efi_gop video
 endif
 

@@ -26,6 +26,10 @@ ifdef BUILD_KERNEL_GRAPHICSBASE
 $(call add_directory,graphicsbase,GRAPHICSBASE)
 endif
 
+ifdef BUILD_DRIVERS_SERIAL
+DEFINES := $(DEFINES) -DSERIAL
+endif
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 

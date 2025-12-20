@@ -15,11 +15,31 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#include <stdint.h>
+
 #include <core/panic.h>
+#include <core/cpu_instr.h>
+
+#ifdef SERIAL
+#include <drivers/serial/serial_print.h>
+#endif /* SERIAL */
+
+static const char* panic_names[] = {
+	[PANIC_UNK] = "Unkown",
+	[PANIC_PAGING] = "Paging error",
+	[PANIC_NO_MEM] = "Out of memory",
+	[PANIC_STATE] = "Illegal kernel state",
+	[PANIC_MAX] = 0
+};
 
 void panic(enum panic_code_t code) {
-	// TODO: log
+	const char* name = panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK];
+#ifdef SERIAL
+	serial_printf_com1("PANIC! 0x%X64 %s\r\nHalt", (uint64_t)code, name);
+	serial_printf_com2("PANIC! 0x%X64 %s\r\nHalt", (uint64_t)code, name);
+#else
 	(void)code;
+#endif /* SERIAL */
 
-	while (1);
+	cpu_halt_loop();
 }

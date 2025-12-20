@@ -35,3 +35,8 @@ ret
 cpu_sti:
 sti
 ret
+
+.globl cpu_halt_loop
+cpu_halt_loop:
+hlt
+jmp cpu_halt_loop

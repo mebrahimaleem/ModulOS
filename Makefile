@@ -21,8 +21,6 @@
 
 # Global options
 
-export BUILD_GRAPHICSBASE = 1
-
 # Optional boot modules
 
 export BUILD_BOOT_MULTIBOOT2 = 1
@@ -30,19 +28,11 @@ export BUILD_BOOT_MULTIBOOT2 = 1
 
 # Optional core modules
 
+export BUILD_KERNEL_GRAPHICSBASE = 1
 
 # Optional driver modules
 
-
-# Auto include modules
-
-ifdef BUILD_GRAPHICSBASE
-export BUILD_BOOT_GRAPHICSBASE = 1
-endif
-
-ifdef BUILD_GRAPHICSBASE
-export BUILD_KERNEL_GRAPHICSBASE = 1
-endif
+export BUILD_DRIVERS_SERIAL = 1
 
 # End of options
 

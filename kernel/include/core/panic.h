@@ -19,9 +19,11 @@
 #define CORE_PANIC_H
 
 enum panic_code_t {
-	PANIC_UNK,
-	PANIC_PAGING,
-	PANIC_NO_MEM,
+	PANIC_UNK, // unkown panic
+	PANIC_PAGING, // paging related panic
+	PANIC_NO_MEM, // out of memory panic
+	PANIC_STATE, // illegal kernel state panic
+	PANIC_MAX
 };
 
 extern void panic(enum panic_code_t code) __attribute__((noreturn));

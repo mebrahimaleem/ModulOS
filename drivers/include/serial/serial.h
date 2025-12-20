@@ -1,4 +1,4 @@
-/* kentry.c - kernel entry point */
+/* serial.h - serial driver interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,38 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef DRIVERS_SERIAL_SERIAL
+#define DRIVERS_SERIAL_SERIAL
+
 #include <stdint.h>
 
-#include <core/kentry.h>
-#include <core/tss.h>
-#include <core/idt.h>
-#include <core/cpu_instr.h>
-#include <core/panic.h>
+extern void serial_init_com1(void);
+extern void serial_init_com2(void);
 
-#include <drivers/pic_8259/pic.h>
+extern void serial_write_com1(uint8_t b);
+extern void serial_write_com2(uint8_t b);
 
-#ifdef SERIAL
-#include <drivers/serial/serial.h>
-#include <drivers/serial/serial_print.h>
-#endif /* SERIAL */
-
-struct boot_context_t boot_context;
-
-void kentry(void) {
-	tss_init();
-	idt_init();
-
-	pic_disab();
-
-#ifdef SERIAL
-	serial_init_com1();
-	serial_init_com2();
-
-	serial_print_com1("COM1\r\nModulOS\r\n");
-	serial_print_com2("COM2\r\nModulOS\r\n");
-#endif /* SERIAL */
-
-	cpu_sti();
-
-	panic(PANIC_STATE);
-}
+#endif /* DRIVERS_SERIAL_SERIAL */
