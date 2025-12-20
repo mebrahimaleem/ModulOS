@@ -22,6 +22,7 @@
 #include <core/mm.h>
 #include <core/mm_init.h>
 #include <core/panic.h>
+#include <core/logging.h>
 
 #include <lib/mem_utils.h>
 
@@ -191,6 +192,7 @@ void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t pa
 
 	if ((pd & PAGE_PRESENT) == PAGE_PRESENT && (pd & PAGE_PS) == PAGE_PS) {
 		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -215,6 +217,7 @@ void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t pa
 
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT && (pt & PAGE_PS) == PAGE_PS) {
 		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -239,6 +242,7 @@ void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t pa
 
 	if ((addr & PAGE_PRESENT) == PAGE_PRESENT) {
 		if ((addr & TABLE_PADDR_MASK) == paddr) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -260,6 +264,7 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 
 	if ((pd & PAGE_PS) == PAGE_PS) {
 		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -275,6 +280,7 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
 		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 

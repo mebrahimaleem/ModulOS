@@ -18,10 +18,16 @@
 #ifndef DRIVERS_SERIAL_PRINT_STR
 #define DRIVERS_SERIAL_PRINT_STR
 
+#include <stdarg.h>
+
+#include <kernel/core/logging.h>
+
 extern void serial_print_com1(const char* s);
 extern void serial_print_com2(const char* s);
 
 extern void serial_printf_com1(const char* s, ...);
 extern void serial_printf_com2(const char* s, ...);
+
+extern void serial_log(enum log_severity_t severity, const char* s, va_list args);
 
 #endif /* DRIVERS_SERIAL_SERIAL_PRINT */

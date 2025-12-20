@@ -22,7 +22,7 @@ enum panic_code_t {
 	PANIC_UNK, // unkown panic
 	PANIC_PAGING, // paging related panic
 	PANIC_NO_MEM, // out of memory panic
-	PANIC_STATE, // illegal kernel state panic
+	PANIC_STATE, // bad kernel state panic
 	PANIC_MAX
 };
 

@@ -22,6 +22,7 @@
 #include <core/mm.h>
 #include <core/mm_init.h>
 #include <core/paging.h>
+#include <core/logging.h>
 
 #include <lib/mem_utils.h>
 
@@ -50,6 +51,8 @@ void alloc_init(void) {
 	head = base;
 	paging_early_map_2m((uint64_t)base, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
 
+	logging_log_debug("New arena @ 0x%X64", head);
+
 	// preallocate prevents mm/alloc deadlock
 	memset(base, 0, ARENA_SIZE);
 	base->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
@@ -70,6 +73,7 @@ void* kmalloc(size_t size) {
 	// TODO: check if hint is free
 	if ((uint64_t)head->hint + size >= (uint64_t)head + ARENA_SIZE) {	
 		head = head->next;
+		logging_log_debug("New arena @ 0x%X64", head);
 		memset(head, 0, ARENA_SIZE);
 		head->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
 		paging_map((uint64_t)head->next, mm_alloc(MM_ORDER_2M), PAGE_PRESENT | PAGE_RW, PAGE_2M);

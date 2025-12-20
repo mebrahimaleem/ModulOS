@@ -27,6 +27,10 @@ ifdef BUILD_KERNEL_GRAPHICSBASE
 DEFINES := $(DEFINES) -DGRAPHICSBASE
 endif
 
+ifdef BUILD_DRIVERS_SERIAL
+DEFINES := $(DEFINES) -DSERIAL
+endif
+
 ifneq ($(words $(SRC_DIRS)), 1)
 $(error Exactly a single bootloader can be built)
 endif

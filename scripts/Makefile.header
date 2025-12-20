@@ -35,3 +35,7 @@ CDEBUG := -DDEBUG -Og -g3 -glldb
 else
 CDEBUG := -O2 -g
 endif
+
+ifdef DEBUG_LOGGING
+CDEBUG := $(CDEBUG) -DDEBUG_LOGGING
+endif

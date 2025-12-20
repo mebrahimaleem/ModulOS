@@ -22,6 +22,7 @@
 #include <core/alloc.h>
 #include <core/cpu_instr.h>
 #include <core/kentry.h>
+#include <core/logging.h>
 
 #include <lib/mem_utils.h>
 
@@ -76,6 +77,9 @@ void tss_init(void) {
 	const uint64_t ist1 = (uint64_t)kmalloc(IST_ABORT_SIZE);
 	tss->ist1_lo = ist1 & IST_LO_MASK;
 	tss->ist1_hi = (uint32_t)(ist1 >> IST_HI_SHFT);
+
+	logging_log_debug("New TSS @ 0x%X64 - 0x%X64 (rsp0) 0x%X64 (ist1)",
+			(uint64_t)tss, rsp0, ist1);
 
 	((struct gdt_sys_t*)&(*boot_context.gdt)[GDT_TSS_INDEX])->base0 = 
 		(uint64_t)tss & GDT_BASE0_MASK;

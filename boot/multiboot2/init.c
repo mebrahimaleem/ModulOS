@@ -23,6 +23,12 @@
 #include <kernel/core/acpitables.h>
 #include <kernel/core/mm_init.h>
 #include <kernel/core/gdt.h>
+#include <kernel/core/logging.h>
+
+#ifdef SERIAL
+#include <drivers/serial/serial.h>
+#include <drivers/serial/serial_print.h>
+#endif /* SERIAL */
 
 #define MOD8_MASK	(uint64_t)0x7
 
@@ -127,6 +133,18 @@ static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
 
 
 void multiboot2_init(struct mb2_info_t* info) {
+	logging_init();
+
+#ifdef SERIAL
+	serial_init_com1();
+	serial_init_com2();
+
+	serial_print_com1("COM1\r\n");
+	serial_print_com2("COM2\r\n");
+
+	logging_register(serial_log);
+#endif
+
 	// parse bootInformation
 	uint64_t i = sizeof(*info);
 	const uint64_t maxi = info->total_size;
@@ -140,6 +158,7 @@ void multiboot2_init(struct mb2_info_t* info) {
 				mm_init(first_segment, next_segment);
 				break;
 			case MBITAG_TYPE_RSDPV2:
+				logging_log_info("Found RSDP @ 0x%X64", (uint64_t)&tag->tag.rsdpv2.rsdp);
 				boot_context.rsdp = tag->tag.rsdpv2.rsdp;
 				break;
 #ifdef GRAPHICSBASE

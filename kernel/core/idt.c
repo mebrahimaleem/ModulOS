@@ -16,9 +16,10 @@
 */
 
 #include <core/idt.h>
-#include <core/isr.h>
+#include <core/exceptions.h>
 #include <core/cpu_instr.h>
 #include <core/tss.h>
+#include <core/logging.h>
 
 #include <lib/mem_utils.h>
 
@@ -92,4 +93,8 @@ void idt_install(
 	idt[v].seg_sel = seg_sel;
 	idt[v].ist = ist;
 	idt[v].flgs = type | (uint8_t)(dpl << IDT_TYP_SHFT) | IDT_PRESENT;
+
+	logging_log_info(
+			"Installed ISR 0x%X64 (vector) 0x%X64 (isr addr) %u64 (ist) %u64 (cs) 0x%X64 (type) %u64 (dpl)",
+			(uint64_t)v, offset, (uint64_t)seg_sel, (uint64_t)ist, (uint64_t)type, (uint64_t)dpl);
 }

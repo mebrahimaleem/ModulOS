@@ -102,6 +102,12 @@ static void serial_print(const char* s, void (*printer)(uint8_t)) {
 	}
 }
 
+
+static void serial_com12(uint8_t b) {
+	serial_write_com1(b);
+	serial_write_com2(b);
+}
+
 static void serial_printf(const char* s, void (*printer)(uint8_t), va_list args) {
 	for (; *s != 0; s++) {
 		switch (*s) {
@@ -157,4 +163,31 @@ void serial_printf_com2(const char* s, ...) {
 	va_start(args, s);
 	serial_printf(s, serial_write_com2, args);
 	va_end(args);
+}
+
+void serial_log(enum log_severity_t severity, const char* s, va_list args) {
+	switch (severity) {
+		case SEVERITY_DBG:
+			serial_print("DEBUG: ", serial_com12);
+			serial_printf(s, serial_com12, args);
+			serial_print("\r\n", serial_com12);
+			break;
+		case SEVERITY_INF:
+			serial_print("INFO: ", serial_com12);
+			serial_printf(s, serial_com12, args);
+			serial_print("\r\n", serial_com12);
+			break;
+		case SEVERITY_WRN:
+			serial_print("WARNING: ", serial_com12);
+			serial_printf(s, serial_com12, args);
+			serial_print("\r\n", serial_com12);
+			break;
+		case SEVERITY_ERR:
+			serial_print("ERROR: ", serial_com12);
+			serial_printf(s, serial_com12, args);
+			serial_print("\r\n", serial_com12);
+			break;
+		default:
+			break;
+	}
 }

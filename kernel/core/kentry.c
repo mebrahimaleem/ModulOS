@@ -21,32 +21,29 @@
 #include <core/tss.h>
 #include <core/idt.h>
 #include <core/cpu_instr.h>
-#include <core/panic.h>
+#include <core/logging.h>
 
 #include <drivers/pic_8259/pic.h>
 
-#ifdef SERIAL
-#include <drivers/serial/serial.h>
-#include <drivers/serial/serial_print.h>
-#endif /* SERIAL */
-
 struct boot_context_t boot_context;
 
+extern void test_tt(void);
+
 void kentry(void) {
+	logging_log_debug("Kernel Entry");
+	logging_log_debug("TSS and IDT init");
 	tss_init();
 	idt_init();
+	logging_log_debug("TSS and IDT init done");
 
+	logging_log_debug("Masking PIC");
 	pic_disab();
+	logging_log_debug("PIC masked");
 
-#ifdef SERIAL
-	serial_init_com1();
-	serial_init_com2();
-
-	serial_print_com1("COM1\r\nModulOS\r\n");
-	serial_print_com2("COM2\r\nModulOS\r\n");
-#endif /* SERIAL */
-
+	logging_log_debug("Setting interrupt flag");
 	cpu_sti();
 
-	panic(PANIC_STATE);
+	logging_log_info("Boot Complete ModulOS");
+
+	cpu_halt_loop();
 }
