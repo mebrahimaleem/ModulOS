@@ -1,4 +1,4 @@
-/* idt.h - interrupt descriptor table interface */
+/* msr.h - Model specific register routine interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,36 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_IDT_H
-#define CORE_IDT_H
+#ifndef CORE_MSR_H
+#define CORE_MSR_H
 
 #include <stdint.h>
 
-#define IDT_GATE_INT	0xE
-#define IDT_GATE_TRP	0xF
+#define MSR_APIC_BASE	0x0000001B
 
-#define GDT_CODE_SEL		8
+extern void msr_write(uint64_t msr, uint64_t val);
 
-struct idt_entry_t {
-	uint16_t offset0;
-	uint16_t seg_sel;
-	uint8_t ist;
-	uint8_t flgs;
-	uint16_t offset1;
-	uint32_t offset2;
-	uint32_t resv;
-} __attribute__((packed));
+extern uint64_t msr_read(uint64_t msr);
 
-extern void idt_init(void);
-
-extern void idt_install(
-		uint8_t v,
-		uint64_t offset,
-		uint16_t seg_sel,
-		uint8_t ist,
-		uint8_t type,
-		uint8_t dpl);
-
-extern uint8_t idt_get_vector(void);
-
-#endif /* CORE_IDT_H */
+#endif /* CORE_MSR_H */

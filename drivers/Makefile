@@ -20,6 +20,7 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 OBJ_DIR := $(OBJ_DIR)/drivers
 
 $(call add_directory,pic_8259,PIC_8259)
+$(call add_directory,apic,APIC)
 
 ifdef BUILD_DRIVERS_SERIAL
 $(call add_directory,serial,SERIAL)

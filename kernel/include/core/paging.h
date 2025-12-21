@@ -23,6 +23,7 @@
 
 #define PAGE_PRESENT	0x1
 #define PAGE_RW				0x2
+#define PAT_MMIO_4K		0x98
 
 enum page_size_t {
 	PAGE_4K,

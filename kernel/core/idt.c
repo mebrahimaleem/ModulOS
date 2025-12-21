@@ -35,8 +35,6 @@
 #define IDT_TYP_SHFT		5
 #define IDT_PRESENT			0x80
 
-#define GDT_CODE_SEL		8
-
 struct idt_ptr_t {
 	uint16_t limit;
 	uint64_t base;
@@ -44,6 +42,7 @@ struct idt_ptr_t {
 
 static volatile struct idt_entry_t idt[IDT_MAX_ENTRY] __attribute__((aligned(64)));
 static volatile struct idt_ptr_t idt_ptr;
+static uint8_t next_vector;
 
 void idt_init(void) {
 	memset((void*)&idt[0], 0, sizeof(idt));
@@ -76,6 +75,8 @@ void idt_init(void) {
 	idt_ptr.base = (uint64_t)&idt[0];
 	idt_ptr.limit = sizeof(idt) - 1;
 
+	next_vector = 0x30; // leave 0x20 and 0x28 for legacy PIC IRQs
+
 	cpu_lidt((uint64_t)&idt_ptr);
 }
 
@@ -97,4 +98,8 @@ void idt_install(
 	logging_log_info(
 			"Installed ISR 0x%X64 (vector) 0x%X64 (isr addr) %u64 (ist) %u64 (cs) 0x%X64 (type) %u64 (dpl)",
 			(uint64_t)v, offset, (uint64_t)seg_sel, (uint64_t)ist, (uint64_t)type, (uint64_t)dpl);
+}
+
+uint8_t get_vector(void) {
+	return next_vector++;
 }

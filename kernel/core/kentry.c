@@ -24,6 +24,7 @@
 #include <core/logging.h>
 
 #include <drivers/pic_8259/pic.h>
+#include <drivers/apic/apic_init.h>
 
 struct boot_context_t boot_context;
 
@@ -36,12 +37,18 @@ void kentry(void) {
 	idt_init();
 	logging_log_debug("TSS and IDT init done");
 
-	logging_log_debug("Masking PIC");
+	logging_log_debug("Disabling PIC");
 	pic_disab();
-	logging_log_debug("PIC masked");
+
+	logging_log_debug("Disabling APIC");
+	apic_disab();
+
+	logging_log_debug("All interupts disabled");
 
 	logging_log_debug("Setting interrupt flag");
 	cpu_sti();
+
+	apic_init();
 
 	logging_log_info("Boot Complete ModulOS");
 

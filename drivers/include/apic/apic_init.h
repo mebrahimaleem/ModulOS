@@ -1,4 +1,4 @@
-/* idt.h - interrupt descriptor table interface */
+/* apic_init.h - Advanced programmable interrupt controller initialization interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,36 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_IDT_H
-#define CORE_IDT_H
+#ifndef DRIVERS_APIC_APIC_INIT_H
+#define DRIVERS_APIC_APIC_INIT_H
 
-#include <stdint.h>
+extern void apic_init(void);
 
-#define IDT_GATE_INT	0xE
-#define IDT_GATE_TRP	0xF
+extern void apic_disab(void);
 
-#define GDT_CODE_SEL		8
-
-struct idt_entry_t {
-	uint16_t offset0;
-	uint16_t seg_sel;
-	uint8_t ist;
-	uint8_t flgs;
-	uint16_t offset1;
-	uint32_t offset2;
-	uint32_t resv;
-} __attribute__((packed));
-
-extern void idt_init(void);
-
-extern void idt_install(
-		uint8_t v,
-		uint64_t offset,
-		uint16_t seg_sel,
-		uint8_t ist,
-		uint8_t type,
-		uint8_t dpl);
-
-extern uint8_t idt_get_vector(void);
-
-#endif /* CORE_IDT_H */
+#endif /* DRIVERS_APIC_APIC_INIT_H */
