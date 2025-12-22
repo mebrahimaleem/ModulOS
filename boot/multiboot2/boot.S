@@ -34,8 +34,9 @@
 
 #define STACK_SIZE				0x4000
 
-#define NMI_PORT	0x80
-#define NMI_MASK	0x70
+#define CMOS_RAM_INDEX	0x70
+#define CMOS_RAM_DATA		0x71
+#define NMI_DISABLE			0x80
 
 #define	EFL_CPUIDBIT	0x200000
 
@@ -135,8 +136,11 @@ _start:
 	pushl %ebx
 
 	/* disable NMIs */
-	movb $NMI_PORT, %al
-	outb %al, $NMI_MASK
+	inb $CMOS_RAM_INDEX, %al
+	or $NMI_DISABLE, %al
+	outb %al, $CMOS_RAM_INDEX
+	out %al, $0x80
+	inb $CMOS_RAM_DATA, %al
 
 	/* Check if hardware is supported by OS */
 

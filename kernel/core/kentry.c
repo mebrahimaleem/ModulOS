@@ -22,6 +22,7 @@
 #include <core/idt.h>
 #include <core/cpu_instr.h>
 #include <core/logging.h>
+#include <core/ports.h>
 
 #include <drivers/pic_8259/pic.h>
 #include <drivers/apic/apic_init.h>
@@ -49,6 +50,7 @@ void kentry(void) {
 	cpu_sti();
 
 	apic_init();
+	apic_nmi_enab();
 
 	logging_log_info("Boot Complete ModulOS");
 

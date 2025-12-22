@@ -22,6 +22,8 @@
 
 extern void io_wait(void);
 
-extern void outb(uint8_t port, uint16_t dat);
+extern void outb(uint16_t port, uint8_t dat);
+
+extern uint8_t inb(uint16_t port);
 
 #endif /* CORE_PORTS_H */

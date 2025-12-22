@@ -28,3 +28,10 @@ mov %di, %dx
 mov %sil, %al
 out %al, %dx
 ret
+
+.globl inb
+inb:
+mov %di, %dx
+xorq %rax, %rax
+inb %dx, %al
+ret

@@ -20,6 +20,8 @@
 
 extern void apic_init(void);
 
+extern void apic_nmi_enab(void);
+
 extern void apic_disab(void);
 
 #endif /* DRIVERS_APIC_APIC_INIT_H */
