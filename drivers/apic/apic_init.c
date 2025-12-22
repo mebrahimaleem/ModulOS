@@ -49,10 +49,10 @@
 #define APIC_XLC_SHFT	16
 #define APIC_XLC_MASK	8
 
-#define APIC_LVT_MT_FIXED	0b000
-#define APIC_LVT_MT_SMI		0b010
-#define APIC_LVT_MT_NMI		0b100
-#define APIC_LVT_MT_EXT		0b111
+#define APIC_LVT_MT_FIXED	0x0
+#define APIC_LVT_MT_SMI		0x2
+#define APIC_LVT_MT_NMI		0x4
+#define APIC_LVT_MT_EXT		0x7
 
 #define APIC_LVT_TRG_EDGE	0x00
 #define APIC_LVT_TRG_LEVL	0x80
