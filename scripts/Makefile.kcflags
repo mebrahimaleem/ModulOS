@@ -18,6 +18,10 @@ CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmiss
 	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
 	-Wstrict-prototypes
 
+ifndef DEBUG
+	CWARN := $(CWARN) -Werror
+endif
+
 LD_FLAGS := -std=c23 -mcmodel=kernel -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
 	-fomit-frame-pointer -nodefaultlibs -nostdlib -mcmodel=kernel \
 	-ffreestanding -fno-unwind-tables -fno-exceptions -fno-rtti \

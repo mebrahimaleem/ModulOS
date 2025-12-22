@@ -35,9 +35,9 @@ struct num_printer_t {
 #define _PRINT_UINT(s) \
 	static void _print_uint##s(uint##s##_t num, struct num_printer_t* meta) { \
 		if (!num) return; \
-		const int res = num % meta->base; \
-		_print_uint##s(num / meta->base, meta); \
-		meta->printer(meta->charset[res]); \
+		const int res = (int)(num % (uint64_t)meta->base); \
+		_print_uint##s(num / (uint64_t)meta->base, meta); \
+		meta->printer((uint8_t)meta->charset[res]); \
 	}
 
 #define PRINT_INT(s) \
@@ -47,11 +47,11 @@ struct num_printer_t {
 		meta.charset = charset; \
 		meta.printer = printer; \
 		if (num > 0) { \
-			_print_uint##s(num, &meta); \
+			_print_uint##s((uint##s##_t)num, &meta); \
 		} \
 		else if (num < 0) { \
 			printer('-'); \
-			_print_uint##s(-num, &meta); \
+			_print_uint##s((uint##s##_t)(-num), &meta); \
 		} \
 		else { \
 			printer('0'); \
@@ -98,7 +98,7 @@ PRINT_UINT(32)
 
 static void serial_print(const char* s, void (*printer)(uint8_t)) {
 	for (; *s != 0; s++) {
-		printer(*s);
+		printer((uint8_t)*s);
 	}
 }
 
@@ -137,7 +137,7 @@ static void serial_printf(const char* s, void (*printer)(uint8_t), va_list args)
 				}
 				break;
 			default:
-				printer(*s);
+				printer((uint8_t)*s);
 				break;
 		}
 	}

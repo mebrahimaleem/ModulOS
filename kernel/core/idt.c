@@ -100,6 +100,6 @@ void idt_install(
 			(uint64_t)v, offset, (uint64_t)seg_sel, (uint64_t)ist, (uint64_t)type, (uint64_t)dpl);
 }
 
-uint8_t get_vector(void) {
+uint8_t idt_get_vector(void) {
 	return next_vector++;
 }

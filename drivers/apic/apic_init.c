@@ -35,7 +35,7 @@ struct apic_t {
 	uint64_t v_base;
 };
 
-static struct apic_t* apics;
+static struct apic_t* apics __attribute__((unused));
 
 void apic_init(void) {
 	struct apic_t* bs_apic = kmalloc(sizeof(struct apic_t));
