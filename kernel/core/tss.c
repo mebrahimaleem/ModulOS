@@ -24,7 +24,7 @@
 #include <core/kentry.h>
 #include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/memset.h>
 
 #define RSP_SIZE				0x1000
 #define IST_ABORT_SIZE	0x1000

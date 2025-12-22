@@ -24,7 +24,7 @@
 #include <core/panic.h>
 #include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/memset.h>
 
 #define PAGE_PS 			0x80
 #define PAGE_TBL_FLG	(PAGE_PRESENT | PAGE_RW)

@@ -25,7 +25,7 @@
 #include <core/alloc.h>
 #include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/memset.h>
 
 #define ALLOCATION_UNIT	0x200000
 #define PAGE_SIZE 			0x1000

@@ -32,7 +32,7 @@ extern void logging_init(void);
 extern void logging_register(void (*logger)(enum log_severity_t, const char* format, va_list args));
 
 #if defined(DEBUG) || defined(DEBUG_LOGGING)
-#define logging_log_debug(...) _logging_log_debug(__VA_ARGS__)
+#define logging_log_debug(...) _logging_log_debug(__VA_OPT__(__VA_ARGS__))
 #else
 #define logging_log_debug(...) ((void)0)
 #endif

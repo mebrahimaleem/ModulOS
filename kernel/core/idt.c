@@ -21,7 +21,7 @@
 #include <core/tss.h>
 #include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/memset.h>
 
 #define IDT_MAX_ENTRY	256
 

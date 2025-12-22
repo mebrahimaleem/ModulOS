@@ -1,4 +1,4 @@
-name: Build OS
+name: Run test suite
 on:
   pull_request:
   workflow_dispatch:
@@ -20,9 +20,20 @@ jobs:
         run: |
           make -j$(nproc) build
 
+      - name: Run test suite
+        run: |
+          make -j$(nproc) test-all | tee build/test-log.txt
+
       - name: Archive debugging symbols
         uses: actions/upload-artifact@v4
         with:
           name: dbg-symbols
           path: build/modulos-dbg
+          retention-days: 2
+
+      - name: Archive testsuite log
+        uses: actions/upload-artifact@v4
+        with:
+          name: testsuite-log
+          path: build/test-log.txt
           retention-days: 2

@@ -24,7 +24,7 @@
 #include <core/paging.h>
 #include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/memset.h>
 
 #define ARENA_SIZE	0x200000
 

@@ -42,13 +42,22 @@ export OBJ_DIR = build
 
 export CC := clang
 export AR := llvm-ar
+export STRIP := llvm-strip
 
-SUBDIRS := kernel boot drivers
-SUBDIR_TARGETS := \
-									$(OBJ_DIR)/kernel.a \
+SUBDIRS := kernel boot drivers test
+KERNEL_TARGETS := \
+									$(OBJ_DIR)/kernel.a
+BOOT_TARGETS := \
 									$(OBJ_DIR)/boot.a \
-									$(OBJ_DIR)/esp.img \
+									$(OBJ_DIR)/esp.img
+DRIVERS_TARGETS := \
 									$(OBJ_DIR)/drivers.a
+TEST_TARGETS := \
+									$(OBJ_DIR)/test_lib.a \
+									$(OBJ_DIR)/test_testsuite.a
+
+TEST_CANIDATES := $(patsubst $(OBJ_DIR)/test_%.a,test-%,$(TEST_TARGETS))
+TEST_EXEC := $(basename $(TEST_TARGETS))
 
 COPY_DOC_TO := $(OBJ_DIR)/rootfs/doc/ModulOS/
 COPY_DOC := $(COPY_DOC_TO)COPYING
@@ -61,7 +70,7 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 build: $(OBJ_DIR)/modulos.img
 
 .PHONY: all
-all: index build
+all: index build test-all
 
 .PHONY: index
 index:
@@ -73,6 +82,13 @@ index:
 clean:
 	-rm -rd $(OBJ_DIR)/ tags cscope.*
 
+.PHONY: test-all
+test-all: $(TEST_CANIDATES)
+
+.PHONY: $(TEST_CANIDATES)
+$(TEST_CANIDATES): test-%: $(OBJ_DIR)/test_%
+	./$<
+
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
 	$(MAKE) -C $@ build
@@ -80,7 +96,14 @@ $(SUBDIRS):
 %/:
 	-mkdir -p $@
 
-$(SUBDIR_TARGETS): %: $(SUBDIRS)
+$(KERNEL_TARGETS): kernel
+$(BOOT_TARGETS): boot
+$(DRIVERS_TARGETS): drivers
+
+$(TEST_TARGETS): test
+
+$(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
+	$(CC) -O0 -g -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 
 $(COPY_DOC): $(COPY_DOC_TO)%: % | $(COPY_DOC_TO)
 	cp $< $|
@@ -105,14 +128,16 @@ $(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img $(COPY_DOC)
 	touch $@
 
 $(OBJ_DIR)/modulos.img: $(OBJ_DIR)/stub.img $(OBJ_DIR)/stub-esp.dummy $(OBJ_DIR)/stub-fs.dummy
+	@echo -n "\033[0;32m"
 	ln -f -s -r $< $@
+	@echo -n "\033[0m"
 
-$(OBJ_DIR)/modulos.ld: $(SUBDIRS)
+$(OBJ_DIR)/modulos.ld: $(filter-out test,$(SUBDIRS))
 	cat $$(find $(OBJ_DIR)/lds -type l -name "*.ld" | awk -F/ '{print $$NF, $$0}' | sort \
 		| cut -d' ' -f2-) > $@
 
 $(OBJ_DIR)/modulos: $(OBJ_DIR)/modulos-dbg
-	llvm-strip -s -o $@ $<
+	$(STRIP) -s -o $@ $<
 
 $(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
 	$(CC) -o $@ $(LTO) $(LD_FLAGS) -fuse-ld=lld -T $^
