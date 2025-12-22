@@ -22,7 +22,7 @@ jobs:
 
       - name: Run test suite
         run: |
-          make -j$(nproc) test-all | tee build/test-log.txt
+          make test-all | tee build/test-log.txt
 
       - name: Archive debugging symbols
         uses: actions/upload-artifact@v4
