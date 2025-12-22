@@ -1,4 +1,4 @@
-/* init.h - multiboot2 kernel init interface */
+/* apic_regs.c - APIC registers access */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,28 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef BOOT_MULTIBOOT2_INIT_H
-#define BOOT_MULTIBOOT2_INIT_H
+#include <stdint.h>
 
-#define MBITAG_TYPE_MEMMAP	6
-#ifdef GRAPHICSBASE
-#define MBITAG_TYPE_FRMBUF	8
-#endif /* GRAPHICSBASE */
-#define MBITAG_TYPE_RSDPV2	15
+#include <apic/apic_regs.h>
 
-#ifndef _ASM
+extern uint64_t apic_base;
 
-struct mb2_info_t;
+struct lvt_register_t {
+	uint8_t v;
+	uint8_t flg;
+	uint8_t msk;
+	uint8_t resv;
+} __attribute__((packed));
 
-extern void multiboot2_init(struct mb2_info_t* info);
+void apic_write_reg(enum apic_reg_t reg, uint32_t val) {
+	*(volatile uint32_t*)((uint64_t)reg + apic_base) = val;
+}
 
-#endif /* _ASM */
+uint32_t apic_read_reg(enum apic_reg_t reg) {
+	return *(volatile uint32_t*)((uint64_t)reg + apic_base);
+}
 
-#endif /* BOOT_MULTIBOOT2_INIT_H */
+void apic_write_lve(enum apic_reg_t reg, uint8_t v, uint8_t flg, uint8_t msk) {
+	apic_write_reg(reg, (uint32_t)v + ((uint32_t)flg << 0x8) + ((uint32_t)msk << 0x10));
+}
+

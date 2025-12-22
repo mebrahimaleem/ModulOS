@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_KENTRY_H
-#define CORE_KENTRY_H
+#ifndef KERNEL_CORE_KENTRY_H
+#define KERNEL_CORE_KENTRY_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -40,4 +40,4 @@ extern struct boot_context_t boot_context;
 
 extern void kentry(void) __attribute__((noreturn));
 
-#endif /* CORE_KENTRY_H */
+#endif /* KERNEL_CORE_KENTRY_H */

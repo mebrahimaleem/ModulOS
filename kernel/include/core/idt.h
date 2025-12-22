@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_IDT_H
-#define CORE_IDT_H
+#ifndef KERNEL_CORE_IDT_H
+#define KERNEL_CORE_IDT_H
 
 #include <stdint.h>
 
@@ -47,4 +47,4 @@ extern void idt_install(
 
 extern uint8_t idt_get_vector(void);
 
-#endif /* CORE_IDT_H */
+#endif /* KERNEL_CORE_IDT_H */

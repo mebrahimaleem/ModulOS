@@ -1,4 +1,4 @@
-/* apic_init.h - Advanced programmable interrupt controller initialization */
+/* apic_init.h - Advanced programmable interrupt controller initialization interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -19,30 +19,19 @@
 
 
 #include <apic/apic_init.h>
+#include <apic/apic_regs.h>
+#include <apic/isr.h>
+#include <pic_8259/pic.h>
 
 #include <kernel/core/logging.h>
 #include <kernel/core/msr.h>
-#include <kernel/core/alloc.h>
 #include <kernel/core/paging.h>
 #include <kernel/core/mm.h>
 #include <kernel/core/ports.h>
+#include <kernel/core/idt.h>
+#include <kernel/core/cpu_instr.h>
 
 #define APIC_BASE_MASK	0xFFFFFFFFFF000
-#define APIC_AE					0x800
-
-#define OFF_APIC_ID		0x0020
-#define OFF_APIC_EFR	0x0400
-#define OFF_APIC_SPUR	0x00F0
-
-#define OFF_APIC_TMR_LVT	0x320
-#define OFF_APIC_THR_LVT	0x330
-#define OFF_APIC_PRF_LVT	0x340
-#define OFF_APIC_LI0_LVT	0x350
-#define OFF_APIC_LI1_LVT	0x360
-#define OFF_APIC_ERR_LVT	0x370
-
-#define OFF_APIC_EI_BASE	0x500
-#define APIC_LVT_SIZE			0x10
 
 #define APIC_ID_SHFT	24
 #define APIC_VER_EAS	0x80000000
@@ -59,91 +48,89 @@
 
 #define APIC_LVT_MASK			0x01
 #define APIC_LVT_TMR_PER	0x02
+#define APIC_LVT_TMR_ONE	0x00
 
 // pic master spurious (irq 7, int 0x27) works for apic spurious as well
 #define PIC_SPURIOUS_VEC	0x27
 #define APIC_ASE					0x100
-#define NMI_VECTOR				0x02
 
 #define CMOS_RAM_INDEX	0x70
 #define CMOS_RAM_DATA		0x71
-#define NMI_DISAB_MASK	0x80
+#define NMI_DISAB_MASK	0x7F
 
-struct apic_t {
-	uint64_t v_base;
-};
+#define APIC_TMR_DIV_1	0xB
 
-static struct apic_t* apics __attribute__((unused));
-
-struct lvt_register_t {
-	uint8_t v;
-	uint8_t flg;
-	uint8_t msk;
-	uint8_t resv;
-} __attribute__((packed));
+uint64_t apic_base;
 
 void apic_init(void) {
-	struct apic_t* bs_apic = kmalloc(sizeof(struct apic_t));
-	bs_apic->v_base = mm_alloc_dv(MM_ORDER_4K);
-	paging_map(bs_apic->v_base, msr_read(MSR_APIC_BASE) & APIC_BASE_MASK,
+	pic_disab();
+
+	apic_base = mm_alloc_dv(MM_ORDER_4K);
+	paging_map(apic_base, msr_read(MSR_APIC_BASE) & APIC_BASE_MASK,
 			PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 
-	const uint32_t ver = *(volatile uint32_t*)(bs_apic->v_base + OFF_APIC_ID);
-	logging_log_info("Initializing Local APIC 0x%X64\r\nMasking all APIC interrupts",
-			(uint64_t)(ver >> APIC_ID_SHFT));
+	logging_log_info("Initializing Local APIC 0x%X64",
+			(uint64_t)(apic_read_reg(APIC_REG_IDR) >> APIC_ID_SHFT));
 
 	// mask all interrupts for now
 	
 	// check eas, if set then mask ext lvt based on xlc
-	if ((ver & APIC_VER_EAS) == APIC_VER_EAS) {
-		logging_log_debug("Detected EAS bit");
-		for (uint8_t xlc = 
-				(*(volatile uint32_t*)(bs_apic->v_base + OFF_APIC_EFR) >> APIC_XLC_SHFT) & APIC_XLC_MASK;
-				xlc > 0; xlc--) {
-			*(volatile struct lvt_register_t*)(bs_apic->v_base + OFF_APIC_EI_BASE + APIC_LVT_SIZE * xlc) = 
-			(struct lvt_register_t){
-				.msk = APIC_LVT_MASK,
-				.resv = 0
-			};
+	if ((apic_read_reg(APIC_REG_VER) & APIC_VER_EAS) == APIC_VER_EAS) {
+		const uint8_t xlc = (apic_read_reg(APIC_REG_EFR) >> APIC_XLC_SHFT) & APIC_XLC_MASK;
+		logging_log_debug("Found %u64 extended lvt registers", (uint64_t)xlc);
+		if (xlc >= 1) {
+			apic_write_lve(APIC_REG_EE0, 0, 0, APIC_LVT_MASK);
+		}
+		if (xlc >= 2) {
+			apic_write_lve(APIC_REG_EE1, 0, 0, APIC_LVT_MASK);
+		}
+		if (xlc >= 3) {
+			apic_write_lve(APIC_REG_EE2, 0, 0, APIC_LVT_MASK);
+		}
+		if (xlc >= 4) {
+			apic_write_lve(APIC_REG_EE3, 0, 0, APIC_LVT_MASK);
 		}
 	}
 
-	for (uint64_t addr = bs_apic->v_base + OFF_APIC_TMR_LVT;
-			addr <= bs_apic->v_base + OFF_APIC_ERR_LVT; addr += APIC_LVT_SIZE) {
-		*(volatile struct lvt_register_t*)(addr) = (struct lvt_register_t) {
-			.msk = APIC_XLC_MASK,
-			.resv = 0
-		};
-	}
+	const uint8_t timer_vector = idt_get_vector();
+	const uint8_t error_vector = idt_get_vector();
 
-	// set lints
-	*(volatile struct lvt_register_t*)(bs_apic->v_base + OFF_APIC_LI0_LVT) = (struct lvt_register_t) {
-		.flg = APIC_LVT_MT_EXT,
-		.msk = 0,
-		.resv = 0
-	};
+	// set LVT entries
+	apic_write_lve(APIC_REG_TME, timer_vector,
+			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, APIC_LVT_TMR_ONE); // oneshot for init
 
-	*(volatile struct lvt_register_t*)(bs_apic->v_base + OFF_APIC_LI1_LVT) = (struct lvt_register_t) {
-		.v = NMI_VECTOR,
-		.flg = APIC_LVT_MT_NMI | APIC_LVT_TRG_EDGE,
-		.msk = 0,
-		.resv = 0
-	};
+	apic_write_lve(APIC_REG_THE, 0,
+			0, APIC_LVT_MASK);
+
+	apic_write_lve(APIC_REG_PRE, 0,
+			0, APIC_LVT_MASK);
+
+	apic_write_lve(APIC_REG_L0E, 0,
+			APIC_LVT_MT_EXT | APIC_LVT_TRG_EDGE, 0); // pic masked and litm clear
+
+	apic_write_lve(APIC_REG_L1E, 0,
+			APIC_LVT_MT_NMI | APIC_LVT_TRG_EDGE, 0); // nmi, v is ignored
+
+	apic_write_lve(APIC_REG_ERE, error_vector,
+			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, 0);
+
+	// install idts, init timer first
+	idt_install(timer_vector, (uint64_t)apic_isr_timer_init, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 
 	// enable apic
-	*(volatile uint32_t*)(bs_apic->v_base + OFF_APIC_SPUR) = PIC_SPURIOUS_VEC | APIC_ASE;
-	msr_write(MSR_APIC_BASE, msr_read(MSR_APIC_BASE) | (uint64_t)APIC_AE);
+	apic_write_reg(APIC_REG_ESR, 0);
+	apic_write_reg(APIC_REG_SPR, PIC_SPURIOUS_VEC | APIC_ASE); // pic and apic spurious both only iret, so reuse
 
-	logging_log_info("APIC LVTs masked. NMIs routed to 0x%X64", (uint64_t)NMI_VECTOR);
+	logging_log_debug("Setting interrupt flag");
+	cpu_sti();
+
+	// calibrate APIC timer
+	// TODO
 }
 
 void apic_nmi_enab(void) {
 	outb(CMOS_RAM_INDEX, inb(CMOS_RAM_INDEX) & NMI_DISAB_MASK);
 	io_wait();
 	inb(CMOS_RAM_DATA);
-}
-
-
-void apic_disab(void) {
-	msr_write(MSR_APIC_BASE, msr_read(MSR_APIC_BASE) & ~(uint64_t)APIC_AE);
 }

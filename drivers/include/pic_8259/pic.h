@@ -15,9 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef PIC_8259_PIC_H
-#define PIC_8259_PIC_H
+#ifndef DRIVERS_PIC_8259_PIC_H
+#define DRIVERS_PIC_8259_PIC_H
 
 extern void pic_disab(void);
 
-#endif /* PIC_8259_PIC_H */
+#endif /* DRIVERS_PIC_8259_PIC_H */

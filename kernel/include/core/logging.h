@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_LOGGING_H
-#define CORE_LOGGING_H
+#ifndef KERNEL_CORE_LOGGING_H
+#define KERNEL_CORE_LOGGING_H
 
 #include <stdarg.h>
 
@@ -42,4 +42,4 @@ extern void logging_log_info(const char* format, ...);
 extern void logging_log_warning(const char* format, ...);
 extern void logging_log_error(const char* format, ...);
 
-#endif /* CORE_LOGGING_H */
+#endif /* KERNEL_CORE_LOGGING_H */

@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PORTS_H
-#define CORE_PORTS_H
+#ifndef KERNEL_CORE_PORTS_H
+#define KERNEL_CORE_PORTS_H
 
 #include <stdint.h>
 
@@ -26,4 +26,4 @@ extern void outb(uint16_t port, uint8_t dat);
 
 extern uint8_t inb(uint16_t port);
 
-#endif /* CORE_PORTS_H */
+#endif /* KERNEL_CORE_PORTS_H */

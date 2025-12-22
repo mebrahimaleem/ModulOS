@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ACPITABLES_H
-#define CORE_ACPITABLES_H
+#ifndef KERNEL_CORE_ACPITABLES_H
+#define KERNEL_CORE_ACPITABLES_H
 
 #include <stdint.h>
 
@@ -32,4 +32,4 @@ struct RSDP_t {
 	uint8_t		Reserved[3];
 } __attribute__((packed));
 
-#endif /* ACPITABLES_H */
+#endif /* KERNEL_CORE_ACPITABLES_H */

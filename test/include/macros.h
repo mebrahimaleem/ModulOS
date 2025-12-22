@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef HELPERS_MACROS_H
-#define HELPERS_MACROS_H
+#ifndef TEST_HELPERS_MACROS_H
+#define TEST_HELPERS_MACROS_H
 
 #include <stdarg.h>
 #include <stdlib.h>
@@ -106,4 +106,4 @@ extern void _test_report(const char* report);
 		} \
 	} while (0);
 
-#endif /* HELPERS_MACROS_H */
+#endif /* TEST_HELPERS_MACROS_H */

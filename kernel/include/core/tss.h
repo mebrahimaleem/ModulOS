@@ -15,11 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_TSS_H
-#define CORE_TSS_H
+#ifndef KERNEL_CORE_TSS_H
+#define KERNEL_CORE_TSS_H
 
 #define IST_ABORT	1
 
 extern void tss_init(void);
 
-#endif /* CORE_TSS_H */
+#endif /* KERNEL_CORE_TSS_H */

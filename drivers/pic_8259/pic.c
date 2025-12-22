@@ -39,22 +39,26 @@
 #define PIC_SPURIOUS	0x7
 
 void pic_disab(void) {
-	outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4); // cascade sequence init
+	// icw1
+	outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4); // init, litm not set (edge), not single (cascade) icw4
 	io_wait();
 	outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4);
 	io_wait();
 
-	outb(PIC1_DATA, PIC1_IRQ_BASE);
+	// icw2
+	outb(PIC1_DATA, PIC1_IRQ_BASE); // idt vectors
 	io_wait();
 	outb(PIC2_DATA, PIC2_IRQ_BASE);
 	io_wait();
 
-	outb(PIC1_DATA, CASCADE_BIT);
+	// icw3, since cascade
+	outb(PIC1_DATA, CASCADE_BIT); // pic1 master, cascade bit 3 (IRQ 2)
 	io_wait();
-	outb(PIC2_DATA, PIC2_ID);
+	outb(PIC2_DATA, PIC2_ID); // pic2 slave, id 2
 	io_wait();
 
-	outb(PIC1_DATA, ICW4_8086);
+	// icw4 since icw4 set
+	outb(PIC1_DATA, ICW4_8086); // 8086 mode
 	io_wait();
 	outb(PIC2_DATA, ICW4_8086);
 	io_wait();

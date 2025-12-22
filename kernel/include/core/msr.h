@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_MSR_H
-#define CORE_MSR_H
+#ifndef KERNEL_CORE_MSR_H
+#define KERNEL_CORE_MSR_H
 
 #include <stdint.h>
 
@@ -26,4 +26,4 @@ extern void msr_write(uint64_t msr, uint64_t val);
 
 extern uint64_t msr_read(uint64_t msr);
 
-#endif /* CORE_MSR_H */
+#endif /* KERNEL_CORE_MSR_H */

@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PAGING_H
-#define CORE_PAGING_H
+#ifndef KERNEL_CORE_PAGING_H
+#define KERNEL_CORE_PAGING_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -37,4 +37,4 @@ extern void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_si
 
 extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
 
-#endif /* CORE_PAGING_H */
+#endif /* KERNEL_CORE_PAGING_H */

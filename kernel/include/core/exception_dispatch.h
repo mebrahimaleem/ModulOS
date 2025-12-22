@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_EXCEPTION_DISPATCH_H
-#define CORE_EXCEPTION_DISPATCH_H
+#ifndef KERNEL_CORE_EXCEPTION_DISPATCH_H
+#define KERNEL_CORE_EXCEPTION_DISPATCH_H
 
 #include <stdint.h>
 
@@ -48,4 +48,4 @@ struct exception_context_t {
 
 extern void exception_dispatch(struct exception_context_t* context) __attribute__((noreturn));
 
-#endif /* CORE_EXCEPTION_DISPATCH_H */
+#endif /* KERNEL_CORE_EXCEPTION_DISPATCH_H */

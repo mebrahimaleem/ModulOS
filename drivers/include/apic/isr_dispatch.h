@@ -1,4 +1,4 @@
-/* init.h - multiboot2 kernel init interface */
+/* isr_dispatch.h - APIC ISR dispatcher interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef BOOT_MULTIBOOT2_INIT_H
-#define BOOT_MULTIBOOT2_INIT_H
+#ifndef DRIVERS_APIC_ISR_DISPATCH_H
+#define DRIVERS_APIC_ISR_DISPATCH_H
 
-#define MBITAG_TYPE_MEMMAP	6
-#ifdef GRAPHICSBASE
-#define MBITAG_TYPE_FRMBUF	8
-#endif /* GRAPHICSBASE */
-#define MBITAG_TYPE_RSDPV2	15
+extern void apic_error_dispatch(void);
 
-#ifndef _ASM
-
-struct mb2_info_t;
-
-extern void multiboot2_init(struct mb2_info_t* info);
-
-#endif /* _ASM */
-
-#endif /* BOOT_MULTIBOOT2_INIT_H */
+#endif /* DIRVERS_APIC_ISR_DISPATCH_H */

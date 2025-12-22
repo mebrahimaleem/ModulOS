@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_CPU_INSTR_H
-#define CORE_CPU_INSTR_H
+#ifndef KERNEL_CORE_CPU_INSTR_H
+#define KERNEL_CORE_CPU_INSTR_H
 
 #include <stdint.h>
 
@@ -30,4 +30,4 @@ extern void cpu_sti(void);
 
 extern void cpu_halt_loop(void) __attribute__((noreturn));
 
-#endif /* CORE_CPU_INSTR_H */
+#endif /* KERNEL_CORE_CPU_INSTR_H */

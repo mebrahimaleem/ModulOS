@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ALLOC_H
-#define CORE_ALLOC_H
+#ifndef KERNEL_CORE_ALLOC_H
+#define KERNEL_CORE_ALLOC_H
 
 #include <stddef.h>
 
@@ -26,4 +26,4 @@ extern void* kmalloc(size_t size);
 
 extern void* early_kmalloc(size_t size);
 
-#endif /* CORE_ALLOC_H */
+#endif /* KERNEL_CORE_ALLOC_H */

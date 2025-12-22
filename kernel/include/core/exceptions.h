@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_EXCEPTIONS_H
-#define CORE_EXCEPTIONS_H
+#ifndef KERNEL_CORE_EXCEPTIONS_H
+#define KERNEL_CORE_EXCEPTIONS_H
 
 extern void isr_00(void) __attribute__((noreturn));
 extern void isr_01(void) __attribute__((noreturn));
@@ -43,4 +43,4 @@ extern void isr_1c(void) __attribute__((noreturn));
 extern void isr_1d(void) __attribute__((noreturn));
 extern void isr_1e(void) __attribute__((noreturn));
 
-#endif /* CORE_EXCEPTIONS_H */
+#endif /* KERNEL_CORE_EXCEPTIONS_H */

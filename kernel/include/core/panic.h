@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_PANIC_H
-#define CORE_PANIC_H
+#ifndef KERNEL_CORE_PANIC_H
+#define KERNEL_CORE_PANIC_H
 
 enum panic_code_t {
 	PANIC_UNK, // unkown panic
@@ -28,4 +28,4 @@ enum panic_code_t {
 
 extern void panic(enum panic_code_t code) __attribute__((noreturn));
 
-#endif /* CORE_PANIC_H */
+#endif /* KERNEL_CORE_PANIC_H */

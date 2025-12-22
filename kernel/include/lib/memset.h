@@ -15,12 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef LIB_MEMSET_H
-#define LIB_MEMSET_H
+#ifndef KERNEL_LIB_MEMSET_H
+#define KERNEL_LIB_MEMSET_H
 
 #include <stdint.h>
 #include <stddef.h>
 
 extern void* memset(void* ptr, uint64_t v, size_t c);
 
-#endif /* LIB_MEMSET_H */
+#endif /* KERNEL_LIB_MEMSET_H */

@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_GDT_H
-#define CORE_GDT_H
+#ifndef KERNEL_CORE_GDT_H
+#define KERNEL_CORE_GDT_H
 
 #include <stdint.h>
 
@@ -63,4 +63,4 @@ struct gdt_sys_t {
 	uint32_t resv;
 } __attribute__((packed));
 
-#endif /* CORE_GDT_H */
+#endif /* KERNEL_CORE_GDT_H */
