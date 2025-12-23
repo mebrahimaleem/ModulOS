@@ -33,6 +33,11 @@
 #define RSDPV1	1
 #define RSDPV2	2
 
+#define MADT_CONTROLLER_IO_APIC	1
+
+#define FOUND_FADT	0x01
+#define FOUND_MADT	0x02
+
 struct acpi_gen_header_t {
 	uint8_t Signature[4];
 	uint32_t Length;
@@ -44,7 +49,7 @@ struct acpi_xsdt_t {
 	uint8_t Revision;
 	uint8_t Checksum;
 	uint8_t OEMID[6];
-	uint8_t OEMTableId[8];
+	uint8_t OEMTableID[8];
 	uint32_t OEMRevision;
 	uint32_t CreatorID;
 	uint32_t CreatorRevision;
@@ -57,12 +62,56 @@ struct acpi_rsdt_t {
 	uint8_t Revision;
 	uint8_t Checksum;
 	uint8_t OEMID[6];
-	uint8_t OEMTableId[8];
+	uint8_t OEMTableID[8];
 	uint32_t OEMRevision;
 	uint32_t CreatorID;
 	uint32_t CreatorRevision;
 	uint32_t Entry[];
 } __attribute__((packed));
+
+struct acpi_fadt_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t FADTMajorVersion;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint8_t _[];
+} __attribute__((packed));
+
+struct acpi_madt_ics_gen_t {
+	uint8_t type;
+	uint8_t len;
+	uint8_t _[];
+} __attribute__((packed));
+
+struct acpi_madt_ics_io_apic_t {
+	uint8_t type;
+	uint8_t len;
+	uint8_t IOAPICID;
+	uint8_t Reserved;
+	uint32_t IOAPICAddress;
+	uint32_t GlobalSystemInterruptBase;
+} __attribute__((packed));
+
+struct acpi_madt_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t OEMCreatorID;
+	uint32_t OEMCreatorRevision;
+	uint32_t LocalInterruptControllerAddress;
+	uint32_t Flags;
+	uint8_t InterruptControllerStructure[];
+} __attribute__((packed));
+
+static struct {
+	struct acpi_io_apic_list_t* io_apics;
+} acpi_index;
 
 static void map_header(const volatile void* table) {
 	// ACPI memory will never collide, so identity map everything
@@ -96,8 +145,39 @@ static inline uint8_t verify_checksum(const volatile void* table) {
 	return hash_byte_sum((void*)gen, gen->Length);
 }
 
+static void index_io_apics(const volatile struct acpi_madt_t* madt) {
+	const volatile struct acpi_madt_ics_io_apic_t* io_apic;
+	struct acpi_io_apic_list_t* t;
+
+	for (const volatile struct acpi_madt_ics_gen_t* gen = 
+				(const volatile struct acpi_madt_ics_gen_t*)&madt->InterruptControllerStructure[0];
+			(uint64_t)gen < (uint64_t)madt + madt->Length;
+			gen = (const volatile struct acpi_madt_ics_gen_t*)((uint64_t)gen + (uint64_t)gen->len)) {
+		switch (gen->type) {
+			case MADT_CONTROLLER_IO_APIC:
+				io_apic = (const volatile struct acpi_madt_ics_io_apic_t*)gen;
+				t = acpi_index.io_apics;
+				acpi_index.io_apics = kmalloc(sizeof(struct acpi_io_apic_list_t));
+				*acpi_index.io_apics = (struct acpi_io_apic_list_t) {
+					.base = io_apic->IOAPICAddress,
+					.gsi_base = io_apic->GlobalSystemInterruptBase,
+					.id = io_apic->IOAPICID,
+					.next = t
+				};
+				logging_log_info("Found IO APIC 0x%X64 @ 0x%X64 : 0x%X64 (gsi)",
+						(uint64_t)io_apic->IOAPICID,
+						(uint64_t)io_apic->IOAPICAddress,
+						(uint64_t)io_apic->GlobalSystemInterruptBase);
+				break;
+			default:
+				break;
+		}
+	}
+}
+
 void acpi_index_tables(void) {
 	const volatile struct acpi_gen_header_t* gen;
+	uint8_t found;
 
 	if (memcmp(boot_context.rsdp.Signature, "RSD PTR ", 8)) {
 		logging_log_error("Bad ACPI RSD PTR signature");
@@ -112,6 +192,7 @@ void acpi_index_tables(void) {
 	switch (boot_context.rsdp.Revision) {
 		case RSDPV1:
 fallback:
+			found = 0;
 			const struct acpi_rsdt_t* rsdt = (const struct acpi_rsdt_t*)(uint64_t)boot_context.rsdp.RsdtAddress;
 			map_header(rsdt);
 			if (memcmp(rsdt->Signature, "RSDT", 4)) {
@@ -132,14 +213,43 @@ fallback:
 				gen = (const volatile struct acpi_gen_header_t*)(uint64_t)*entry;
 				map_header(gen);
 
+				//FADT
 				if (!memcmp((uint8_t*)gen->Signature, "FACP", 4)) {
 					if (verify_checksum(gen)) {
 						logging_log_error("Bad ACPI FACP checksum");
 						panic(PANIC_ACPI);
 					}
 
-					logging_log_info("Found ACPI FACP @ 0x%X64", (uint64_t)entry);
+					const volatile struct acpi_fadt_t* fadt = (const volatile struct acpi_fadt_t*)gen;
+					if (memcmp((uint8_t*)rsdt->OEMTableID, (uint8_t*)fadt->OEMTableID, 8)) {
+						logging_log_error("Bad ACPI FACP OEM Table ID");
+						panic(PANIC_ACPI);
+					}
+
+					logging_log_info("Found ACPI FACP @ 0x%X64", (uint64_t)fadt);
+
+					found |= FOUND_FADT;
 				}
+
+				//MADT
+				if (!memcmp((uint8_t*)gen->Signature, "APIC", 4)) {
+					if (verify_checksum(gen)) {
+						logging_log_warning("Bad ACPI MADT checksum");
+						panic(PANIC_ACPI);
+					}
+
+					const volatile struct acpi_madt_t* madt = (const volatile struct acpi_madt_t*)gen;
+
+					logging_log_info("Found ACPI MADT @ 0x%X64", (uint64_t)madt);
+
+					index_io_apics(madt);
+					found |= FOUND_MADT;
+				}
+			}
+
+			if (found != (FOUND_FADT | FOUND_MADT)) {
+				logging_log_error("Could not find all ACPI tables");
+				panic(PANIC_ACPI);
 			}
 			break;
 		default:
@@ -152,6 +262,7 @@ fallback:
 				goto fallback;
 			}
 
+			found = 0;
 			const struct acpi_xsdt_t* xsdt = (const struct acpi_xsdt_t*)boot_context.rsdp.XsdtAddress;
 			map_header(xsdt);
 			if (memcmp(xsdt->Signature, "XSDT", 4)) {
@@ -172,18 +283,48 @@ fallback:
 				gen = (const volatile struct acpi_gen_header_t*)*entry;
 				map_header(gen);
 
+				//FADT
 				if (!memcmp((uint8_t*)gen->Signature, "FACP", 4)) {
 					if (verify_checksum(gen)) {
 						logging_log_warning("Bad ACPI FACP checksum. Falling back to RSDPV1");
 						goto fallback;
 					}
 
-					logging_log_info("Found ACPI FACP @ 0x%X64", entry);
+					const volatile struct acpi_fadt_t* fadt = (const volatile struct acpi_fadt_t*)gen;
+					if (memcmp((uint8_t*)xsdt->OEMTableID, (uint8_t*)fadt->OEMTableID, 8)) {
+						logging_log_warning("Bad ACPI FACP OEM Table ID. Falling back to RSDPV1");
+						goto fallback;
+					}
+
+					logging_log_info("Found ACPI FACP @ 0x%X64", (uint64_t)fadt);
+
+					found |= FOUND_FADT;
+				}
+
+				//MADT
+				if (!memcmp((uint8_t*)gen->Signature, "APIC", 4)) {
+					if (verify_checksum(gen)) {
+						logging_log_warning("Bad ACPI MADT checksum. Falling back to RSDPV1");
+						goto fallback;
+					}
+
+					const volatile struct acpi_madt_t* madt = (const volatile struct acpi_madt_t*)gen;
+
+					logging_log_info("Found ACPI MADT @ 0x%X64", (uint64_t)madt);
+
+					index_io_apics(madt);
+					found |= FOUND_MADT;
 				}
 			}
 
+			if (found != (FOUND_FADT | FOUND_MADT)) {
+				logging_log_warning("Could not find all ACPI tables. Falling back to RSDPV1");
+				goto fallback;
+			}
 			break;
 	}
+}
 
-	// TODO: free used mem
+struct acpi_io_apic_list_t* acpi_get_io_apics(void) {
+	return acpi_index.io_apics;
 }

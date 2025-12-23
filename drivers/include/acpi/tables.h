@@ -32,6 +32,15 @@ struct acpi_rsdp_t {
 	uint8_t		Reserved[3];
 } __attribute__((packed));
 
+struct acpi_io_apic_list_t {
+	uint8_t id;
+	uint32_t base;
+	uint32_t gsi_base;
+	struct acpi_io_apic_list_t* next;
+};
+
 extern void acpi_index_tables(void);
+
+extern struct acpi_io_apic_list_t* acpi_get_io_apics(void);
 
 #endif /* DRIVERS_ACPI_TABLES_H */
