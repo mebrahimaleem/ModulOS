@@ -106,7 +106,7 @@ void apic_init(void) {
 			0, APIC_LVT_MASK);
 
 	apic_write_lve(APIC_REG_L0E, 0,
-			APIC_LVT_MT_EXT | APIC_LVT_TRG_EDGE, 0); // pic masked and litm clear
+			APIC_LVT_MT_EXT | APIC_LVT_TRG_EDGE, APIC_LVT_MASK); // pic masked and litm clear
 
 	apic_write_lve(APIC_REG_L1E, 0,
 			APIC_LVT_MT_NMI | APIC_LVT_TRG_EDGE, 0); // nmi, v is ignored
