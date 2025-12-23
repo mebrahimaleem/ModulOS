@@ -39,8 +39,15 @@ struct acpi_io_apic_list_t {
 	struct acpi_io_apic_list_t* next;
 };
 
+struct acpi_hpet_base_t {
+	uint32_t base;
+	uint16_t min_clock_tick;
+};
+
 extern void acpi_index_tables(void);
 
 extern struct acpi_io_apic_list_t* acpi_get_io_apics(void);
+
+extern struct acpi_hpet_base_t acpi_get_hpet_base(void);
 
 #endif /* DRIVERS_ACPI_TABLES_H */
