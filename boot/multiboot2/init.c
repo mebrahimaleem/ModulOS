@@ -20,10 +20,11 @@
 #include <multiboot2/init.h>
 
 #include <kernel/core/kentry.h>
-#include <kernel/core/acpitables.h>
 #include <kernel/core/mm_init.h>
 #include <kernel/core/gdt.h>
 #include <kernel/core/logging.h>
+
+#include <drivers/acpi/tables.h>
 
 #ifdef SERIAL
 #include <drivers/serial/serial.h>
@@ -63,7 +64,7 @@ struct mb2_tag_t {
 		} __attribute__((packed)) memmap;
 
 		struct {
-			struct RSDP_t rsdp;
+			struct acpi_rsdp_t rsdp;
 		} __attribute__((packed)) rsdpv2;
 
 #ifdef GRAPHICSBASE

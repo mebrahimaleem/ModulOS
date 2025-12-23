@@ -23,6 +23,7 @@ enum panic_code_t {
 	PANIC_PAGING, // paging related panic
 	PANIC_NO_MEM, // out of memory panic
 	PANIC_STATE, // bad kernel state panic
+	PANIC_ACPI, // bad ACPI data
 	PANIC_MAX
 };
 

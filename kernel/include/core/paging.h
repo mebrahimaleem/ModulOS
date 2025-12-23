@@ -25,6 +25,10 @@
 #define PAGE_RW				0x2
 #define PAT_MMIO_4K		0x98
 
+#define PAGE_BASE_MASK	0xFFFFFFFFFFFFF000	
+
+#define PAGE_SIZE_4K		0x1000
+
 enum page_size_t {
 	PAGE_4K,
 	PAGE_2M,

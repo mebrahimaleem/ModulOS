@@ -1,4 +1,4 @@
-/* acpiTables.h - ACPI tables interface */
+/* memset.S - library memcmp routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_ACPITABLES_H
-#define KERNEL_CORE_ACPITABLES_H
+.section .text
 
-#include <stdint.h>
-
-struct RSDP_t {
-	uint8_t		Signature[8];
-	uint8_t		Checksum;
-	uint8_t		OEMID[6];
-	uint8_t		Revision;
-	uint32_t	RsdtAddress;
-	uint32_t  Length;
-	uint64_t	XsdtAddress;
-	uint8_t		ExtendedChecksum;
-	uint8_t		Reserved[3];
-} __attribute__((packed));
-
-#endif /* KERNEL_CORE_ACPITABLES_H */
+.globl memcmp
+memcmp:
+xorq %rax, %rax
+movq %rdx, %rcx
+test %rdx, %rdx // clear zf
+repe cmpsb
+jz .ret
+movb -1(%rdi), %al
+movzbq -1(%rsi), %rcx
+subq %rcx, %rax
+.ret:
+ret

@@ -1,4 +1,4 @@
-/* panic.h - kernel panic method */
+/* tables.h - ACPI tables interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,25 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef DRIVERS_ACPI_TABLES_H
+#define DRIVERS_ACPI_TABLES_H
+
 #include <stdint.h>
 
-#include <core/panic.h>
-#include <core/cpu_instr.h>
-#include <core/logging.h>
+struct acpi_rsdp_t {
+	uint8_t		Signature[8];
+	uint8_t		Checksum;
+	uint8_t		OEMID[6];
+	uint8_t		Revision;
+	uint32_t	RsdtAddress;
+	uint32_t  Length;
+	uint64_t	XsdtAddress;
+	uint8_t		ExtendedChecksum;
+	uint8_t		Reserved[3];
+} __attribute__((packed));
 
+extern void acpi_index_tables(void);
 
-static const char* panic_names[] = {
-	[PANIC_UNK] = "Unkown",
-	[PANIC_PAGING] = "Paging error",
-	[PANIC_NO_MEM] = "Out of memory",
-	[PANIC_STATE] = "Unrecoverable kernel state",
-	[PANIC_ACPI] = "Bad ACPI hardware",
-	[PANIC_MAX] = 0
-};
-
-void panic(enum panic_code_t code) {
-	logging_log_error("Panic 0x%X64 %s\r\nHalt", (uint64_t)code, 
-			panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK]);
-
-	cpu_halt_loop();
-}
+#endif /* DRIVERS_ACPI_TABLES_H */

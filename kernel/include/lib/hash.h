@@ -1,4 +1,4 @@
-/* panic.h - kernel panic method */
+/* hash.h - hashing interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,25 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_LIB_HASH_H
+#define KERNEL_LIB_HASH_H
+
 #include <stdint.h>
+#include <stddef.h>
 
-#include <core/panic.h>
-#include <core/cpu_instr.h>
-#include <core/logging.h>
+extern uint8_t hash_byte_sum(const void* ptr, size_t c);
 
-
-static const char* panic_names[] = {
-	[PANIC_UNK] = "Unkown",
-	[PANIC_PAGING] = "Paging error",
-	[PANIC_NO_MEM] = "Out of memory",
-	[PANIC_STATE] = "Unrecoverable kernel state",
-	[PANIC_ACPI] = "Bad ACPI hardware",
-	[PANIC_MAX] = 0
-};
-
-void panic(enum panic_code_t code) {
-	logging_log_error("Panic 0x%X64 %s\r\nHalt", (uint64_t)code, 
-			panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK]);
-
-	cpu_halt_loop();
-}
+#endif /* KERNEL_LIB_HASH_H */

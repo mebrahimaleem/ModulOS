@@ -21,15 +21,16 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <kernel/core/acpitables.h>
 #include <kernel/core/gdt.h>
+
+#include <drivers/acpi/tables.h>
 
 #ifdef GRAPHICSBASE
 #include <kernel/graphicsbase/framebuffer.h>
 #endif /* GRAPHICSBASE */
 
 struct boot_context_t {
-	struct RSDP_t rsdp;
+	struct acpi_rsdp_t rsdp;
 	volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
 #ifdef GRAPHICSBASE
 	struct framebuffer_t framebuffer;

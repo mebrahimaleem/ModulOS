@@ -22,9 +22,13 @@
 #include <macros.h>
 
 #define memset k_memset
+#define memcmp k_memcmp
 #include <kernel/lib/memset.h>
+#include <kernel/lib/memcmp.h>
+#include <kernel/lib/hash.h>
 
 void* k_memset(void* ptr, uint64_t v, size_t len) __asm__("memset");
+int64_t k_memcmp(const void* l, const void* r, size_t c) __asm__("memcmp");
 
 #define MEM_TEST_SIZE	256
 
@@ -37,4 +41,23 @@ TEST("memset") {
 		ASSERT_TRUE(actual == k_memset(actual, i, MEM_TEST_SIZE), "kernel memset return value changed");
 
 	}
+
+	free(actual);
+}
+
+TEST("memcmp") {
+	ASSERT_TRUE(k_memcmp("", "", 0) == 0, "kernel memcmp fails zero size");
+	ASSERT_TRUE(k_memcmp("", "", 1) == 0, "kernel memcmp fails empty string");
+	ASSERT_TRUE(k_memcmp(" a", " b", 3) < 0, "kernel memcmp flips sign");
+	ASSERT_TRUE(k_memcmp(" 4", " 2", 3) > 0, "kernel memcmp flips sign");
+	ASSERT_TRUE(k_memcmp(" a", " b", 1) == 0, "kernel memcmp reads too many bytes");
+	ASSERT_TRUE(k_memcmp("\0sneaky", "\0hidden", 8) > 0, "kernel memcmp stops on null");
+	ASSERT_TRUE(k_memcmp("1234567", "12345", 5) == 0, "kernel memcmp reads too many bytes");
+	ASSERT_TRUE(k_memcmp((void*)0xdeadbeef, (void*)0xdeadbeef, 0) == 0, "kernel memcmp fails invalid ptr");
+}
+
+TEST("hash_byte_sum") {
+	ASSERT_TRUE(hash_byte_sum((uint8_t*)0xdeadbeef, 0) == 0, "fails invalid ptr");
+	ASSERT_TRUE(hash_byte_sum((uint8_t*)"\0\1\2\3\0\0\1\2", 8) == 9, "fails basic sum");
+	ASSERT_TRUE(hash_byte_sum((uint8_t*)"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF", 8) == 248, "fails overflow");
 }

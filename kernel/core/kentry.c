@@ -24,6 +24,7 @@
 #include <core/logging.h>
 
 #include <drivers/apic/apic_init.h>
+#include <drivers/acpi/tables.h>
 
 struct boot_context_t boot_context;
 
@@ -35,6 +36,10 @@ void kentry(void) {
 	tss_init();
 	idt_init();
 	logging_log_debug("TSS and IDT init done");
+
+	logging_log_debug("ACPI init");
+	acpi_index_tables();
+	logging_log_debug("ACPI init done");
 
 	logging_log_debug("APIC init");
 	apic_init();
