@@ -23,6 +23,7 @@
 #define MADT_ICS_PROCESSOR_LOCAL_APIC				0
 #define MADT_ICS_IO_APIC										1
 #define MADT_ICS_INTERRUPT_SOURCE_OVERRIDE	2
+#define MADT_ICS_NMI_SOURCE									3
 #define MADT_ICS_LOCAL_APIC_NMI							4
 
 #define MADT_ICS_MPS_POLARITY_MASK					0x3
@@ -83,6 +84,13 @@ struct acpi_madt_ics_interrupt_source_override_t {
 	uint8_t Source;
 	uint32_t GlobalSystemInterrupt;
 	struct acpi_madt_ics_mps_t Flags;
+} __attribute__((packed));
+
+struct acpi_madt_ics_nmi_source_t {
+	uint8_t Type;
+	uint8_t Length;
+	struct acpi_madt_ics_mps_t Flags;
+	uint32_t GlobalSystemInterrupt;
 } __attribute__((packed));
 
 struct acpi_madt_ics_local_apic_nmi_t {

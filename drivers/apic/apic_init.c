@@ -64,6 +64,7 @@
 #define LINT1_SET	0x2
 
 uint64_t apic_base;
+uint8_t bsp_apic_id;
 
 void apic_init(void) {
 	apic_base = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
@@ -71,6 +72,7 @@ void apic_init(void) {
 			PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 
 	const uint8_t apic_id = (uint8_t)(apic_read_reg(APIC_REG_IDR) >> APIC_ID_SHFT);
+	bsp_apic_id = apic_id;
 	logging_log_info("Initializing Local APIC 0x%X64", (uint64_t)apic_id);
 
 	// get ACPI uid

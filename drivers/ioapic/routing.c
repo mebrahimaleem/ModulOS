@@ -82,7 +82,7 @@ void ioapic_routing_init(uint64_t num_gsi) {
 				(uint64_t)(override->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_POLARITY_MASK),
 				(uint64_t)(override->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_TRIGGER_MASK) >> 2);
 
-		// almost guaranteed ISA, so we can assume conform is EDG and HI
+		// guaranteed ISA, so we can assume conform is EDG and HI
 		const uint32_t flg =
 			(((override->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_TRIGGER_MASK)
 				== MADT_ICS_MPS_TRIGGER_LEVL) ? IOAPIC_REDIR_TRG_LVL : IOAPIC_REDIR_TRG_EDG) |
