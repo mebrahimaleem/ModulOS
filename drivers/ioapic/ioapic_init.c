@@ -39,16 +39,12 @@
 
 #define REDIR_DST_SHF				24
 
-#define REDIR_NMI	0x500
-
 struct redirection_entry_ptr_t {
 	uint64_t ioapic_base;
 	uint64_t gsi_base;
 };
 
 static struct redirection_entry_ptr_t* redir_index;
-
-extern uint8_t bsp_apic_id;
 
 void ioapic_init(void) {
 	uint64_t gsi_max = 0;
@@ -106,20 +102,6 @@ void ioapic_init(void) {
 	// mask everything until needed
 	for (uint64_t i = 0; i < gsi_max; i++) {
 		ioapic_conf_gsi(i, 0, IOAPIC_REDIR_MASK, 0);
-	}
-
-	// set nmis
-	struct acpi_madt_ics_nmi_source_t* nmi_source;
-	acpi_parse_madt_ics_start(&handle);
-	for (acpi_parse_madt_ics((void*)&nmi_source, &handle, MADT_ICS_NMI_SOURCE);
-			handle != 0;
-			acpi_parse_madt_ics((void*)&ioapic, &handle, MADT_ICS_NMI_SOURCE)) {
-		logging_log_info("Found IO APIC NMI source on GSI 0x%X64", (uint64_t)nmi_source->GlobalSystemInterrupt);
-		// guaranteed ISA, so we can assume conform is EDG and HI
-		const uint32_t flg = IOAPIC_REDIR_TRG_EDG | REDIR_NMI |
-			(((nmi_source->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_POLARITY_MASK)
-				== MADT_ICS_MPS_POLARITY_LO) ? IOAPIC_REDIR_POL_LO : IOAPIC_REDIR_POL_HI);
-		ioapic_conf_gsi(nmi_source->GlobalSystemInterrupt, 0, flg, bsp_apic_id);
 	}
 
 	// initialize interrupt routing (also sets up ISA IRQs)

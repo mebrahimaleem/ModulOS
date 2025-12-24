@@ -26,6 +26,8 @@
 #define IOAPIC_REDIR_POL_LO		0x02000
 #define IOAPIC_REDIR_MASK			0x10000
 
+#define IOAPIC_REDIR_NMI	0x500
+
 extern void ioapic_init(void);
 
 extern void ioapic_conf_gsi(uint64_t gsi, uint8_t v, uint32_t flg, uint8_t dest);

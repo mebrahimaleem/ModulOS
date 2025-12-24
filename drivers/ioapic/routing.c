@@ -28,11 +28,14 @@
 
 #define NUM_LEGACY	16
 
+extern uint8_t bsp_apic_id;
+
 struct gsi_route_t {
 	const char* purpose;
 	enum {
 		GSI_TYPE_UNUSED,
-		GSI_TYPE_LEGACY
+		GSI_TYPE_LEGACY,
+		GSI_TYPE_NMI
 	} type;
 	union {
 		uint64_t isa_src;
@@ -107,6 +110,21 @@ void ioapic_routing_init(uint64_t num_gsi) {
 		if (gsi_is_identity_isa(i)) {
 			ioapic_conf_gsi(i, 0, IOAPIC_REDIR_TRG_EDG | IOAPIC_REDIR_POL_HI | IOAPIC_REDIR_MASK, 0);
 		}
+	}
+
+	// set nmis
+	struct acpi_madt_ics_nmi_source_t* nmi_source;
+	acpi_parse_madt_ics_start(&handle);
+	for (acpi_parse_madt_ics((void*)&nmi_source, &handle, MADT_ICS_NMI_SOURCE);
+			handle != 0;
+			acpi_parse_madt_ics((void*)&nmi_source, &handle, MADT_ICS_NMI_SOURCE)) {
+		logging_log_info("Found IO APIC NMI source on GSI 0x%X64", (uint64_t)nmi_source->GlobalSystemInterrupt);
+		const uint32_t flg = IOAPIC_REDIR_TRG_EDG | IOAPIC_REDIR_NMI | //NMI is always edge
+			(((nmi_source->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_POLARITY_MASK)
+				== MADT_ICS_MPS_POLARITY_LO) ? IOAPIC_REDIR_POL_LO : IOAPIC_REDIR_POL_HI);
+		ioapic_conf_gsi(nmi_source->GlobalSystemInterrupt, 0, flg, bsp_apic_id);
+		gsi_routing[nmi_source->GlobalSystemInterrupt].purpose = "NMI";
+		gsi_routing[nmi_source->GlobalSystemInterrupt].type = GSI_TYPE_NMI;
 	}
 }
 
