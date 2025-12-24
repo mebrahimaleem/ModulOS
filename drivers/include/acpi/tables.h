@@ -106,4 +106,6 @@ extern void acpi_copy_tables(void);
 extern void acpi_parse_madt_ics_start(uint64_t* handle);
 extern void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* handle, uint8_t type);
 
+extern uint16_t acpi_get_sci_int(void);
+
 #endif /* DRIVERS_ACPI_TABLES_H */

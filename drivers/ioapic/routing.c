@@ -21,9 +21,11 @@
 #include <ioapic/routing.h>
 
 #include <acpi/tables.h>
+#include <acpi/sci.h>
 
 #include <kernel/core/alloc.h>
 #include <kernel/core/logging.h>
+#include <kernel/core/idt.h>
 #include <kernel/lib/kmemset.h>
 
 #define NUM_LEGACY	16
@@ -35,7 +37,8 @@ struct gsi_route_t {
 	enum {
 		GSI_TYPE_UNUSED,
 		GSI_TYPE_LEGACY,
-		GSI_TYPE_NMI
+		GSI_TYPE_NMI,
+		GSI_TYPE_SCI
 	} type;
 	union {
 		uint64_t isa_src;
@@ -126,6 +129,17 @@ void ioapic_routing_init(uint64_t num_gsi) {
 		gsi_routing[nmi_source->GlobalSystemInterrupt].purpose = "NMI";
 		gsi_routing[nmi_source->GlobalSystemInterrupt].type = GSI_TYPE_NMI;
 	}
+
+	// set sci
+	uint64_t sci_gsi = acpi_get_sci_int();
+	if (sci_gsi < NUM_LEGACY) {
+		sci_gsi = legacy_routing[sci_gsi];
+	}
+
+	logging_log_info("Found SCI on GSI 0x%X64", sci_gsi);
+	const uint8_t sci_v = idt_get_vector();
+	idt_install(sci_v, (uint64_t)sci_isr, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	ioapic_conf_gsi(sci_gsi, sci_v, IOAPIC_REDIR_TRG_LVL | IOAPIC_REDIR_POL_LO, bsp_apic_id);
 }
 
 uint64_t ioapic_routing_legacy_gsi(uint8_t isa_irq) {

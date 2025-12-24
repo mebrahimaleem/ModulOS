@@ -1,4 +1,4 @@
-/* isr.S - APIC ISRs */
+/* sci.h - system control interrupt interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,41 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.globl apic_isr_timer_init
-apic_isr_timer_init:
-// TODO
-iretq
+#ifndef DRIVERS_ACPI_SCI_H
+#define DRIVERS_ACPI_SCI_H
 
-.globl apic_isr_error
-apic_isr_error:
-pushq %rax
-pushq %rcx
-pushq %rdx
-pushq %rsi
-pushq %rdi
-pushq %r8
-pushq %r9
-pushq %r10
-pushq %r11
-pushq %rbp
+extern void sci_isr(void);
 
-movq %rsp, %rbp
-movq %rsp, %rax
-andq $0xF, %rax
-jz .aligned
-subq %rax, %rsp
-.aligned:
-call apic_error_dispatch
-movq %rbp, %rsp
-
-popq %rbp
-popq %r11
-popq %r10
-popq %r9
-popq %r8
-popq %rdi
-popq %rsi
-popq %rdx
-popq %rcx
-popq %rax
-iretq
+#endif /* DRIVERS_ACPI_SCI_H */

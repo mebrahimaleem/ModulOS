@@ -1,4 +1,4 @@
-/* isr.S - APIC ISRs */
+/* sci.S - system control interrupt isr */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,10 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.globl apic_isr_timer_init
-apic_isr_timer_init:
-// TODO
-iretq
+.section .text
 
-.globl apic_isr_error
-apic_isr_error:
+.globl sci_isr
+sci_isr:
 pushq %rax
 pushq %rcx
 pushq %rdx
@@ -39,7 +36,7 @@ andq $0xF, %rax
 jz .aligned
 subq %rax, %rsp
 .aligned:
-call apic_error_dispatch
+call acpi_sci_dispatch
 movq %rbp, %rsp
 
 popq %rbp
