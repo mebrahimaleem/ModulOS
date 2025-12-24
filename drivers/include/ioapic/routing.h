@@ -22,4 +22,6 @@
 
 extern void ioapic_routing_init(uint64_t num_gsi);
 
+extern uint64_t ioapic_routing_legacy_gsi(uint8_t isa_irq);
+
 #endif /* DRIVERS_IOAPIC_ROUTING_H */

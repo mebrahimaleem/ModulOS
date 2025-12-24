@@ -95,7 +95,7 @@ void idt_install(
 	idt[v].ist = ist;
 	idt[v].flgs = type | (uint8_t)(dpl << IDT_TYP_SHFT) | IDT_PRESENT;
 
-	logging_log_info(
+	logging_log_debug(
 			"Installed ISR 0x%X64 (vector) 0x%X64 (isr addr) %u64 (ist) %u64 (cs) 0x%X64 (type) %u64 (dpl)",
 			(uint64_t)v, offset, (uint64_t)seg_sel, (uint64_t)ist, (uint64_t)type, (uint64_t)dpl);
 }

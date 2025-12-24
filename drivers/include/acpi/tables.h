@@ -22,7 +22,17 @@
 
 #define MADT_ICS_PROCESSOR_LOCAL_APIC				0
 #define MADT_ICS_IO_APIC										1
+#define MADT_ICS_INTERRUPT_SOURCE_OVERRIDE	2
 #define MADT_ICS_LOCAL_APIC_NMI							4
+
+#define MADT_ICS_MPS_POLARITY_MASK					0x3
+#define MADT_ICS_MPS_POLARITY_CONF					0x0
+#define MADT_ICS_MPS_POLARITY_HI						0x1
+#define MADT_ICS_MPS_POLARITY_LO						0x3
+#define MADT_ICS_MPS_TRIGGER_MASK						0xC
+#define MADT_ICS_MPS_TRIGGER_CONF						0x0
+#define MADT_ICS_MPS_TRIGGER_EDGE						0x4
+#define MADT_ICS_MPS_TRIGGER_LEVL						0xC
 
 #define ACPI_UID_ALL_PROC	0xFF
 
@@ -64,6 +74,15 @@ struct acpi_madt_ics_io_apic_t {
 	uint8_t Reserved;
 	uint32_t IOAPICAddress;
 	uint32_t GlobalSystemInterruptBase;
+} __attribute__((packed));
+
+struct acpi_madt_ics_interrupt_source_override_t {
+	uint8_t Type;
+	uint8_t Length;
+	uint8_t Bus;
+	uint8_t Source;
+	uint32_t GlobalSystemInterrupt;
+	struct acpi_madt_ics_mps_t Flags;
 } __attribute__((packed));
 
 struct acpi_madt_ics_local_apic_nmi_t {

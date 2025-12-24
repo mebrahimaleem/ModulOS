@@ -125,16 +125,19 @@ void apic_init(void) {
 			acpi_parse_madt_ics((void*)&local_nmi, &handle, MADT_ICS_LOCAL_APIC_NMI)) {
 		if (local_nmi->ACPIProcessorUID == acpi_uid || local_nmi->ACPIProcessorUID == ACPI_UID_ALL_PROC) {
 			logging_log_debug("Found local NMI on LINT%u64", (uint64_t)local_nmi->LocalAPICLINTNum);
+			const uint8_t tgm = 
+				((local_nmi->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_TRIGGER_MASK) == MADT_ICS_MPS_TRIGGER_LEVL) ?
+				APIC_LVT_TRG_LEVL : APIC_LVT_TRG_EDGE; // default to edge since its more probable
 			switch (local_nmi->LocalAPICLINTNum) {
 				case 0:
 					lint_state |= LINT0_SET;
 					apic_write_lve(APIC_REG_L0E, 0,
-							APIC_LVT_MT_NMI | APIC_LVT_TRG_EDGE, 0); // nmi, v is ignored
+							APIC_LVT_MT_NMI | tgm, 0); // nmi, v is ignored
 					break;
 				case 1:
 					lint_state |= LINT1_SET;
 					apic_write_lve(APIC_REG_L1E, 0,
-							APIC_LVT_MT_NMI | APIC_LVT_TRG_EDGE, 0); // nmi, v is ignored
+							APIC_LVT_MT_NMI | tgm, 0); // nmi, v is ignored
 					break;
 				default:
 					logging_log_error("NMI on non-existent LINT%u64", (uint64_t)local_nmi->LocalAPICLINTNum);
@@ -172,10 +175,6 @@ void apic_init(void) {
 	// enable apic
 	apic_write_reg(APIC_REG_ESR, 0);
 	apic_write_reg(APIC_REG_SPR, PIC_SPURIOUS_VEC | APIC_ASE); // pic and apic spurious both only iret, so reuse
-
-	// TODO: move this after masking ioapic
-	logging_log_debug("Setting interrupt flag");
-	cpu_sti();
 }
 
 void apic_nmi_enab(void) {

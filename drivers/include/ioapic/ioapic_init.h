@@ -18,6 +18,16 @@
 #ifndef DRIVERS_IOAPIC_IOAPIC_INIT_H
 #define DRIVERS_IOAPIC_IOAPIC_INIT_H
 
+#include <stdint.h>
+
+#define IOAPIC_REDIR_TRG_EDG	0x00000
+#define IOAPIC_REDIR_TRG_LVL	0x08000
+#define IOAPIC_REDIR_POL_HI		0x00000
+#define IOAPIC_REDIR_POL_LO		0x02000
+#define IOAPIC_REDIR_MASK			0x10000
+
 extern void ioapic_init(void);
+
+extern void ioapic_conf_gsi(uint64_t gsi, uint8_t v, uint32_t flg, uint8_t dest);
 
 #endif /* DRIVERS_IOAPIC_IOAPIC_INIT_H */
