@@ -1,4 +1,4 @@
-/* acpiTables.h - ACPI tables interface */
+/* hash.h - hashing functions */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,19 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_ACPITABLES_H
-#define CORE_ACPITABLES_H
+#include <stdint.h>
+#include <stddef.h>
 
-struct RSDP_t {
-	uint8_t		Signature[8];
-	uint8_t		Checksum;
-	uint8_t		OEMID[6];
-	uint8_t		Revision;
-	uint32_t	RsdtAddress;
-	uint32_t  Length;
-	uint64_t	XsdtAddress;
-	uint8_t		ExtendedChecksum;
-	uint8_t		Reserved[3];
-} __attribute__((packed));
+#include <lib/hash.h>
 
-#endif /* ACPITABLES_H */
+uint8_t hash_byte_sum(const void* ptr, size_t c) {
+	const uint8_t* _ptr = ptr;
+	uint8_t sum = 0;
+	for (; c > 0; c--) {
+		sum += *(_ptr++);
+	}
+
+	return sum;
+}

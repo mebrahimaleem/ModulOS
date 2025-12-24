@@ -1,4 +1,4 @@
-/* mem_utils.h - library memory utility interface */
+/* hash.h - hashing interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,22 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_LIB_HASH_H
+#define KERNEL_LIB_HASH_H
+
 #include <stdint.h>
 #include <stddef.h>
 
-#ifndef LIB_MEM_UTILS_H
-#define LIB_MEM_UTILS_H
+extern uint8_t hash_byte_sum(const void* ptr, size_t c);
 
-extern void* memset(void* ptr, uint64_t v, size_t c);
-extern void* memsetb(void* ptr, uint8_t v, size_t c);
-extern void* memsetw(void* ptr, uint16_t v, size_t c);
-extern void* memsetd(void* ptr, uint32_t v, size_t c);
-extern void* memsetq(void* ptr, uint64_t v, size_t c);
-
-extern void* memcpy(void* dest, uint64_t src, size_t c);
-extern void* memcpyb(void* dest, uint64_t src, size_t c);
-extern void* memcpyw(void* dest, uint64_t src, size_t c);
-extern void* memcpyd(void* dest, uint64_t src, size_t c);
-extern void* memcpyq(void* dest, uint64_t src, size_t c);
-
-#endif /* LIB_MEM_UTILS_H */
+#endif /* KERNEL_LIB_HASH_H */

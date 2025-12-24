@@ -23,8 +23,9 @@
 #include <core/paging.h>
 #include <core/panic.h>
 #include <core/alloc.h>
+#include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/kmemset.h>
 
 #define ALLOCATION_UNIT	0x200000
 #define PAGE_SIZE 			0x1000
@@ -35,6 +36,8 @@
 #define INITIAL_VIRTUAL_LIMIT	0xFFFFFFFF80000000
 
 #define ORDER_SIZE(order)	((uint64_t)(PAGE_SIZE * (1 << (uint64_t)order)))
+
+#define SIZE_GIB	(1024 * 1024 * 1024)
 
 extern uint64_t page_frames_num;
 extern struct page_frame_t* page_frames;
@@ -63,7 +66,9 @@ void mm_init(
 	// permanent virtual addresses are useful for early memory/paging
 	virt_limit = INITIAL_VIRTUAL_LIMIT;
 
+	logging_log_debug("Initializing paging");
 	paging_init();
+	logging_log_debug("Early paging done");
 
 	// find memory limit
 	mem_limit = 0;
@@ -73,8 +78,12 @@ void mm_init(
 
 	first_segment(&handle);
 	for (early_next_segment(&handle, &seg); seg.size || seg.base; next_segment(&handle, &seg)) {
+		logging_log_debug("Memory segment 0x%X64 (base) 0x%X64 (size) 0x%X64 (type)",
+				(uint64_t)seg.base, (uint64_t)seg.size, (uint64_t)seg.type);
 		if (seg.type == MEM_AVL && seg.base + seg.size > mem_limit) mem_limit = seg.base + seg.size;
 	}
+
+	logging_log_info("Detected 0x%X64 bytes (0x%X64 GiB) of memory", mem_limit, (uint64_t)(mem_limit / SIZE_GIB));
 
 	// find number of pages
 	page_frames_num = (mem_limit + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -97,7 +106,7 @@ void mm_init(
 	for (i = 0; i < MM_MAX_ORDER; i++) {
 		order_entries[i].free = 0;
 		order_entries[i].bitmap = early_kmalloc(page_frames_num / (uint64_t)(8 * (1 << i)));
-		memset(order_entries[i].bitmap, 0, page_frames_num / (uint64_t)(8 * ( 1 << i)));
+		kmemset(order_entries[i].bitmap, 0, page_frames_num / (uint64_t)(8 * ( 1 << i)));
 	}
 
 	i = early_skip;
@@ -180,7 +189,7 @@ void mm_init(
 	}
 }
 
-uint64_t mm_early_alloc_2m() {
+uint64_t mm_early_alloc_2m(void) {
 
 	uint64_t handle, i = early_skip;
 	struct mem_segment_t seg;

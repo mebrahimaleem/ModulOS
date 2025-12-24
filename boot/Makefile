@@ -17,16 +17,18 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
-
 OBJ_DIR := $(OBJ_DIR)/boot
 
 ifdef BUILD_BOOT_MULTIBOOT2
 $(call add_directory,multiboot2,MULTIBOOT2)
 endif
 
-ifdef BUILD_BOOT_GRAPHICSBASE
+ifdef BUILD_KERNEL_GRAPHICSBASE
 DEFINES := $(DEFINES) -DGRAPHICSBASE
+endif
+
+ifdef BUILD_DRIVERS_SERIAL
+DEFINES := $(DEFINES) -DSERIAL
 endif
 
 ifneq ($(words $(SRC_DIRS)), 1)
@@ -40,19 +42,10 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 all: build
 
 .PHONY: build
-build: $(OBJ_DIR)/../boot.a $(LDS) $(OBJ_DIR)/../bootstub.img
+build: $(OBJ_DIR)/../boot.a $(LDS) $(OBJ_DIR)/../esp.img
 
-$(OBJ_DIR)/../bootstub.img: $(OBJ_DIR)/gpt.img $(OBJ_DIR)/esp.img
-	truncate -s 4G $@
-	dd if=$(OBJ_DIR)/gpt.img of=$@ seek=0 count=1 bs=4M conv=notrunc
-	dd if=$(OBJ_DIR)/gpt.img of=$@ skip=1023 seek=1023 count=1 bs=4M conv=notrunc
-
-.PHONY: $(OBJ_DIR)/gpt.img
-$(OBJ_DIR)/gpt.img:
-	$(MAKE) -C $(SRC_DIRS) ../$@
-
-.PHONY: $(OBJ_DIR)/esp.img
-$(OBJ_DIR)/esp.img:
+.PHONY: $(OBJ_DIR)/../esp.img
+$(OBJ_DIR)/../esp.img:
 	$(MAKE) -C $(SRC_DIRS) ../$@
 
 $(OBJ_DIR)/boot.a: $(TARGETS) | $(BUILD_DIRS)

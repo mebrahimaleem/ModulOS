@@ -19,6 +19,15 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
 OBJ_DIR := $(OBJ_DIR)/drivers
 
+$(call add_directory,pic_8259,PIC_8259)
+$(call add_directory,apic,APIC)
+$(call add_directory,ioapic,IOAPIC)
+$(call add_directory,acpi,ACPI)
+
+ifdef BUILD_DRIVERS_SERIAL
+$(call add_directory,serial,SERIAL)
+endif
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 
@@ -26,4 +35,8 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 all: build
 
 .PHONY: build
-build:
+build: $(OBJ_DIR)/../drivers.a $(LDS)
+
+$(OBJ_DIR)/drivers.a: $(TARGETS) | $(BUILD_DIRS)
+	rm -f $@
+	$(AR) rcs $@ $(TARGETS)

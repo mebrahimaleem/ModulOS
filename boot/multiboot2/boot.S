@@ -34,8 +34,9 @@
 
 #define STACK_SIZE				0x4000
 
-#define NMI_PORT	0x80
-#define NMI_MASK	0x70
+#define CMOS_RAM_INDEX	0x70
+#define CMOS_RAM_DATA		0x71
+#define NMI_DISABLE			0x80
 
 #define	EFL_CPUIDBIT	0x200000
 
@@ -135,8 +136,11 @@ _start:
 	pushl %ebx
 
 	/* disable NMIs */
-	movb $NMI_PORT, %al
-	outb %al, $NMI_MASK
+	inb $CMOS_RAM_INDEX, %al
+	or $NMI_DISABLE, %al
+	outb %al, $CMOS_RAM_INDEX
+	out %al, $0x80
+	inb $CMOS_RAM_DATA, %al
 
 	/* Check if hardware is supported by OS */
 
@@ -200,7 +204,7 @@ _start:
 
 	pushl $CODE_SEG
 	pushl $enter64
-	retfl
+	lret
 
 hang:
 	hlt
@@ -222,19 +226,22 @@ enter64:
 	/* far return to high memory */
 	pushq $CODE_SEG
 	pushq $ktransfer
-	retfq
+	lretq
 
 	.section .text
 ktransfer:
 	addq $KERNEL_VMA, gdt_ptr64.addr
 	lgdt gdt_ptr64
 	addq $KERNEL_VMA, %rsp
+	pushq $0
+	pushq $0
 	call multiboot2_init
-	call kentry
+	jmp kentry
 
 	.section .data.boot
 
 	/* GDT */
+	.globl gdt
 	.align	8
 gdt:
 	gdt.nullseg:
@@ -253,8 +260,13 @@ gdt:
 		.byte		GDT_RW + GDT_S + GDT_P	/* access: RW S P */
 		.byte		GDT_G		/* limit 16:19 flag: G */
 		.byte		0x92		/* access: RW S P */
-		.byte		0x80		/* limit 16:19 flag: G */
-		.byte		0x00		/* base 24:31 */
+	gdt.ucodeseg:
+		.quad 0
+	gdt.udataseg:
+		.quad 0
+	gdt.tss:
+		.quad 0
+		.quad 0
 	gdt.end:
 
 	.equ	CODE_SEG, gdt.codeseg - gdt
