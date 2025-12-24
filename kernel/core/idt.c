@@ -21,7 +21,7 @@
 #include <core/tss.h>
 #include <core/logging.h>
 
-#include <lib/memset.h>
+#include <lib/kmemset.h>
 
 #define IDT_MAX_ENTRY	256
 
@@ -45,7 +45,7 @@ static volatile struct idt_ptr_t idt_ptr;
 static uint8_t next_vector;
 
 void idt_init(void) {
-	memset((void*)&idt[0], 0, sizeof(idt));
+	kmemset((void*)&idt[0], 0, sizeof(idt));
 
 	idt_install(0x00, (uint64_t)isr_00, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	idt_install(0x01, (uint64_t)isr_01, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);

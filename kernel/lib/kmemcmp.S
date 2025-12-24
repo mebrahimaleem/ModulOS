@@ -1,4 +1,4 @@
-/* memset.S - library memcmp routines */
+/* kmemcmp.S - library memcmp routines */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 
 .section .text
 
-.globl memcmp
-memcmp:
+.globl kmemcmp
+kmemcmp:
 xorq %rax, %rax
 movq %rdx, %rcx
 test %rdx, %rdx // clear zf

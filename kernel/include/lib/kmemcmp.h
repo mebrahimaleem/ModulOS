@@ -1,4 +1,4 @@
-/* panic.h - kernel panic interface */
+/* kmemcmp.h - library memcmp interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,19 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_PANIC_H
-#define KERNEL_CORE_PANIC_H
+#ifndef KERNEL_LIB_KMEMCMP_H
+#define KERNEL_LIB_KMEMCMP_H
 
-enum panic_code_t {
-	PANIC_UNK, // unkown panic
-	PANIC_PAGING, // paging related panic
-	PANIC_NO_MEM, // out of memory panic
-	PANIC_STATE, // bad kernel state panic
-	PANIC_ACPI, // bad ACPI data
-	PANIC_APIC, // unrecoverable APIC error
-	PANIC_MAX
-};
+#include <stdint.h>
+#include <stddef.h>
 
-extern void panic(enum panic_code_t code) __attribute__((noreturn));
+extern int64_t kmemcmp(const void* l, const void* r, size_t c);
 
-#endif /* KERNEL_CORE_PANIC_H */
+#endif /* KERNEL_LIB_KMEMCMP_H */

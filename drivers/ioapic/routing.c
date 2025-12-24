@@ -1,4 +1,4 @@
-/* panic.h - kernel panic interface */
+/* routing.c - IO/APIC interrupt routing */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,19 +15,24 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_PANIC_H
-#define KERNEL_CORE_PANIC_H
+#include <stdint.h>
 
-enum panic_code_t {
-	PANIC_UNK, // unkown panic
-	PANIC_PAGING, // paging related panic
-	PANIC_NO_MEM, // out of memory panic
-	PANIC_STATE, // bad kernel state panic
-	PANIC_ACPI, // bad ACPI data
-	PANIC_APIC, // unrecoverable APIC error
-	PANIC_MAX
+#include <ioapic/routing.h>
+
+#include <kernel/core/alloc.h>
+
+#define NUM_LEGACY	16
+
+struct gsi_route_t {
+	const char* purpose;
+	enum {
+		GSI_TYPE_LEGACY
+	} type;
 };
 
-extern void panic(enum panic_code_t code) __attribute__((noreturn));
+static struct gsi_route_t* gsi_routing;
 
-#endif /* KERNEL_CORE_PANIC_H */
+void ioapic_routing_init(uint64_t num_gsi) {
+	gsi_routing = kmalloc(num_gsi * sizeof(struct gsi_route_t));
+}
+

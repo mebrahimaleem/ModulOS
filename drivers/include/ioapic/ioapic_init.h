@@ -1,4 +1,4 @@
-/* memcmp.h - library memcmp interface */
+/* ioapic_init.h - IO/APIC initialization interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_MEMCMP_H
-#define KERNEL_LIB_MEMCMP_H
+#ifndef DRIVERS_IOAPIC_IOAPIC_INIT_H
+#define DRIVERS_IOAPIC_IOAPIC_INIT_H
 
-#include <stdint.h>
-#include <stddef.h>
+extern void ioapic_init(void);
 
-extern int64_t memcmp(const void* l, const void* r, size_t c);
-
-#endif /* KERNEL_LIB_MEMCMP_H */
+#endif /* DRIVERS_IOAPIC_IOAPIC_INIT_H */

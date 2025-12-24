@@ -24,7 +24,7 @@
 #include <core/panic.h>
 #include <core/logging.h>
 
-#include <lib/memset.h>
+#include <lib/kmemset.h>
 
 #define PAGE_PS 			0x80
 #define PAGE_TBL_FLG	(PAGE_PRESENT | PAGE_RW)
@@ -90,7 +90,7 @@ static uint64_t early_alloc_page(void) {
 					hint->bitmap[hint->hint] |= 1 << i;
 					hint->used++;
 					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
-					memset((void*)addr, 0, PAGE_SIZE);
+					kmemset((void*)addr, 0, PAGE_SIZE);
 					return addr;
 				}
 			}
@@ -119,7 +119,7 @@ static uint64_t alloc_page(void) {
 					hint->bitmap[hint->hint] |= 1 << i;
 					hint->used++;
 					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
-					memset((void*)addr, 0, PAGE_SIZE);
+					kmemset((void*)addr, 0, PAGE_SIZE);
 					return addr;
 				}
 			}
@@ -134,7 +134,7 @@ static struct paging_pool_header_t* early_create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_early_alloc_2m();
 	paging_early_map_2m((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW);
 
-	memset(addr, 0, POOL_SIZE);
+	kmemset(addr, 0, POOL_SIZE);
 	addr->bitmap[0] = 0x01;
 
 	return addr;
@@ -144,7 +144,7 @@ static struct paging_pool_header_t* create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc(MM_ORDER_2M);
 	paging_map((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW, PAGE_2M);
 
-	memset(addr, 0, POOL_SIZE);
+	kmemset(addr, 0, POOL_SIZE);
 	addr->bitmap[0] = 0x01;
 
 	return addr;
@@ -173,7 +173,7 @@ void paging_init(void) {
 	root_pool = (struct paging_pool_header_t*)pool_base;
 	hint = root_pool;
 
-	memset(root_pool, 0, POOL_SIZE);
+	kmemset(root_pool, 0, POOL_SIZE);
 
 	root_pool->ac = 1;
 	root_pool->bitmap[0] = 0x01;

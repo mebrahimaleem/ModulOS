@@ -1,4 +1,4 @@
-/* memset.h - library memset interface */
+/* kmemcpy.h - library memcpy interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_MEMSET_H
-#define KERNEL_LIB_MEMSET_H
+#ifndef KERNEL_LIB_KMEMCPY_H
+#define KERNEL_LIB_KMEMCPY_H
 
-#include <stdint.h>
 #include <stddef.h>
 
-extern void* memset(void* ptr, uint64_t v, size_t c);
+extern void* kmemcpy(void* dest, const void* src, size_t c);
 
-#endif /* KERNEL_LIB_MEMSET_H */
+#endif /* KERNEL_LIB_KMEMCPY */

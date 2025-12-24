@@ -23,8 +23,9 @@
 #include <core/cpu_instr.h>
 #include <core/logging.h>
 
+#include <drivers/pic_8259/pic.h>
 #include <drivers/apic/apic_init.h>
-#include <drivers/acpi/tables.h>
+#include <drivers/ioapic/ioapic_init.h>
 
 struct boot_context_t boot_context;
 
@@ -38,13 +39,15 @@ void kentry(void) {
 	logging_log_debug("TSS and IDT init done");
 
 	logging_log_debug("ACPI init");
-	acpi_index_tables();
+	acpi_copy_tables();
 	logging_log_debug("ACPI init done");
 
-	logging_log_debug("APIC init");
+	logging_log_debug("APIC and IOAPIC init");
+	pic_disab();
 	apic_init();
 	apic_nmi_enab();
-	logging_log_debug("APIC init done");
+	ioapic_init();
+	logging_log_debug("APIC and IOAPIC init done");
 
 	logging_log_info("Boot Complete ModulOS");
 

@@ -21,39 +21,50 @@
 
 #include <macros.h>
 
-#define memset k_memset
-#define memcmp k_memcmp
-#include <kernel/lib/memset.h>
-#include <kernel/lib/memcmp.h>
+#include <kernel/lib/kmemset.h>
+#include <kernel/lib/kmemcmp.h>
+#include <kernel/lib/kmemcpy.h>
 #include <kernel/lib/hash.h>
-
-void* k_memset(void* ptr, uint64_t v, size_t len) __asm__("memset");
-int64_t k_memcmp(const void* l, const void* r, size_t c) __asm__("memcmp");
 
 #define MEM_TEST_SIZE	256
 
 TEST_NAME("libary test suite")
 
-TEST("memset") {
+TEST("kmemset") {
 	char* actual = malloc(MEM_TEST_SIZE);
 
 	for (uint64_t i = 0; i < 256; i += (i % 7) + 1) {
-		ASSERT_TRUE(actual == k_memset(actual, i, MEM_TEST_SIZE), "kernel memset return value changed");
+		ASSERT_TRUE(actual == kmemset(actual, i, MEM_TEST_SIZE), "kernel memset return value changed");
 
 	}
 
 	free(actual);
 }
 
-TEST("memcmp") {
-	ASSERT_TRUE(k_memcmp("", "", 0) == 0, "kernel memcmp fails zero size");
-	ASSERT_TRUE(k_memcmp("", "", 1) == 0, "kernel memcmp fails empty string");
-	ASSERT_TRUE(k_memcmp(" a", " b", 3) < 0, "kernel memcmp flips sign");
-	ASSERT_TRUE(k_memcmp(" 4", " 2", 3) > 0, "kernel memcmp flips sign");
-	ASSERT_TRUE(k_memcmp(" a", " b", 1) == 0, "kernel memcmp reads too many bytes");
-	ASSERT_TRUE(k_memcmp("\0sneaky", "\0hidden", 8) > 0, "kernel memcmp stops on null");
-	ASSERT_TRUE(k_memcmp("1234567", "12345", 5) == 0, "kernel memcmp reads too many bytes");
-	ASSERT_TRUE(k_memcmp((void*)0xdeadbeef, (void*)0xdeadbeef, 0) == 0, "kernel memcmp fails invalid ptr");
+TEST("kmemcmp") {
+	ASSERT_TRUE(kmemcmp("", "", 0) == 0, "kernel memcmp fails zero size");
+	ASSERT_TRUE(kmemcmp("", "", 1) == 0, "kernel memcmp fails empty string");
+	ASSERT_TRUE(kmemcmp(" a", " b", 3) < 0, "kernel memcmp flips sign");
+	ASSERT_TRUE(kmemcmp(" 4", " 2", 3) > 0, "kernel memcmp flips sign");
+	ASSERT_TRUE(kmemcmp(" a", " b", 1) == 0, "kernel memcmp reads too many bytes");
+	ASSERT_TRUE(kmemcmp("\0sneaky", "\0hidden", 8) > 0, "kernel memcmp stops on null");
+	ASSERT_TRUE(kmemcmp("1234567", "12345", 5) == 0, "kernel memcmp reads too many bytes");
+	ASSERT_TRUE(kmemcmp((void*)0xdeadbeef, (void*)0xdeadbeef, 0) == 0, "kernel memcmp fails invalid ptr");
+}
+
+TEST("kmemcpy") {
+	char* original = malloc(MEM_TEST_SIZE);
+	char* copy = malloc(MEM_TEST_SIZE);
+
+	for (uint64_t i = 0; i < MEM_TEST_SIZE; i += (i % 7) + 1) {
+		original[i] = (char)(i ^ (i * i));
+	}
+
+	kmemcpy(copy, original, MEM_TEST_SIZE);
+	ASSERT_TRUE(!memcmp(original, copy, MEM_TEST_SIZE), "memory comparison fails");
+
+	free(original);
+	free(copy);
 }
 
 TEST("hash_byte_sum") {

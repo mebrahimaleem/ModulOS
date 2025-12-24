@@ -24,7 +24,7 @@
 #include <core/paging.h>
 #include <core/logging.h>
 
-#include <lib/memset.h>
+#include <lib/kmemset.h>
 
 #define ARENA_SIZE	0x200000
 
@@ -54,7 +54,7 @@ void alloc_init(void) {
 	logging_log_debug("New arena @ 0x%X64", head);
 
 	// preallocate prevents mm/alloc deadlock
-	memset(base, 0, ARENA_SIZE);
+	kmemset(base, 0, ARENA_SIZE);
 	base->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
 	paging_early_map_2m((uint64_t)base->next, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
 	base->left = sizeof(base->arena);
@@ -74,7 +74,7 @@ void* kmalloc(size_t size) {
 	if ((uint64_t)head->hint + size >= (uint64_t)head + ARENA_SIZE) {	
 		head = head->next;
 		logging_log_debug("New arena @ 0x%X64", head);
-		memset(head, 0, ARENA_SIZE);
+		kmemset(head, 0, ARENA_SIZE);
 		head->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
 		paging_map((uint64_t)head->next, mm_alloc(MM_ORDER_2M), PAGE_PRESENT | PAGE_RW, PAGE_2M);
 		head->left = sizeof(head->arena);
@@ -101,7 +101,7 @@ void* early_kmalloc(size_t size) {
 	// TODO: check if hint is free
 	if ((uint64_t)head->hint + size >= (uint64_t)head + ARENA_SIZE) {	
 		head = head->next;
-		memset(head, 0, ARENA_SIZE);
+		kmemset(head, 0, ARENA_SIZE);
 		head->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
 		paging_early_map_2m((uint64_t)head->next, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
 		head->left = sizeof(head->arena);

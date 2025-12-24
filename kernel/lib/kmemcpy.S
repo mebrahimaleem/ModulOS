@@ -1,4 +1,4 @@
-/* panic.h - kernel panic interface */
+/* kmemcpy.S - library memcpy routine */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,19 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_PANIC_H
-#define KERNEL_CORE_PANIC_H
+.section .text
 
-enum panic_code_t {
-	PANIC_UNK, // unkown panic
-	PANIC_PAGING, // paging related panic
-	PANIC_NO_MEM, // out of memory panic
-	PANIC_STATE, // bad kernel state panic
-	PANIC_ACPI, // bad ACPI data
-	PANIC_APIC, // unrecoverable APIC error
-	PANIC_MAX
-};
+.globl kmemcpy
+kmemcpy:
+movq %rdi, %rax
+movq %rdx, %rcx
+rep movsb
+ret
 
-extern void panic(enum panic_code_t code) __attribute__((noreturn));
-
-#endif /* KERNEL_CORE_PANIC_H */

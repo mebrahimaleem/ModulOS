@@ -1,4 +1,4 @@
-/* memset.S - library memset routines */
+/* routing.h - IO/APIC interrupt routing interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.section .text
+#ifndef DRIVERS_IOAPIC_ROUTING_H
+#define DRIVERS_IOAPIC_ROUTING_H
 
-.globl memset
-memset:
-pushq %rdi
-movq %rsi, %rax
-movq %rdx, %rcx
-rep stosb
-popq %rax
-ret
+#include <stdint.h>
+
+extern void ioapic_routing_init(uint64_t num_gsi);
+
+#endif /* DRIVERS_IOAPIC_ROUTING_H */

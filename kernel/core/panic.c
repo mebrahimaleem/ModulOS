@@ -28,6 +28,7 @@ static const char* panic_names[] = {
 	[PANIC_NO_MEM] = "Out of memory",
 	[PANIC_STATE] = "Unrecoverable kernel state",
 	[PANIC_ACPI] = "Bad ACPI hardware",
+	[PANIC_APIC] = "Unrecoverable APIC error",
 	[PANIC_MAX] = 0
 };
 

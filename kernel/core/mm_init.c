@@ -25,7 +25,7 @@
 #include <core/alloc.h>
 #include <core/logging.h>
 
-#include <lib/memset.h>
+#include <lib/kmemset.h>
 
 #define ALLOCATION_UNIT	0x200000
 #define PAGE_SIZE 			0x1000
@@ -106,7 +106,7 @@ void mm_init(
 	for (i = 0; i < MM_MAX_ORDER; i++) {
 		order_entries[i].free = 0;
 		order_entries[i].bitmap = early_kmalloc(page_frames_num / (uint64_t)(8 * (1 << i)));
-		memset(order_entries[i].bitmap, 0, page_frames_num / (uint64_t)(8 * ( 1 << i)));
+		kmemset(order_entries[i].bitmap, 0, page_frames_num / (uint64_t)(8 * ( 1 << i)));
 	}
 
 	i = early_skip;

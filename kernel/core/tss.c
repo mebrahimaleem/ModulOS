@@ -24,7 +24,7 @@
 #include <core/kentry.h>
 #include <core/logging.h>
 
-#include <lib/memset.h>
+#include <lib/kmemset.h>
 
 #define RSP_SIZE				0x1000
 #define IST_ABORT_SIZE	0x1000
@@ -66,7 +66,7 @@ struct tss_t {
 void tss_init(void) {
 	volatile struct tss_t* tss = kmalloc(sizeof(struct tss_t));
 
-	memset((void*)tss, 0, sizeof(struct tss_t));
+	kmemset((void*)tss, 0, sizeof(struct tss_t));
 
 	const uint64_t rsp0 = (uint64_t)kmalloc(RSP_SIZE);
 	tss->rsp0_lo = rsp0 & IST_LO_MASK;

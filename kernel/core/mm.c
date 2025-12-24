@@ -22,8 +22,6 @@
 #include <core/paging.h>
 #include <core/panic.h>
 
-#include <lib/memset.h>
-
 #define PAGE_SIZE				0x1000
 #define PD_ENTRY_SIZE 	0x200000
 #define PDPT_ENTRY_SIZE 0x40000000
