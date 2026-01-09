@@ -17,7 +17,7 @@
 
 # Debug options
 
-#export DEBUG = 1
+export DEBUG = 1
 export DEBUG_LOGGING = 1
 
 # Global options
@@ -51,7 +51,8 @@ BOOT_TARGETS := \
 									$(OBJ_DIR)/boot.a \
 									$(OBJ_DIR)/esp.img
 DRIVERS_TARGETS := \
-									$(OBJ_DIR)/drivers.a
+									$(OBJ_DIR)/drivers.a \
+									$(OBJ_DIR)/acpica.a
 TEST_TARGETS := \
 									$(OBJ_DIR)/test_lib.a \
 									$(OBJ_DIR)/test_testsuite.a
@@ -60,7 +61,6 @@ TEST_CANIDATES := $(patsubst $(OBJ_DIR)/test_%.a,test-%,$(TEST_TARGETS))
 TEST_EXEC := $(basename $(TEST_TARGETS))
 
 COPY_DOC_TO := $(OBJ_DIR)/rootfs/doc/ModulOS/
-COPY_DOC := $(COPY_DOC_TO)COPYING
 
 SRC := $(shell find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \))
 
@@ -73,9 +73,8 @@ build: $(OBJ_DIR)/modulos.img
 all: index build test-all
 
 .PHONY: index
-index:
+index: cscope.files
 	ctags --C-kinds=+pxzL -R $(SRC)
-	echo $(SRC) > cscope.files
 	cscope -q -R -b -i cscope.files
 
 .PHONY: clean
@@ -93,6 +92,9 @@ $(TEST_CANIDATES): test-%: $(OBJ_DIR)/test_%
 $(SUBDIRS):
 	$(MAKE) -C $@ build
 
+cscope.files: $(SRC)
+	find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \) > $@
+
 %/:
 	-mkdir -p $@
 
@@ -105,8 +107,9 @@ $(TEST_TARGETS): test
 $(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
 	$(CC) -O0 -g -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 
-$(COPY_DOC): $(COPY_DOC_TO)%: % | $(COPY_DOC_TO)
-	cp $< $|
+.PHONY: copy-doc
+copy-doc: COPYING LICENSES | $(COPY_DOC_TO)
+	cp -r COPYING LICENSES $(COPY_DOC_TO)
 
 $(OBJ_DIR)/stub.img: | $(OBJ_DIR)/
 	truncate -s 4G $@
@@ -122,7 +125,7 @@ $(OBJ_DIR)/stub-esp.dummy: $(OBJ_DIR)/stub.img $(OBJ_DIR)/modulos $(OBJ_DIR)/esp
 
 # 54525952 is for 52MiB offset (512 * 1024 * 1024)
 # 1034240 is for 52MiB initial (4MiB align + 48MiB ESP) and 4MiB tail for gpt
-$(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img $(COPY_DOC)
+$(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img copy-doc
 	yes | mke2fs -L rootfs -E offset=54525952 -d $(OBJ_DIR)/rootfs/ -t ext4 \
 		-b 4096 $< 1034240
 	touch $@
@@ -139,5 +142,9 @@ $(OBJ_DIR)/modulos.ld: $(filter-out test,$(SUBDIRS))
 $(OBJ_DIR)/modulos: $(OBJ_DIR)/modulos-dbg
 	$(STRIP) -s -o $@ $<
 
-$(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
+$(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld \
+	$(OBJ_DIR)/boot.a \
+	$(OBJ_DIR)/kernel.a \
+	$(OBJ_DIR)/drivers.a \
+	$(OBJ_DIR)/acpica.a
 	$(CC) -o $@ $(LTO) $(LD_FLAGS) -fuse-ld=lld -T $^
