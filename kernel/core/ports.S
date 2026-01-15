@@ -29,9 +29,37 @@ mov %sil, %al
 out %al, %dx
 ret
 
+.globl outw
+outw:
+mov %di, %dx
+mov %si, %ax
+out %ax, %dx
+ret
+
+.globl outd
+outd:
+mov %di, %dx
+mov %esi, %eax
+out %eax, %dx
+ret
+
 .globl inb
 inb:
 mov %di, %dx
 xorq %rax, %rax
-inb %dx, %al
+in %dx, %al
+ret
+
+.globl inw
+inw:
+mov %di, %dx
+xorq %rax, %rax
+in %dx, %ax
+ret
+
+.globl ind
+ind:
+mov %di, %dx
+xorq %rax, %rax
+in %dx, %eax
 ret

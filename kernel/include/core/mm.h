@@ -57,5 +57,7 @@ extern void mm_init_dv(void);
 
 extern uint64_t mm_alloc_dv(enum mm_order_t order);
 
+extern uint64_t mm_lowest_order(size_t size);
+
 #endif /* KERNEL_CORE_MM_H */
 

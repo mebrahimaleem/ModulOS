@@ -24,7 +24,8 @@ enum log_severity_t {
 	SEVERITY_DBG,
 	SEVERITY_INF,
 	SEVERITY_WRN,
-	SEVERITY_ERR
+	SEVERITY_ERR,
+	SEVERITY_NON,
 };
 
 extern void logging_init(void);

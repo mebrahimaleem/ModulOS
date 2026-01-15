@@ -33,8 +33,6 @@
 
 #define TABLE_PADDR_MASK 	0xFFFFFFFFFFFFF000
 
-#define KERNEL_VMA 	0xFFFFFFFF80000000
-
 #define POOL_SIZE	0x200000
 
 #define GET_TABLE(entry) ((uint64_t*)((uint64_t)entry & TABLE_PADDR_MASK))

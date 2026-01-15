@@ -43,7 +43,7 @@ $(OBJ_DIR)/../acpica.a: $(OBJ_DIR)/acpica.a
 	ln $< $@
 
 $(TARGETS): $(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)/
-	$(CC) $(CFLAGS) -I $(SRC_TREE_ROOT)/include/drivers/acpica/ -o $@ $<
+	$(CC) $(CFLAGS) -I $(SRC_TREE_ROOT)/include/drivers/acpica/ -Wno-error -o $@ $<
 
 $(OBJ_DIR)/acpica.a: $(TARGETS)
 	rm -f $@

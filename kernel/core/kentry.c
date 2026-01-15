@@ -23,6 +23,8 @@
 #include <core/cpu_instr.h>
 #include <core/logging.h>
 
+#include <drivers/acpi/tables.h>
+#include <drivers/acpica_osl/init.h>
 #include <drivers/pic_8259/pic.h>
 #include <drivers/apic/apic_init.h>
 #include <drivers/ioapic/ioapic_init.h>
@@ -41,6 +43,10 @@ void kentry(void) {
 	logging_log_debug("ACPI init");
 	acpi_copy_tables();
 	logging_log_debug("ACPI init done");
+
+	logging_log_debug("ACPICA init");
+	acpica_init();
+	logging_log_debug("ACPICA init done");
 
 	logging_log_debug("APIC and IOAPIC init");
 	pic_disab();

@@ -1,4 +1,4 @@
-/* paging.h - paging managger interface */
+/* init.h - acpica subsystem initialization interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,31 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_PAGING_H
-#define KERNEL_CORE_PAGING_H
+#ifndef DRIVERS_ACPICA_OSL_INIT_H
+#define DRIVERS_ACPICA_OSL_INIT_H
 
-#include <stdint.h>
-#include <stddef.h>
+extern void acpica_init(void);
 
-#define PAGE_PRESENT	0x1
-#define PAGE_RW				0x2
-#define PAT_MMIO_4K		0x98
-
-#define PAGE_BASE_MASK	0xFFFFFFFFFFFFF000	
-
-#define PAGE_SIZE_4K		0x1000
-#define KERNEL_VMA 	0xFFFFFFFF80000000
-
-enum page_size_t {
-	PAGE_4K,
-	PAGE_2M,
-	PAGE_1G
-};
-
-extern void paging_init(void);
-
-extern void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size);
-
-extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
-
-#endif /* KERNEL_CORE_PAGING_H */
+#endif /* DRIVERS_ACPICA_OSL_INIT_H */

@@ -80,3 +80,18 @@ uint64_t mm_alloc_dv(enum mm_order_t order) {
 	dv_base += block;
 	return dv_base - block;
 }
+
+uint64_t mm_lowest_order(size_t size) {
+	uint8_t order = 64 - (uint8_t)__builtin_clzll(size);
+	if (order < 12) {
+		return MM_ORDER_4K;
+	}
+
+	order -= 12;
+
+	if (order > MM_MAX_ORDER) {
+		return (uint64_t)-1;
+	}
+
+	return order;
+}

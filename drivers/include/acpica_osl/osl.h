@@ -15,8 +15,7 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_ACPICA_OSL_H
-#define DRIVERS_ACPICA_OSL_H
+#ifndef DRIVERS_ACPICA_OSL_OSL_H
+#define DRIVERS_ACPICA_OSL_OSL_H
 
-#endif /* DRIVERS_ACPICA_OSL_H */
-
+#endif /* DRIVERS_ACPICA_OSL_OSL_H */

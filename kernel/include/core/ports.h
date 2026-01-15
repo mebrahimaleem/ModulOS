@@ -23,7 +23,11 @@
 extern void io_wait(void);
 
 extern void outb(uint16_t port, uint8_t dat);
+extern void outw(uint16_t, uint16_t dat);
+extern void outd(uint16_t, uint32_t dat);
 
 extern uint8_t inb(uint16_t port);
+extern uint16_t inw(uint16_t port);
+extern uint32_t ind(uint16_t port);
 
 #endif /* KERNEL_CORE_PORTS_H */

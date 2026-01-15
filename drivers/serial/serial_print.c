@@ -21,6 +21,10 @@
 #include <serial/serial_print.h>
 #include <serial/serial.h>
 
+#define FLG_LL	0x1
+#define FLG_PD	0x2
+#define FLG_LM	0x4
+
 static const char low_charset[] =
 	{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 static const char upper_charset[] =
@@ -32,43 +36,45 @@ struct num_printer_t {
 	void (*printer)(uint8_t);
 };
 
+static void serial_print(const char* s, void (*printer)(uint8_t));
+
 #define _PRINT_UINT(s) \
-	static void _print_uint##s(uint##s##_t num, struct num_printer_t* meta) { \
-		if (!num) return; \
+	static void _print_uint##s(uint##s##_t num, struct num_printer_t* meta, uint8_t flg, uint64_t lim) { \
+		if (!num || (!lim && (flg & FLG_LM) == FLG_LM)) return; \
 		const int res = (int)(num % (uint64_t)meta->base); \
-		_print_uint##s(num / (uint64_t)meta->base, meta); \
+		_print_uint##s(num / (uint64_t)meta->base, meta, flg, --lim); \
 		meta->printer((uint8_t)meta->charset[res]); \
 	}
 
 #define PRINT_INT(s) \
-	static void print_int##s(int##s##_t num, int base, const char* charset, void (*printer)(uint8_t)) { \
+	static void print_int##s(int##s##_t num, int base, const char* charset, void (*printer)(uint8_t), uint8_t flg, uint64_t lim) { \
 		struct num_printer_t meta; \
 		meta.base = base; \
 		meta.charset = charset; \
 		meta.printer = printer; \
 		if (num > 0) { \
-			_print_uint##s((uint##s##_t)num, &meta); \
+			_print_uint##s((uint##s##_t)num, &meta, flg, lim); \
 		} \
 		else if (num < 0) { \
 			printer('-'); \
-			_print_uint##s((uint##s##_t)(-num), &meta); \
+			_print_uint##s((uint##s##_t)(-num), &meta, flg, --lim); \
 		} \
 		else { \
-			printer('0'); \
+			serial_print("0", printer); \
 		} \
 	}
 
 #define PRINT_UINT(s) \
-	static void print_uint##s(uint##s##_t num, int base, const char* charset, void (*printer)(uint8_t)) { \
+	static void print_uint##s(uint##s##_t num, int base, const char* charset, void (*printer)(uint8_t), uint8_t flg, uint64_t lim) { \
 		struct num_printer_t meta; \
 		meta.base = base; \
 		meta.charset = charset; \
 		meta.printer = printer; \
 		if (num) { \
-			_print_uint##s(num, &meta); \
+			_print_uint##s(num, &meta, flg, lim); \
 		} \
 		else { \
-			printer('0'); \
+			serial_print("0", printer); \
 		} \
 	}
 
@@ -77,13 +83,18 @@ struct num_printer_t {
 					switch (*s) { \
 						case '6': \
 							s++; \
-							print_##m##64(va_arg(args, m##64_t), b, c##_charset, printer); \
+							print_##m##64(va_arg(args, m##64_t), b, c##_charset, printer, flg, width); \
 							break; \
 						case '3': \
 							s++; \
-							print_##m##32(va_arg(args, m##32_t), b, c##_charset, printer); \
+							print_##m##32(va_arg(args, m##32_t), b, c##_charset, printer, flg, width); \
 							break; \
 						default: \
+							if ((flg & FLG_LL) == FLG_LL) \
+								print_##m##64(va_arg(args, m##64_t), b, c##_charset, printer, flg, width); \
+							else \
+								print_##m##32(va_arg(args, m##32_t), b, c##_charset, printer, flg, width); \
+							s--; \
 							break; \
 					}
 
@@ -102,7 +113,6 @@ static void serial_print(const char* s, void (*printer)(uint8_t)) {
 	}
 }
 
-
 static void serial_com12(uint8_t b) {
 	serial_write_com1(b);
 	serial_write_com2(b);
@@ -112,6 +122,10 @@ static void serial_printf(const char* s, void (*printer)(uint8_t), va_list args)
 	for (; *s != 0; s++) {
 		switch (*s) {
 			case '%':
+				uint8_t flg = 0;
+				uint64_t width = 0;
+				uint64_t precision = 0;
+next_specifier:
 				s++;
 				switch (*s) {
 					case 'd':
@@ -120,6 +134,7 @@ static void serial_printf(const char* s, void (*printer)(uint8_t), va_list args)
 					case 'u':
 						CHOSE_SIZE(uint, 10, low)
 						break;
+					case 'p':
 					case 'x':
 						CHOSE_SIZE(uint, 16, low)
 						break;
@@ -127,14 +142,56 @@ static void serial_printf(const char* s, void (*printer)(uint8_t), va_list args)
 						CHOSE_SIZE(uint, 16, upper)
 						break;
 					case 's':
-						serial_print(va_arg(args, const char*), printer);
+						const char* str = va_arg(args, const char*);
+						if ((flg & FLG_LM) == FLG_LM) {
+							for (; width && *str; width--) {
+								printer((uint8_t)*(str++));
+								precision--;
+							}
+							if ((flg & FLG_PD) == FLG_PD) {
+								for (; precision; precision--) {
+									printer(' ');
+								}
+							}
+						}
+						else {
+							serial_print(str, printer);
+						}
 						break;
+					case 'l':
+						flg |= FLG_LL;
+						goto next_specifier;
 					case '%':
 						printer('%');
 						break;
+					case '0':
+					case '1':
+					case '2':
+					case '3':
+					case '4':
+					case '5':
+					case '6':
+					case '7':
+					case '8':
+					case '9':
+						if ((flg & FLG_PD) == FLG_PD)
+							precision = precision * 10 + (uint64_t)*s - '0';
+						else {
+							flg |= FLG_LM;
+							width = width * 10 + (uint64_t)*s - '0';
+						}
+						goto next_specifier;
+					case '.':
+						flg |= FLG_PD;
+						goto next_specifier;
 					default:
-						break;
+						goto next_specifier; //TODO: implement other specifiers
 				}
+				break;
+			case '\n':
+				// support either crlf or lf
+				printer('\r');
+				printer('\n');
 				break;
 			default:
 				printer((uint8_t)*s);
@@ -188,6 +245,7 @@ void serial_log(enum log_severity_t severity, const char* s, va_list args) {
 			serial_print("\r\n", serial_com12);
 			break;
 		default:
+			serial_printf(s, serial_com12, args);
 			break;
 	}
 }

@@ -177,7 +177,7 @@
 #endif /* ACPI_USE_STANDARD_HEADERS */
 
 #ifdef DEBUG
-#define ACPI_DEBUGGER
+//#define ACPI_DEBUGGER
 #endif /* DEBUG */
 
 #ifdef DEBUG_LOGGING
@@ -233,5 +233,8 @@ static uint8_t _stub(void) {
 	do { \
 		n >>= 1; \
 	} while (0)
+
+#define ACPI_SEMAPHORE 	uint64_t*
+#define ACPI_SPINLOCK		uint64_t*
 
 #endif /* DRIVERS_ACPICA_PLATFORM_ACMODULOS_H */
