@@ -17,30 +17,22 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-GRUB_MODS := multiboot2 fat normal part_gpt search
+GRUB_MODS := multiboot2 fat normal part_gpt search test
 
 ifdef DEBUG
-GRUB_MODS := $(GRUB_MODS) acpi backtrace cat echo lsmmap ls lspci minicmd probe read rdmsr search_fs_file search_fs_uuid search_label serial test wrmsr
+GRUB_MODS := $(GRUB_MODS) acpi backtrace cat echo lsmmap ls lspci minicmd probe read rdmsr search_fs_file search_fs_uuid search_label serial wrmsr
 endif
 
-ifdef BUILD_BOOT_GRAPHICSBASE
+ifdef BUILD_KERNEL_GRAPHICSBASE
 GRUB_MODS := $(GRUB_MODS) efi_gop video
 endif
 
-$(OBJ_DIR)/gpt.img: | $(OBJ_DIR)/
-	truncate -s 4G $@
-	parted -s $@ mklabel gpt
-	parted -s $@ mkpart ESP fat32 4MiB 52MiB
-	parted -s $@ set 1 esp on
-	parted -s $@ mkpart rootfs ext4 52MiB 100%
-	dd if=$@ bs=4M skip=1 count=1022 status=none | cmp -n 4286578688 /dev/zero -
-
-$(OBJ_DIR)/esp.img: grub.cfg | $(OBJ_DIR)/
+$(OBJ_DIR)/../esp.img: grub.cfg | $(OBJ_DIR)/
 	truncate -s 48M $@
 	mformat -v ESP_MODULOS -F -i $@
 	mmd -i $@ ::/EFI
 	mmd -i $@ ::/EFI/BOOT
-	x86_64-elf-grub-mkstandalone \
+	grub-mkstandalone \
 		--format=x86_64-efi \
 		--install-modules="$(GRUB_MODS)" \
 		--output=$(OBJ_DIR)/BOOTX64.EFI \

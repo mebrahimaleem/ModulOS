@@ -19,9 +19,17 @@
 
 #include <multiboot2/init.h>
 
-#include <core/kentry.h>
-#include <core/acpitables.h>
-#include <core/mm_init.h>
+#include <kernel/core/kentry.h>
+#include <kernel/core/mm_init.h>
+#include <kernel/core/gdt.h>
+#include <kernel/core/logging.h>
+
+#include <drivers/acpi/tables.h>
+
+#ifdef SERIAL
+#include <drivers/serial/serial.h>
+#include <drivers/serial/serial_print.h>
+#endif /* SERIAL */
 
 #define MOD8_MASK	(uint64_t)0x7
 
@@ -56,7 +64,7 @@ struct mb2_tag_t {
 		} __attribute__((packed)) memmap;
 
 		struct {
-			struct RSDP_t rsdp;
+			struct acpi_rsdp_t rsdp;
 		} __attribute__((packed)) rsdpv2;
 
 #ifdef GRAPHICSBASE
@@ -88,9 +96,9 @@ struct mb2_info_t {
 	const uint32_t reserved;
 } __attribute__((packed)) header;
 
-extern struct boot_context_t boot_context;
+extern volatile struct gdt_t gdt[GDT_NUM_ENTRIES];
 
-static struct mb2_tag_t* memmap_tag;
+static volatile struct mb2_tag_t* memmap_tag;
 
 static void first_segment(uint64_t* handle) {
 	*handle = 0;
@@ -98,7 +106,7 @@ static void first_segment(uint64_t* handle) {
 
 static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
 	uint64_t addr = (uint64_t)&memmap_tag->tag.memmap.entries + *handle * memmap_tag->tag.memmap.entry_size;
-	if (addr >= (uint64_t)&memmap_tag + memmap_tag->size) {
+	if (addr >= (uint64_t)memmap_tag + memmap_tag->size) {
 		seg->base = 0;
 		seg->size = 0;
 		return;
@@ -126,6 +134,18 @@ static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
 
 
 void multiboot2_init(struct mb2_info_t* info) {
+	logging_init();
+
+#ifdef SERIAL
+	serial_init_com1();
+	serial_init_com2();
+
+	serial_print_com1("COM1\r\n");
+	serial_print_com2("COM2\r\n");
+
+	logging_register(serial_log);
+#endif
+
 	// parse bootInformation
 	uint64_t i = sizeof(*info);
 	const uint64_t maxi = info->total_size;
@@ -139,6 +159,7 @@ void multiboot2_init(struct mb2_info_t* info) {
 				mm_init(first_segment, next_segment);
 				break;
 			case MBITAG_TYPE_RSDPV2:
+				logging_log_info("Found RSDP @ 0x%X64", (uint64_t)&tag->tag.rsdpv2.rsdp);
 				boot_context.rsdp = tag->tag.rsdpv2.rsdp;
 				break;
 #ifdef GRAPHICSBASE
@@ -172,5 +193,6 @@ void multiboot2_init(struct mb2_info_t* info) {
 		i = (i + 7) & ~MOD8_MASK;
 	}
 
+	boot_context.gdt = &gdt;
 	return;
 }
