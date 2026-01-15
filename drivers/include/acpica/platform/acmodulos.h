@@ -176,10 +176,6 @@
 #undef ACPI_USE_STANDARD_HEADERS
 #endif /* ACPI_USE_STANDARD_HEADERS */
 
-#ifdef DEBUG
-//#define ACPI_DEBUGGER
-#endif /* DEBUG */
-
 #ifdef DEBUG_LOGGING
 #define ACPI_DEBUG_OUTPUT
 #endif /* DEBUG_LOGGING */
