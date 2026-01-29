@@ -27,9 +27,7 @@ DEP_DIR := $(OBJ_DIR)/deps
 
 SRC := $(shell find $(SRC_DIRS) -type f \( -name "*.c" -o -name "*.S" \))
 
-ifndef DEBUG
 SRC := $(filter-out %/rsdump.c,$(SRC))
-endif
 
 TARGETS_C := $(filter %.o, $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC)))
 TARGETS := $(TARGETS_C)

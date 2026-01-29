@@ -1,4 +1,4 @@
-/* apic_init.h - Advanced programmable interrupt controller initialization interface */
+/* apic_init.c - Advanced programmable interrupt controller initialization interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify

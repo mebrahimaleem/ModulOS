@@ -15,11 +15,10 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include "acpica/acexcep.h"
 #include <stdint.h>
 
 #include <acpica_osl/init.h>
-
+#include <acpica_osl/namespace.h>
 #include <acpica_osl/acpica_include.h>
 
 #include <kernel/core/logging.h>
@@ -46,4 +45,15 @@ void acpica_init(void) {
 		logging_log_error("Failed to load ACPICA tables: 0x%x64", (uint64_t)sts);
 		panic(PANIC_ACPI);
 	}
+
+	sts = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
+
+	if (ACPI_FAILURE(sts)) {
+		logging_log_error("Failed to init ACPICA namespace: 0x%x64", (uint64_t)sts);
+		panic(PANIC_ACPI);
+	}
+
+	// TODO: init subsys
+	
+	acpica_index_all();
 }

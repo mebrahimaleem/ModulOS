@@ -24,6 +24,7 @@
 #include <acpica_osl/acpica_include.h>
 
 #include <serial/serial_print.h>
+#include <pci/pci_config.h>
 
 #include <kernel/core/logging.h>
 #include <kernel/core/alloc.h>
@@ -33,16 +34,13 @@
 #include <kernel/core/mm.h>
 #include <kernel/core/kentry.h>
 
-#define logging_log_warning _logging_log_warning
-static void _logging_log_warning(const char* fmt, ...) {(void)fmt;}
-
 ACPI_STATUS AcpiOsInitialize(void) {
 	return AE_OK;
 }
 
 ACPI_THREAD_ID AcpiOsGetThreadId(void) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsGetThreadId");
+	//logging_log_warning("Call to unfinished AcpiOsGetThreadId");
 	return 1;
 }
 
@@ -63,12 +61,13 @@ void* AcpiOsAllocate(ACPI_SIZE size) {
 
 void AcpiOsFree(void* ptr) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsFree 0x%x64", ptr);
+	//logging_log_warning("Call to unfinished AcpiOsFree 0x%x64", ptr);
+	(void)ptr;
 }
 
 ACPI_STATUS AcpiOsCreateSemaphore(UINT32 cap, UINT32 init, ACPI_SEMAPHORE* handle) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsCreateSemaphore");
+	//logging_log_warning("Call to unfinished AcpiOsCreateSemaphore");
 	(void)cap;
 	(void)init;
 	*handle = (void*)1;
@@ -77,14 +76,14 @@ ACPI_STATUS AcpiOsCreateSemaphore(UINT32 cap, UINT32 init, ACPI_SEMAPHORE* handl
 
 ACPI_STATUS AcpiOsDeleteSemaphore(ACPI_SEMAPHORE handle) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsDeleteSemaphore");
+	//logging_log_warning("Call to unfinished AcpiOsDeleteSemaphore");
 	(void)handle;
 	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE handle, UINT32 units, UINT16 timeout) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsWaitSemaphore");
+	//logging_log_warning("Call to unfinished AcpiOsWaitSemaphore");
 	(void)handle;
 	(void)units;
 	(void)timeout;
@@ -93,7 +92,7 @@ ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE handle, UINT32 units, UINT16 time
 
 ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE handle, UINT32 units) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsSignalSemaphore");
+	//logging_log_warning("Call to unfinished AcpiOsSignalSemaphore");
 	(void)handle;
 	(void)units;
 	return AE_OK;
@@ -102,26 +101,26 @@ ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE handle, UINT32 units) {
 ACPI_STATUS AcpiOsCreateLock(ACPI_SPINLOCK* handle) {
 	//TODO: implement
 	*handle = (void*)1;
-	logging_log_warning("Call to unfinished AcpiOsCreateLock");
+	//logging_log_warning("Call to unfinished AcpiOsCreateLock");
 	return AE_OK;
 }
 
 void AcpiOsDeleteLock(ACPI_SPINLOCK handle) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsCreateLock");
+	//logging_log_warning("Call to unfinished AcpiOsCreateLock");
 	(void)handle;
 }
 
 ACPI_CPU_FLAGS AcpiOsAcquireLock(ACPI_SPINLOCK handle) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsAcquireLock");
+	//logging_log_warning("Call to unfinished AcpiOsAcquireLock");
 	(void)handle;
 	return 0;
 }
 
 void AcpiOsReleaseLock(ACPI_SPINLOCK handle, ACPI_CPU_FLAGS flg) {
 	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsReleaseLock");
+	//logging_log_warning("Call to unfinished AcpiOsReleaseLock");
 	(void)handle;
 	(void)flg;
 }
@@ -294,21 +293,24 @@ ACPI_STATUS AcpiOsSignal(UINT32 func, void* info) {
 }
 
 ACPI_STATUS AcpiOsReadPciConfiguration(ACPI_PCI_ID* id, UINT32 reg, UINT64* val, UINT32 width) {
-	logging_log_warning("Call to unfinished AcpiOsReadPciConfiguration");
-	(void)id;
-	(void)reg;
-	(void)val;
-	(void)width;
-	return AE_SUPPORT;
+	*val = pci_read_conf_noalign(
+			(uint8_t)reg,
+			(uint8_t)id->Function,
+			(uint8_t)id->Device,
+			(uint8_t)id->Bus,
+			(uint8_t)width);
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsWritePciConfiguration(ACPI_PCI_ID* id, UINT32 reg, UINT64 val, UINT32 width) {
-	logging_log_warning("Call to unfinished AcpiOsWritePciConfiguration");
-	(void)id;
-	(void)reg;
-	(void)val;
-	(void)width;
-	return AE_SUPPORT;
+	pci_write_conf_noalign(
+			(uint8_t)reg,
+			(uint8_t)id->Function,
+			(uint8_t)id->Device,
+			(uint8_t)id->Bus,
+			(uint8_t)width,
+			val);
+	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsTerminate(void) {

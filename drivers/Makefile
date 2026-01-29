@@ -24,6 +24,9 @@ $(call add_directory,apic,APIC)
 $(call add_directory,ioapic,IOAPIC)
 $(call add_directory,acpi,ACPI)
 $(call add_directory,acpica_osl,ACPICA_OSL)
+$(call add_directory,pci,PCI)
+
+#TODO: switch to PCIe
 
 ifdef BUILD_DRIVERS_SERIAL
 $(call add_directory,serial,SERIAL)

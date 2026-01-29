@@ -31,9 +31,9 @@ DEFINES :=
 BUILD_DIRS :=
 
 ifdef DEBUG
-CDEBUG := -DDEBUG -Og -g3 -glldb
+CDEBUG := -DDEBUG -g3 -ggdb -O0
 else
-CDEBUG := -O2 -g
+CDEBUG := -g -O2
 endif
 
 ifdef DEBUG_LOGGING

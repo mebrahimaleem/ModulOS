@@ -17,8 +17,8 @@
 
 # Debug options
 
-#export DEBUG = 1
-#export DEBUG_LOGGING = 1
+export DEBUG = 1
+export DEBUG_LOGGING = 1
 
 # Global options
 
@@ -105,7 +105,7 @@ $(DRIVERS_TARGETS): drivers
 $(TEST_TARGETS): test
 
 $(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
-	$(CC) -O0 -g -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
+	$(CC) -g -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 
 .PHONY: copy-doc
 copy-doc: COPYING LICENSES | $(COPY_DOC_TO)
