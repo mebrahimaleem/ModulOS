@@ -22,6 +22,7 @@
 #include <core/idt.h>
 #include <core/cpu_instr.h>
 #include <core/logging.h>
+#include <core/timers.h>
 
 #include <drivers/acpi/tables.h>
 #include <drivers/acpica_osl/init.h>
@@ -40,13 +41,10 @@ void kentry(void) {
 	idt_init();
 	logging_log_debug("TSS and IDT init done");
 
+
 	logging_log_debug("ACPI init");
 	acpi_copy_tables();
 	logging_log_debug("ACPI init done");
-
-	logging_log_debug("ACPICA init");
-	acpica_init();
-	logging_log_debug("ACPICA init done");
 
 	logging_log_debug("APIC and IOAPIC init");
 	pic_disab();
@@ -54,6 +52,14 @@ void kentry(void) {
 	apic_nmi_enab();
 	ioapic_init();
 	logging_log_debug("APIC and IOAPIC init done");
+
+	logging_log_debug("Timer init");
+	default_timer_init();
+	logging_log_debug("Timer init done");
+
+	logging_log_debug("ACPICA init");
+	acpica_init();
+	logging_log_debug("ACPICA init done");
 
 	logging_log_info("Boot Complete ModulOS");
 

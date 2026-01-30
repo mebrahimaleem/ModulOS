@@ -17,7 +17,7 @@
 
 # Debug options
 
-export DEBUG = 1
+#export DEBUG = 1
 export DEBUG_LOGGING = 1
 
 # Global options
@@ -34,6 +34,8 @@ export BUILD_KERNEL_GRAPHICSBASE = 1
 # Optional driver modules
 
 export BUILD_DRIVERS_SERIAL = 1
+
+export BUILD_DRIVERS_HPET = 1
 
 # End of options
 

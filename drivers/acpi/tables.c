@@ -36,7 +36,14 @@
 
 #define FOUND_FADT	0x01
 #define FOUND_MADT	0x02
+#ifdef HPET
 #define FOUND_HPET	0x04
+#else /* HPET */
+#define FOUND_HPET	0x00
+#endif /* HPET */
+
+#define GAS_TYPE_SYS	0
+#define GAS_TYPE_IO		1
 
 struct acpi_gen_header_t {
 	uint8_t Signature[4];
@@ -280,7 +287,9 @@ fallback:
 #define CHECK_FAIL(sig) CHECK_FAIL_RSDPV1(sig)
 				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT);
 				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT);
+#ifdef HPET
 				CHECK_AND_COPY("HPET", "HPET", acpi_hpet, FOUND_HPET);
+#endif /* HPET */
 #undef CHECK_FAIL
 			}
 
@@ -330,7 +339,9 @@ fallback:
 #define CHECK_FAIL(sig) CHECK_FAIL_RSDPV2(sig)
 				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT);
 				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT);
+#ifdef HPET
 				CHECK_AND_COPY("HPET", "HPET", acpi_hpet, FOUND_HPET);
+#endif /* HPET */
 #undef CHECK_FAIL
 			}
 
@@ -365,3 +376,15 @@ void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* handle, uin
 uint16_t acpi_get_sci_int(void) {
 	return acpi_fadt->SCI_INT;
 }
+
+#ifdef HPET
+uint64_t acpi_get_hpet_reg_base(void) {
+	if (acpi_hpet->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_SYS &&
+			acpi_hpet->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_IO) {
+		logging_log_error("HPET base addr type must be sys or io. got: 0x%x64", 
+				(uint64_t)acpi_hpet->BASE_ADDRESS.AddressSpaceID);
+		panic(PANIC_ACPI);
+	}
+	return acpi_hpet->BASE_ADDRESS.Address;
+}
+#endif /* HPET */

@@ -104,7 +104,7 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 			}
 
 			if (((ACPI_OBJECT*)buf.Pointer)->Type != ACPI_TYPE_BUFFER) {
-				logging_log_error("ACPI _CRS has wrong type: 0x%64x", ((ACPI_OBJECT*)buf.Pointer)->Type);
+				logging_log_error("ACPI _CRS has wrong type: 0x%x64", ((ACPI_OBJECT*)buf.Pointer)->Type);
 				sts = AE_TYPE;
 				goto cleanup;
 			}
@@ -113,7 +113,7 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 			while (1) {
 				switch (elem->type & CRS_TYPE_SIZE_MASK) {
 					case (CRS_TYPE_SIZE_SMALL):
-						logging_log_info("Found small CRS entry type: 0x%64x", elem->type & CRS_SMALL_TYPE_MASK);
+						logging_log_info("Found small CRS entry type: 0x%x64", elem->type & CRS_SMALL_TYPE_MASK);
 						switch (elem->type & CRS_SMALL_TYPE_MASK) {
 							case CRS_TAG_END:
 								sts = AE_OK;
@@ -124,7 +124,7 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 						}
 						break;
 					case (CRS_TYPE_SIZE_LARGE):
-						logging_log_info("Found large CRS entry type: 0x%64x", elem->type & CRS_LARGE_TYPE_MASK);
+						logging_log_info("Found large CRS entry type: 0x%x64", elem->type & CRS_LARGE_TYPE_MASK);
 						elem = (union crs_elem_t*)(
 								(uint64_t)elem + 3 + (uint64_t)(elem->large_res.len_lo) + ((uint64_t)elem->large_res.len_hi << 8));
 						break;

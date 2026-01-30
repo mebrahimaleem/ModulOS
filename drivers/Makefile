@@ -26,6 +26,10 @@ $(call add_directory,acpi,ACPI)
 $(call add_directory,acpica_osl,ACPICA_OSL)
 $(call add_directory,pci,PCI)
 
+ifdef BUILD_DRIVERS_HPET
+$(call add_directory,hpet,HPET)
+endif
+
 #TODO: switch to PCIe
 
 ifdef BUILD_DRIVERS_SERIAL

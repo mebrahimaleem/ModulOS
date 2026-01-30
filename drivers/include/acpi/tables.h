@@ -108,4 +108,8 @@ extern void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* hand
 
 extern uint16_t acpi_get_sci_int(void);
 
+#ifdef HPET
+extern uint64_t acpi_get_hpet_reg_base(void);
+#endif /* HPET */
+
 #endif /* DRIVERS_ACPI_TABLES_H */
