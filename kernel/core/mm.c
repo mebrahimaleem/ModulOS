@@ -22,8 +22,6 @@
 #include <core/paging.h>
 #include <core/panic.h>
 
-#include <lib/mem_utils.h>
-
 #define PAGE_SIZE				0x1000
 #define PD_ENTRY_SIZE 	0x200000
 #define PDPT_ENTRY_SIZE 0x40000000
@@ -67,7 +65,7 @@ uint64_t mm_alloc_pv(size_t size) {
 	return virt_limit;
 }
 
-void mm_init_dv() {
+void mm_init_dv(void) {
 	// TODO: create a linked list of free dvs starting from mem_limit
 	dv_base = mem_limit;
 }
@@ -81,4 +79,19 @@ uint64_t mm_alloc_dv(enum mm_order_t order) {
 
 	dv_base += block;
 	return dv_base - block;
+}
+
+uint64_t mm_lowest_order(size_t size) {
+	uint8_t order = 64 - (uint8_t)__builtin_clzll(size);
+	if (order < 12) {
+		return MM_ORDER_4K;
+	}
+
+	order -= 12;
+
+	if (order > MM_MAX_ORDER) {
+		return (uint64_t)-1;
+	}
+
+	return order;
 }

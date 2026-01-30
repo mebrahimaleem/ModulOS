@@ -22,8 +22,9 @@
 #include <core/mm.h>
 #include <core/mm_init.h>
 #include <core/panic.h>
+#include <core/logging.h>
 
-#include <lib/mem_utils.h>
+#include <lib/kmemset.h>
 
 #define PAGE_PS 			0x80
 #define PAGE_TBL_FLG	(PAGE_PRESENT | PAGE_RW)
@@ -31,8 +32,6 @@
 #define PAGE_SIZE	0x1000
 
 #define TABLE_PADDR_MASK 	0xFFFFFFFFFFFFF000
-
-#define KERNEL_VMA 	0xFFFFFFFF80000000
 
 #define POOL_SIZE	0x200000
 
@@ -62,7 +61,7 @@ struct paging_pool_header_t {
 	uint8_t resv[4020];
 } __attribute__((packed));
 
-_Static_assert(sizeof(struct paging_pool_header_t) == PAGE_SIZE);
+_Static_assert(sizeof(struct paging_pool_header_t) == PAGE_SIZE, "paging pool header must be 4K");
 
 struct paging_pool_header_t* root_pool;
 
@@ -89,7 +88,7 @@ static uint64_t early_alloc_page(void) {
 					hint->bitmap[hint->hint] |= 1 << i;
 					hint->used++;
 					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
-					memset((void*)addr, 0, PAGE_SIZE);
+					kmemset((void*)addr, 0, PAGE_SIZE);
 					return addr;
 				}
 			}
@@ -118,7 +117,7 @@ static uint64_t alloc_page(void) {
 					hint->bitmap[hint->hint] |= 1 << i;
 					hint->used++;
 					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
-					memset((void*)addr, 0, PAGE_SIZE);
+					kmemset((void*)addr, 0, PAGE_SIZE);
 					return addr;
 				}
 			}
@@ -129,27 +128,27 @@ static uint64_t alloc_page(void) {
 	return alloc_page();
 }
 
-static struct paging_pool_header_t* early_create_pool() {
+static struct paging_pool_header_t* early_create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_early_alloc_2m();
 	paging_early_map_2m((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW);
 
-	memset(addr, 0, POOL_SIZE);
+	kmemset(addr, 0, POOL_SIZE);
 	addr->bitmap[0] = 0x01;
 
 	return addr;
 }
 
-static struct paging_pool_header_t* create_pool() {
+static struct paging_pool_header_t* create_pool(void) {
 	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc(MM_ORDER_2M);
 	paging_map((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW, PAGE_2M);
 
-	memset(addr, 0, POOL_SIZE);
+	kmemset(addr, 0, POOL_SIZE);
 	addr->bitmap[0] = 0x01;
 
 	return addr;
 }
 
-void paging_init() {
+void paging_init(void) {
 	const uint64_t pool_base = mm_early_alloc_2m();
 
 	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(pool_base)];
@@ -172,7 +171,7 @@ void paging_init() {
 	root_pool = (struct paging_pool_header_t*)pool_base;
 	hint = root_pool;
 
-	memset(root_pool, 0, POOL_SIZE);
+	kmemset(root_pool, 0, POOL_SIZE);
 
 	root_pool->ac = 1;
 	root_pool->bitmap[0] = 0x01;
@@ -191,6 +190,7 @@ void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t pa
 
 	if ((pd & PAGE_PRESENT) == PAGE_PRESENT && (pd & PAGE_PS) == PAGE_PS) {
 		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -215,6 +215,7 @@ void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t pa
 
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT && (pt & PAGE_PS) == PAGE_PS) {
 		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -239,6 +240,7 @@ void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t pa
 
 	if ((addr & PAGE_PRESENT) == PAGE_PRESENT) {
 		if ((addr & TABLE_PADDR_MASK) == paddr) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -260,6 +262,7 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 
 	if ((pd & PAGE_PS) == PAGE_PS) {
 		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 
@@ -275,6 +278,7 @@ void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
 
 	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
 		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
+			logging_log_warning("Already mapped 0x%X64 -> 0x%X64", paddr, vaddr);
 			return;
 		}
 

@@ -15,10 +15,26 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#include <stdint.h>
+
 #include <core/panic.h>
+#include <core/cpu_instr.h>
+#include <core/logging.h>
+
+
+static const char* panic_names[] = {
+	[PANIC_UNK] = "Unkown",
+	[PANIC_PAGING] = "Paging error",
+	[PANIC_NO_MEM] = "Out of memory",
+	[PANIC_STATE] = "Unrecoverable kernel state",
+	[PANIC_ACPI] = "Bad ACPI hardware",
+	[PANIC_APIC] = "Unrecoverable APIC error",
+	[PANIC_MAX] = 0
+};
 
 void panic(enum panic_code_t code) {
-	// TODO: log
+	logging_log_error("Panic 0x%X64 %s\r\nHalt", (uint64_t)code, 
+			panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK]);
 
-	while (1);
+	cpu_halt_loop();
 }

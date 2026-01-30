@@ -17,11 +17,10 @@
 
 # Debug options
 
-export DEBUG = 1
+#export DEBUG = 1
+export DEBUG_LOGGING = 1
 
 # Global options
-
-export BUILD_GRAPHICSBASE = 1
 
 # Optional boot modules
 
@@ -30,87 +29,124 @@ export BUILD_BOOT_MULTIBOOT2 = 1
 
 # Optional core modules
 
+export BUILD_KERNEL_GRAPHICSBASE = 1
 
 # Optional driver modules
 
+export BUILD_DRIVERS_SERIAL = 1
 
-# Auto include modules
-
-ifdef BUILD_GRAPHICSBASE
-export BUILD_BOOT_GRAPHICSBASE = 1
-endif
-
-ifdef BUILD_GRAPHICSBASE
-export BUILD_KERNEL_GRAPHICSBASE = 1
-endif
+export BUILD_DRIVERS_HPET = 1
 
 # End of options
 
 export SRC_TREE_ROOT = .
 export OBJ_DIR = build
 
-export KERNEL_TOOLCHAIN_PREFIX = x86_64-elf-
+export CC := clang
+export AR := llvm-ar
+export STRIP := llvm-strip
 
-KERNEL_CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
-KERNEL_LD := $(KERNEL_TOOLCHAIN_PREFIX)ld
-KERNEL_STRIP := $(KERNEL_TOOLCHAIN_PREFIX)strip
+SUBDIRS := kernel boot drivers test
+KERNEL_TARGETS := \
+									$(OBJ_DIR)/kernel.a
+BOOT_TARGETS := \
+									$(OBJ_DIR)/boot.a \
+									$(OBJ_DIR)/esp.img
+DRIVERS_TARGETS := \
+									$(OBJ_DIR)/drivers.a \
+									$(OBJ_DIR)/acpica.a
+TEST_TARGETS := \
+									$(OBJ_DIR)/test_lib.a \
+									$(OBJ_DIR)/test_testsuite.a
 
-SUBDIRS := kernel boot drivers
-SUBDIR_TARGETS := $(OBJ_DIR)/kernel.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/esp.img
+TEST_CANIDATES := $(patsubst $(OBJ_DIR)/test_%.a,test-%,$(TEST_TARGETS))
+TEST_EXEC := $(basename $(TEST_TARGETS))
 
 COPY_DOC_TO := $(OBJ_DIR)/rootfs/doc/ModulOS/
-COPY_DOC := $(COPY_DOC_TO)COPYING
-
-TEST_RUNTIME_DIR := $(OBJ_DIR)/test
 
 SRC := $(shell find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \))
 
-KERNEL_LIB_DIR := $(dir $(shell $(KERNEL_CC) -mno-red-zone -print-libgcc-file-name))
+include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 
 .PHONY: build
 build: $(OBJ_DIR)/modulos.img
 
 .PHONY: all
-all: index build
+all: index build test-all
 
 .PHONY: index
-index:
+index: cscope.files
 	ctags --C-kinds=+pxzL -R $(SRC)
-	echo $(SRC) > cscope.files
 	cscope -q -R -b -i cscope.files
 
 .PHONY: clean
 clean:
 	-rm -rd $(OBJ_DIR)/ tags cscope.*
 
+.PHONY: test-all
+test-all: $(TEST_CANIDATES)
+
+.PHONY: $(TEST_CANIDATES)
+$(TEST_CANIDATES): test-%: $(OBJ_DIR)/test_%
+	./$<
+
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
 	$(MAKE) -C $@ build
 
+cscope.files: $(SRC)
+	find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \) > $@
+
 %/:
 	-mkdir -p $@
 
-$(SUBDIR_TARGETS): %: $(SUBDIRS)
+$(KERNEL_TARGETS): kernel
+$(BOOT_TARGETS): boot
+$(DRIVERS_TARGETS): drivers
 
-$(COPY_DOC): $(COPY_DOC_TO)%: % | $(COPY_DOC_TO)
-	cp $< $|
+$(TEST_TARGETS): test
 
-$(OBJ_DIR)/fs.img: $(COPY_DOC)
-	truncate -s 4040M $@
-	yes | mke2fs -L rootfs -d $(OBJ_DIR)/rootfs/ -t ext4 $@
+$(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
+	$(CC) -g -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 
-$(OBJ_DIR)/modulos.img: $(OBJ_DIR)/bootstub.img $(OBJ_DIR)/fs.img $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos
-	cp $< $@
-	mcopy -o -i $(OBJ_DIR)/boot/esp.img $(OBJ_DIR)/modulos ::/
-	dd if=$(OBJ_DIR)/boot/esp.img of=$@ seek=1 count=12 bs=4M conv=notrunc
-	dd if=$(OBJ_DIR)/fs.img of=$@ seek=13 count=1010 bs=4M conv=notrunc
+.PHONY: copy-doc
+copy-doc: COPYING LICENSES | $(COPY_DOC_TO)
+	cp -r COPYING LICENSES $(COPY_DOC_TO)
 
-$(OBJ_DIR)/modulos.ld: $(SUBDIRS)
+$(OBJ_DIR)/stub.img: | $(OBJ_DIR)/
+	truncate -s 4G $@
+	parted -s $@ mklabel gpt
+	parted -s $@ mkpart ESP fat32 4MiB 52MiB
+	parted -s $@ set 1 esp on
+	parted -s $@ mkpart rootfs ext4 52MiB 100%
+
+$(OBJ_DIR)/stub-esp.dummy: $(OBJ_DIR)/stub.img $(OBJ_DIR)/modulos $(OBJ_DIR)/esp.img
+	mcopy -o -i $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos ::/
+	dd if=$(OBJ_DIR)/esp.img of=$< seek=1 count=12 bs=4M conv=notrunc
+	touch $@
+
+# 54525952 is for 52MiB offset (512 * 1024 * 1024)
+# 1034240 is for 52MiB initial (4MiB align + 48MiB ESP) and 4MiB tail for gpt
+$(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img copy-doc
+	yes | mke2fs -L rootfs -E offset=54525952 -d $(OBJ_DIR)/rootfs/ -t ext4 \
+		-b 4096 $< 1034240
+	touch $@
+
+$(OBJ_DIR)/modulos.img: $(OBJ_DIR)/stub.img $(OBJ_DIR)/stub-esp.dummy $(OBJ_DIR)/stub-fs.dummy
+	@echo -n "\033[0;32m"
+	ln -f -s -r $< $@
+	@echo -n "\033[0m"
+
+$(OBJ_DIR)/modulos.ld: $(filter-out test,$(SUBDIRS))
 	cat $$(find $(OBJ_DIR)/lds -type l -name "*.ld" | awk -F/ '{print $$NF, $$0}' | sort \
 		| cut -d' ' -f2-) > $@
 
 $(OBJ_DIR)/modulos: $(OBJ_DIR)/modulos-dbg
-	$(KERNEL_STRIP) -s -o $@ $<
+	$(STRIP) -s -o $@ $<
 
-$(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a
-	$(KERNEL_LD) -o $@ -T $^ -L $(KERNEL_LIB_DIR) -lgcc
+$(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld \
+	$(OBJ_DIR)/boot.a \
+	$(OBJ_DIR)/kernel.a \
+	$(OBJ_DIR)/drivers.a \
+	$(OBJ_DIR)/acpica.a
+	$(CC) -o $@ $(LTO) $(LD_FLAGS) -fuse-ld=lld -T $^

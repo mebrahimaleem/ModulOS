@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_MM_H
-#define CORE_MM_H
+#ifndef KERNEL_CORE_MM_H
+#define KERNEL_CORE_MM_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -57,5 +57,7 @@ extern void mm_init_dv(void);
 
 extern uint64_t mm_alloc_dv(enum mm_order_t order);
 
-#endif /* CORE_MM_H */
+extern uint64_t mm_lowest_order(size_t size);
+
+#endif /* KERNEL_CORE_MM_H */
 

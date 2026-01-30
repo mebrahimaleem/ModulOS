@@ -1,6 +1,10 @@
 # ModulOS
 An operating system that aims to be customizable and modular to provide a fast user experience
 
+## Licensing
+
+This software is provided under the GPLv3 license, found in COPYING. This software also contains third party source code with their own licenses, all found under LICENSES/
+
 ## Installing
 
 For installing instructions, see `INSTALL`

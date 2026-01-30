@@ -15,27 +15,30 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_KENTRY_H
-#define CORE_KENTRY_H
+#ifndef KERNEL_CORE_KENTRY_H
+#define KERNEL_CORE_KENTRY_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-#include <core/acpitables.h>
+#include <kernel/core/gdt.h>
+
+#include <drivers/acpi/tables.h>
 
 #ifdef GRAPHICSBASE
-#include <graphicsbase/framebuffer.h>
+#include <kernel/graphicsbase/framebuffer.h>
 #endif /* GRAPHICSBASE */
 
 struct boot_context_t {
-	size_t num_memmap;
-	struct memmap_t* memmap;
-	struct RSDP_t rsdp;
+	struct acpi_rsdp_t rsdp;
+	volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
 #ifdef GRAPHICSBASE
 	struct framebuffer_t framebuffer;
 #endif /* GRAPHICSBASE */
 };
 
+extern struct boot_context_t boot_context;
+
 extern void kentry(void) __attribute__((noreturn));
 
-#endif /* CORE_KENTRY_H */
+#endif /* KERNEL_CORE_KENTRY_H */
