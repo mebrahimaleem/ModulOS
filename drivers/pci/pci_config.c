@@ -1,5 +1,5 @@
 /* pci_config.c - Peripheral Controller Interface configuration space access */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
