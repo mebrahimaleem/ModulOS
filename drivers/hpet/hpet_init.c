@@ -1,5 +1,5 @@
-/* hpet.c - hpet init */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* hpet_init.c - hpet init */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -22,8 +22,17 @@
 #include <kernel/core/panic.h>
 #include <kernel/core/paging.h>
 #include <kernel/core/mm.h>
+#include <kernel/core/alloc.h>
+#include <kernel/core/clock_src.h>
 
 #define HPET_GROUP_ENA		0x1
+#define HPET_INT_ENA			0x4
+#define HPET_NUM_TIM			0x1F00
+#define HPET_NUM_TIM_SHF	8
+#define HPET_PER					0xFFFFFFFF00000000
+#define HPET_PER_SHF			32
+
+#define NS_TO_FS	1000000
 
 struct hpet_timer_t {
 	uint64_t cap;
@@ -32,7 +41,7 @@ struct hpet_timer_t {
 	uint64_t r0;
 } __attribute__((packed));
 
-static volatile struct {
+static volatile struct hpet_group_t {
 	uint64_t cap;
 	uint64_t r0;
 	uint64_t gen_conf;
@@ -44,8 +53,24 @@ static volatile struct {
 	struct hpet_timer_t timers[32];
 } __attribute__((packed))* hpet_reg_bases[8];
 
+static uint64_t hpet_get_counter(void* meta) {
+	volatile struct hpet_group_t* hpet = meta;
+	return hpet->counter;
+}
+
+static void hpet_set_counter(void* meta, uint64_t counter) {
+	volatile struct hpet_group_t* hpet = meta;
+	hpet->gen_conf &= ~(uint64_t)HPET_GROUP_ENA;
+	hpet->counter = counter;
+	hpet->gen_conf |= HPET_GROUP_ENA;
+}
+
 void hpet_init(void) {
 	acpi_get_hpet_bases((uint64_t*)&hpet_reg_bases[0]);
+
+	struct clock_src_t* clock;
+
+	int8_t num_tim;
 
 	for (uint8_t i = 0; i < 8; i++) {
 		if (hpet_reg_bases[i]) {
@@ -58,8 +83,23 @@ void hpet_init(void) {
 					PAGE_4K);
 			hpet_reg_bases[i] = (void*)temp;
 
-			// disable all hpet timer groups
-			hpet_reg_bases[i]->gen_conf &= ~(uint64_t)HPET_GROUP_ENA;
+			// disable all interrupts
+			for (num_tim = (hpet_reg_bases[i]->cap & HPET_NUM_TIM) >> HPET_NUM_TIM_SHF;
+					num_tim >= 0;
+					num_tim--) {
+				hpet_reg_bases[i]->timers[num_tim].cap &= ~(uint64_t)HPET_INT_ENA;
+			}
+
+
+			// enable timers with no interrupts
+			clock = kmalloc(sizeof(struct clock_src_t));
+			clock->counter = hpet_get_counter;
+			clock->reset = hpet_set_counter;
+			clock->meta = (void*)hpet_reg_bases[i];
+			clock->period_fs = (hpet_reg_bases[i]->cap & HPET_PER) >> HPET_PER_SHF;
+			clock_src_register(clock);
+
+			clock->reset(clock->meta, 0);
 		}
 	}
 }

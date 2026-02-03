@@ -1,5 +1,5 @@
 /* time.c - time management utilities */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,33 @@
 */
 
 #include <core/time.h>
+#include <core/clock_src.h>
+#include <core/cpu_instr.h>
+#include <core/logging.h>
+#include <core/panic.h>
 
-static uint64_t time_since_start = 0;
+static struct clock_src_t* clock;
 
-void time_init(void) {}
+void time_init(void) {
+	if(!(clock = clock_src_alloc()))  {
+		logging_log_error("Out of clock sources");
+		panic(PANIC_STATE);
+	}
 
-uint64_t time_get_since_start(void) {
-	return time_since_start;
+	clock->reset(clock->meta, 0);
+}
+
+uint64_t time_busy_wait(uint64_t min_ns) {
+	const uint64_t start = clock->counter(clock->meta) * clock->period_fs;
+	const uint64_t stop = start + min_ns * TIME_CONV_NS_TO_FS;
+	uint64_t actual;
+	while ((actual = clock->counter(clock->meta) * clock->period_fs) < stop) {
+		cpu_pause();
+	}
+
+	return actual - start;
+}
+
+uint64_t time_since_init_ns(void) {
+	return clock->counter(clock->meta) * clock->period_fs / TIME_CONV_NS_TO_FS;
 }

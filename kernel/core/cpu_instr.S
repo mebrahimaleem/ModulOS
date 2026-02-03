@@ -36,6 +36,11 @@ cpu_sti:
 sti
 ret
 
+.globl cpu_pause
+cpu_pause:
+pause
+ret
+
 .globl cpu_halt_loop
 cpu_halt_loop:
 hlt

@@ -1,5 +1,5 @@
 /* time.c - time management interface */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -22,8 +22,8 @@
 
 extern void time_init(void);
 
-extern void time_tick_isr(void);
+extern uint64_t time_busy_wait(uint64_t min_ns);
 
-extern uint64_t time_get_since_start(void);
+extern uint64_t time_since_init_ns(void);
 
 #endif /* KERNEL_CORE_TIME_H */

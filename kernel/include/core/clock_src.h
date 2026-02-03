@@ -1,5 +1,5 @@
-/* apic_init.h - Local advanced programmable interrupt controller initialization interface */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* clock_src.h - generic clock source interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,15 +15,27 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_APIC_APIC_INIT_H
-#define DRIVERS_APIC_APIC_INIT_H
+#ifndef KERNEL_CORE_CLOCK_SRC_H
+#define KERNEL_CORE_CLOCK_SRC_H
 
 #include <stdint.h>
 
-extern void apic_init(void);
+#define TIME_CONV_NS_TO_FS	1000000
+#define TIME_CONV_MS_TO_NS	1000000
+#define TIME_CONV_US_TO_NS	1000
 
-extern void apic_nmi_enab(void);
 
-extern void apic_disab(void);
+struct clock_src_t {
+	uint64_t period_fs;
+	uint64_t (*counter)(void*);
+	void (*reset)(void*, uint64_t);
+	void* meta;
+};
 
-#endif /* DRIVERS_APIC_APIC_INIT_H */
+extern void clock_src_init(void);
+
+extern void clock_src_register(struct clock_src_t* clock);
+
+extern struct clock_src_t* clock_src_alloc(void);
+
+#endif /* KERNEL_CORE_CLOCK_SRC_H */

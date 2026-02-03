@@ -33,6 +33,8 @@
 #include <kernel/core/ports.h>
 #include <kernel/core/mm.h>
 #include <kernel/core/kentry.h>
+#include <kernel/core/time.h>
+#include <kernel/core/clock_src.h>
 
 ACPI_STATUS AcpiOsInitialize(void) {
 	return AE_OK;
@@ -214,15 +216,11 @@ ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE type, ACPI_OSD_EXEC_CALLBACK callbac
 }
 
 void AcpiOsSleep(UINT64 ms) {
-	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsSleep");
-	(void)ms;
+	time_busy_wait(ms * TIME_CONV_MS_TO_NS);
 }
 
 void AcpiOsStall(UINT32 us) {
-	//TODO: implement
-	logging_log_warning("Call to unfinished AcpiOsStall");
-	(void)us;
+	time_busy_wait(us * TIME_CONV_US_TO_NS);
 }
 
 ACPI_STATUS AcpiOsPredefinedOverride(const ACPI_PREDEFINED_NAMES* predefined, ACPI_STRING* new_value) {
@@ -259,7 +257,7 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS paddr, ACPI_SIZE len) {
 }
 
 void AcpiOsUnmapMemory(void* vaddr, ACPI_SIZE len) {
-	logging_log_warning("Call to unfinished AcpiOsUnmapMemory");
+	//logging_log_warning("Call to unfinished AcpiOsUnmapMemory");
 	(void)vaddr;
 	(void)len;
 }
@@ -281,8 +279,7 @@ ACPI_STATUS AcpiOsPhysicalTableOverride(
 }
 
 UINT64 AcpiOsGetTimer(void) {
-	logging_log_warning("Call to unfinished AcpiOsGetTimer");
-	return 0;
+	return time_since_init_ns();
 }
 
 ACPI_STATUS AcpiOsSignal(UINT32 func, void* info) {
