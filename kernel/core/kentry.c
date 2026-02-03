@@ -22,13 +22,16 @@
 #include <core/idt.h>
 #include <core/cpu_instr.h>
 #include <core/logging.h>
-#include <core/timers.h>
+#include <core/time.h>
 
 #include <drivers/acpi/tables.h>
 #include <drivers/acpica_osl/init.h>
 #include <drivers/pic_8259/pic.h>
 #include <drivers/apic/apic_init.h>
 #include <drivers/ioapic/ioapic_init.h>
+#ifdef HPET
+#include <drivers/hpet/hpet_init.h>
+#endif /* HPET */
 
 struct boot_context_t boot_context;
 
@@ -53,9 +56,14 @@ void kentry(void) {
 	ioapic_init();
 	logging_log_debug("APIC and IOAPIC init done");
 
-	logging_log_debug("Timer init");
-	default_timer_init();
-	logging_log_debug("Timer init done");
+
+#ifdef HPET
+	hpet_init();
+#endif /* HPET */
+
+	logging_log_debug("Initializing system clock");
+	time_init();
+	logging_log_debug("System clock initialized.");
 
 	logging_log_debug("ACPICA init");
 	acpica_init();

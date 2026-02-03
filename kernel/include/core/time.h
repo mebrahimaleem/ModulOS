@@ -1,4 +1,4 @@
-/* apic_init.h - Local advanced programmable interrupt controller initialization interface */
+/* time.c - time management interface */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,19 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_APIC_APIC_INIT_H
-#define DRIVERS_APIC_APIC_INIT_H
+#ifndef KERNEL_CORE_TIME_H
+#define KERNEL_CORE_TIME_H
 
 #include <stdint.h>
 
-extern void apic_init(void);
+extern void time_init(void);
 
-extern void apic_nmi_enab(void);
+extern void time_tick_isr(void);
 
-extern void apic_disab(void);
+extern uint64_t time_get_since_start(void);
 
-extern uint64_t apic_get_base(void);
-
-extern uint8_t apic_get_bsp_id(void);
-
-#endif /* DRIVERS_APIC_APIC_INIT_H */
+#endif /* KERNEL_CORE_TIME_H */

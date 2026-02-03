@@ -166,6 +166,7 @@ struct acpi_madt_t {
 	uint8_t InterruptControllerStructure[];
 } __attribute__((packed));
 
+#ifdef HPET
 struct acpi_hpet_t {
 	uint8_t Signature[4];
 	uint32_t Length;
@@ -186,10 +187,14 @@ struct acpi_hpet_t {
 	uint16_t MainCounterMinimumClockTick;
 	uint8_t PageProtectionAndOEMAttribute;
 } __attribute__((packed));
+#endif /* HPET */
 
 static struct acpi_fadt_t* acpi_fadt;
 static struct acpi_madt_t* acpi_madt;
-static struct acpi_hpet_t* acpi_hpet;
+#ifdef HPET
+static struct acpi_hpet_t* acpi_hpet[8];
+static uint8_t hpet_count;
+#endif /* HPET */
 
 #define CHECK_FAIL_RSDPV1(sig) \
 	logging_log_error("Bad ACPI " sig " checksum"); \
@@ -199,7 +204,7 @@ static struct acpi_hpet_t* acpi_hpet;
 	logging_log_warning("Bad ACPI " sig " checksum. Falling back to RSDPV1"); \
 	goto fallback
 
-#define CHECK_AND_COPY(sig, tbl, store, fnd) \
+#define CHECK_AND_COPY(sig, tbl, store, fnd, post) \
 	do { \
 		if (!kmemcmp((uint8_t*)gen->Signature, sig, 4)) { \
 			map_table(gen); \
@@ -210,6 +215,7 @@ static struct acpi_hpet_t* acpi_hpet;
 			store = kmalloc(gen->Length); \
 			kmemcpy((void*)store, (void*)gen, gen->Length); \
 			found |= fnd; \
+			post; \
 		} \
 	} \
 	while (0)
@@ -247,6 +253,10 @@ static inline uint8_t verify_checksum(const volatile void* table) {
 }
 
 void acpi_copy_tables(void) {
+#ifdef HPET
+	hpet_count = 0;
+#endif /* HPET */
+
 	const volatile struct acpi_gen_header_t* gen;
 	uint8_t found;
 
@@ -285,10 +295,10 @@ fallback:
 				map_header(gen);
 
 #define CHECK_FAIL(sig) CHECK_FAIL_RSDPV1(sig)
-				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT);
-				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT);
+				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT, (void)0);
+				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT, (void)0);
 #ifdef HPET
-				CHECK_AND_COPY("HPET", "HPET", acpi_hpet, FOUND_HPET);
+				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
 #endif /* HPET */
 #undef CHECK_FAIL
 			}
@@ -337,10 +347,10 @@ fallback:
 				map_header(gen);
 
 #define CHECK_FAIL(sig) CHECK_FAIL_RSDPV2(sig)
-				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT);
-				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT);
+				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT, (void)0);
+				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT, (void)0);
 #ifdef HPET
-				CHECK_AND_COPY("HPET", "HPET", acpi_hpet, FOUND_HPET);
+				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
 #endif /* HPET */
 #undef CHECK_FAIL
 			}
@@ -378,13 +388,18 @@ uint16_t acpi_get_sci_int(void) {
 }
 
 #ifdef HPET
-uint64_t acpi_get_hpet_reg_base(void) {
-	if (acpi_hpet->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_SYS &&
-			acpi_hpet->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_IO) {
-		logging_log_error("HPET base addr type must be sys or io. got: 0x%x64", 
-				(uint64_t)acpi_hpet->BASE_ADDRESS.AddressSpaceID);
-		panic(PANIC_ACPI);
+void acpi_get_hpet_bases(uint64_t* bases) {
+	bases[0] = bases[1] = bases[2] = bases[3] = 
+	bases[4] = bases[5] = bases[6] = bases[7] = 0;
+
+	for (uint8_t i = 0; i < hpet_count; i++) {
+		if (acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_SYS &&
+				acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_IO) {
+			logging_log_error("HPET base addr type must be sys or io. got: 0x%x64", 
+					(uint64_t)acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID);
+			panic(PANIC_ACPI);
+		}
+		bases[acpi_hpet[i]->HPETNumber] = acpi_hpet[i]->BASE_ADDRESS.Address;
 	}
-	return acpi_hpet->BASE_ADDRESS.Address;
 }
 #endif /* HPET */

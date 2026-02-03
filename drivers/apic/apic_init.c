@@ -184,3 +184,11 @@ void apic_nmi_enab(void) {
 	io_wait();
 	inb(CMOS_RAM_DATA);
 }
+
+uint64_t apic_get_base(void) {
+	return apic_base;
+}
+
+uint8_t apic_get_bsp_id(void) {
+	return bsp_apic_id;
+}

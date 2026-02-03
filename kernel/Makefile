@@ -30,6 +30,10 @@ ifdef BUILD_DRIVERS_SERIAL
 DEFINES := $(DEFINES) -DSERIAL
 endif
 
+ifdef BUILD_DRIVERS_HPET
+DEFINES := $(DEFINES) -DHPET
+endif
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 

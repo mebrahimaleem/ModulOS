@@ -1,4 +1,4 @@
-/* exceptions.h - exceptions interrrupt service routines*/
+/* exceptions.S - exceptions interrrupt service routines*/
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify

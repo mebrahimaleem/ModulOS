@@ -1,4 +1,4 @@
-/* timers.h - generic timer interface */
+/* time.c - time management utilities */
 /* Copyright (C) 2025  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,17 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_TIMER_H
-#define KERNEL_CORE_TIMER_H
+#include <core/time.h>
 
-#include <stdint.h>
+static uint64_t time_since_start = 0;
 
-typedef void (*timer_init_t)(void);
+void time_init(void) {}
 
-struct timer_t {
-	uint64_t id;
-};
-
-extern timer_init_t default_timer_init;
-
-#endif /* KERNEL_CORE_TIMER_H */
+uint64_t time_get_since_start(void) {
+	return time_since_start;
+}
