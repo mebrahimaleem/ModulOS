@@ -1,5 +1,5 @@
-/* boot.ld - boot linker script */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* 06_boot.ld - boot linker script */
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -25,16 +25,16 @@ PHDRS {
 SECTIONS {
 	. = 1M;
 
-	.text.boot BLOCK(4K) : {
+	.text.boot ALIGN(4K) : {
 		KEEP(*(.text.multiboot2))
 		*(.text.boot)
 	} :boottext
 
-	.data.boot BLOCK(4K) : {
+	.data.boot ALIGN(4K) : {
 		*(.data.boot)
 	} :bootdata
 
-	.bss.boot BLOCK(4K) : {
+	.bss.boot ALIGN(4K) : {
 		*(.bss.boot)
 	} :bootdata
 

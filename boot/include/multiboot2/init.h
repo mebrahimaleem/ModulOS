@@ -1,5 +1,5 @@
 /* init.h - multiboot2 kernel init interface */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef MULTIBOOT2_INIT_H
-#define MULTIBOOT2_INIT_H
+#ifndef BOOT_MULTIBOOT2_INIT_H
+#define BOOT_MULTIBOOT2_INIT_H
 
 #define MBITAG_TYPE_MEMMAP	6
 #ifdef GRAPHICSBASE
@@ -32,4 +32,4 @@ extern void multiboot2_init(struct mb2_info_t* info);
 
 #endif /* _ASM */
 
-#endif /* MULTIBOOT2_INIT_H */
+#endif /* BOOT_MULTIBOOT2_INIT_H */

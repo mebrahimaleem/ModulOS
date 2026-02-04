@@ -1,5 +1,5 @@
 /* framebuffer.h - framebuffer interface */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef GRAPHICSBASE_FRAMEBUFFER_H
-#define GRAPHICSBASE_FRAMEBUFFER_H
+#ifndef KERNEL_GRAPHICSBASE_FRAMEBUFFER_H
+#define KERNEL_GRAPHICSBASE_FRAMEBUFFER_H
 
 #include <stdint.h>
 
@@ -35,5 +35,5 @@ extern void framebuffer_fillrect(
 		struct framebuffer_t* framebuffer, uint32_t startx, uint32_t starty, uint32_t width,
 		uint32_t height, uint8_t r, uint8_t g, uint8_t b);
 
-#endif /* GRAPHICSBASE_FRAMEBUFFER_H */
+#endif /* KERNEL_GRAPHICSBASE_FRAMEBUFFER_H */
 

@@ -1,5 +1,5 @@
 /* kentry.c - kernel entry point */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,13 +15,56 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#include "core/clock_src.h"
 #include <stdint.h>
 
 #include <core/kentry.h>
+#include <core/tss.h>
+#include <core/idt.h>
+#include <core/cpu_instr.h>
+#include <core/logging.h>
+#include <core/clock_src.h>
+#include <core/time.h>
+
+#include <drivers/acpi/tables.h>
+#include <drivers/acpica_osl/init.h>
+#include <drivers/pic_8259/pic.h>
+#include <drivers/apic/apic_init.h>
+#include <drivers/ioapic/ioapic_init.h>
 
 struct boot_context_t boot_context;
 
-void kentry() {
+extern void test_tt(void);
 
-	while (1) {}
+void kentry(void) {
+	logging_log_debug("Kernel Entry");
+	logging_log_debug("TSS and IDT init");
+	tss_init();
+	idt_init();
+	logging_log_debug("TSS and IDT init done");
+
+	logging_log_debug("ACPI init");
+	acpi_copy_tables();
+	logging_log_debug("ACPI init done");
+
+	logging_log_debug("Initializing system clock");
+	clock_src_init();
+	time_init();
+	logging_log_debug("System clock initialized.");
+
+	logging_log_debug("APIC and IOAPIC init");
+	pic_disab();
+	apic_init();
+	apic_timer_calib(apic_get_bsp_id());
+	apic_nmi_enab();
+	ioapic_init();
+	logging_log_debug("APIC and IOAPIC init done");
+
+	logging_log_debug("ACPICA init");
+	acpica_init();
+	logging_log_debug("ACPICA init done");
+
+	logging_log_info("Boot Complete ModulOS");
+
+	cpu_halt_loop();
 }

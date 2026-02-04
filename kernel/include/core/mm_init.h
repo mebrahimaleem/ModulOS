@@ -1,5 +1,5 @@
 /* mm_init.h - memory manager initialization interface */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef CORE_MM_INIT_H
-#define CORE_MM_INIT_H
+#ifndef KERNEL_CORE_MM_INIT_H
+#define KERNEL_CORE_MM_INIT_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -37,4 +37,4 @@ extern void mm_init(
 
 extern uint64_t mm_early_alloc_2m(void);
 
-#endif /* CORE_MM_INIT_H */
+#endif /* KERNEL_CORE_MM_INIT_H */

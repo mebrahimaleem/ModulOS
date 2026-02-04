@@ -1,5 +1,5 @@
 # Makefile - kernel build makefile
-# Copyright (C) 2025  Ebrahim Aleem
+# Copyright (C) 2025-2026  Ebrahim Aleem
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,9 +17,6 @@
 SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-CC := $(KERNEL_TOOLCHAIN_PREFIX)gcc
-AR := $(KERNEL_TOOLCHAIN_PREFIX)ar
-
 OBJ_DIR := $(OBJ_DIR)/kernel
 
 $(call add_directory,core,CORE)
@@ -27,6 +24,14 @@ $(call add_directory,lib,LIB)
 
 ifdef BUILD_KERNEL_GRAPHICSBASE
 $(call add_directory,graphicsbase,GRAPHICSBASE)
+endif
+
+ifdef BUILD_DRIVERS_SERIAL
+DEFINES := $(DEFINES) -DSERIAL
+endif
+
+ifdef BUILD_DRIVERS_HPET
+DEFINES := $(DEFINES) -DHPET
 endif
 
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags

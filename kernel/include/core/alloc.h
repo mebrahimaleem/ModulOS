@@ -1,5 +1,5 @@
 /* alloc.h - heap allocator interface */
-/* Copyright (C) 2025  Ebrahim Aleem
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,6 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_CORE_ALLOC_H
+#define KERNEL_CORE_ALLOC_H
+
 #include <stddef.h>
 
 extern void alloc_init(void);
@@ -22,3 +25,5 @@ extern void alloc_init(void);
 extern void* kmalloc(size_t size);
 
 extern void* early_kmalloc(size_t size);
+
+#endif /* KERNEL_CORE_ALLOC_H */
