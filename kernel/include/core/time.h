@@ -18,6 +18,11 @@
 #ifndef KERNEL_CORE_TIME_H
 #define KERNEL_CORE_TIME_H
 
+#define TIME_CONV_NS_TO_FS	1000000
+#define TIME_CONV_MS_TO_NS	1000000
+#define TIME_CONV_US_TO_NS	1000
+#define TIME_CONV_MS_TO_FS	1000000000000
+
 #include <stdint.h>
 
 extern void time_init(void);
@@ -25,5 +30,7 @@ extern void time_init(void);
 extern uint64_t time_busy_wait(uint64_t min_ns);
 
 extern uint64_t time_since_init_ns(void);
+
+extern uint64_t time_since_init_fs(void);
 
 #endif /* KERNEL_CORE_TIME_H */

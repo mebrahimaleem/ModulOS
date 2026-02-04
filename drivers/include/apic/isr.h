@@ -18,7 +18,8 @@
 #ifndef DRIVERS_APIC_ISR_H
 #define DRIVERS_APIC_ISR_H
 
-extern void apic_isr_timer_init(void);
+extern void apic_isr_timer(void);
+
 extern void apic_isr_error(void);
 
 #endif /* DRIVERS_APIC_ISR_H */

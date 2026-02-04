@@ -15,9 +15,38 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.globl apic_isr_timer_init
-apic_isr_timer_init:
-// TODO
+.globl apic_isr_timer
+apic_isr_timer:
+pushq %rax
+pushq %rcx
+pushq %rdx
+pushq %rsi
+pushq %rdi
+pushq %r8
+pushq %r9
+pushq %r10
+pushq %r11
+pushq %rbp
+
+movq %rsp, %rbp
+movq %rsp, %rax
+andq $0xF, %rax
+jz .aligned_timer
+subq %rax, %rsp
+.aligned_timer:
+call apic_timer_dispatch
+movq %rbp, %rsp
+
+popq %rbp
+popq %r11
+popq %r10
+popq %r9
+popq %r8
+popq %rdi
+popq %rsi
+popq %rdx
+popq %rcx
+popq %rax
 iretq
 
 .globl apic_isr_error
@@ -36,9 +65,9 @@ pushq %rbp
 movq %rsp, %rbp
 movq %rsp, %rax
 andq $0xF, %rax
-jz .aligned
+jz .aligned_error
 subq %rax, %rsp
-.aligned:
+.aligned_error:
 call apic_error_dispatch
 movq %rbp, %rsp
 

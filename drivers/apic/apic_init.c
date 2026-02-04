@@ -17,7 +17,6 @@
 
 #include <stdint.h>
 
-
 #include <apic/apic_init.h>
 #include <apic/apic_regs.h>
 #include <apic/isr.h>
@@ -30,6 +29,9 @@
 #include <kernel/core/idt.h>
 #include <kernel/core/cpu_instr.h>
 #include <kernel/core/panic.h>
+#include <kernel/core/time.h>
+#include <kernel/core/lock.h>
+#include <kernel/core/clock_src.h>
 
 #define APIC_BASE_MASK	0xFFFFFFFFFF000
 
@@ -50,6 +52,16 @@
 #define APIC_LVT_TMR_PER	0x02
 #define APIC_LVT_TMR_ONE	0x00
 
+#define APIC_DIV_CFG_OFF	0x3E0
+#define APIC_INI_CNT_OFF	0x380
+#define APIC_CUR_CNT_OFF	0x390
+
+#define APIC_CAL_ITR_MS		50
+#define APIC_CAL_BATCH		20
+#define APIC_CAL_TOL			5000
+
+#define APIC_CLOCK_MS			50
+
 // pic master spurious (irq 7, int 0x27) works for apic spurious as well
 #define PIC_SPURIOUS_VEC	0x27
 #define APIC_ASE					0x100
@@ -65,6 +77,8 @@
 
 uint64_t apic_base;
 uint8_t bsp_apic_id;
+
+static uint8_t timer_vector;
 
 void apic_init(void) {
 	apic_base = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
@@ -115,7 +129,7 @@ void apic_init(void) {
 		}
 	}
 
-	const uint8_t timer_vector = idt_get_vector();
+	timer_vector = idt_get_vector();
 	const uint8_t error_vector = idt_get_vector();
 
 	// set NMI
@@ -159,7 +173,7 @@ void apic_init(void) {
 	}
 
 	apic_write_lve(APIC_REG_TME, timer_vector,
-			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, APIC_LVT_TMR_ONE); // oneshot for init
+			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, APIC_LVT_TMR_ONE | APIC_LVT_MASK);
 
 	apic_write_lve(APIC_REG_THE, 0,
 			0, APIC_LVT_MASK);
@@ -171,7 +185,7 @@ void apic_init(void) {
 			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, 0);
 
 	// install idts, init timer first
-	idt_install(timer_vector, (uint64_t)apic_isr_timer_init, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 
 	// enable apic
@@ -183,4 +197,52 @@ void apic_nmi_enab(void) {
 	outb(CMOS_RAM_INDEX, inb(CMOS_RAM_INDEX) & NMI_DISAB_MASK);
 	io_wait();
 	inb(CMOS_RAM_DATA);
+}
+
+void apic_timer_calib(uint8_t id) {
+	uint8_t i;
+	uint64_t min, max, sum, ticks, rate, delta;
+
+	*(volatile uint32_t*)(apic_base + APIC_DIV_CFG_OFF) = APIC_TMR_DIV_1;
+
+	do {
+		min = 0xFFFFFFFFFFFFFFFFu;
+		max = 0;
+		sum = 0;
+		for (i = 0; i < APIC_CAL_BATCH; i++) {
+			*(volatile uint32_t*)(apic_base + APIC_INI_CNT_OFF) = 0xFFFFFFFF;
+
+			(void)*(volatile uint32_t*)(apic_base + id);
+
+			delta = time_busy_wait(APIC_CAL_ITR_MS * TIME_CONV_MS_TO_NS);
+
+			ticks = 0xFFFFFFFF - *(volatile uint32_t*)(apic_base + APIC_CUR_CNT_OFF);
+			rate = delta / ticks;
+
+			if (rate < min) {
+				min = rate;
+			}
+
+			if (rate > max) {
+				max = rate;
+			}
+
+			sum += rate;
+		}
+	} while (max - min > APIC_CAL_TOL);
+
+	rate = sum / APIC_CAL_BATCH;
+	logging_log_debug("Apic timer rate: %d64 fs/tick (%d64/%d64)", rate, min, max);
+
+	apic_write_lve(APIC_REG_TME, timer_vector,
+			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, APIC_LVT_TMR_PER);
+
+	*(volatile uint32_t*)(apic_base + APIC_INI_CNT_OFF) =
+		(uint32_t)(APIC_CLOCK_MS * TIME_CONV_MS_TO_FS / rate);
+
+	(void)*(volatile uint32_t*)(apic_base + id);
+}
+
+uint8_t apic_get_bsp_id(void) {
+	return bsp_apic_id;
 }

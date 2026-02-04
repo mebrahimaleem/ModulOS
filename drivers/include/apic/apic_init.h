@@ -26,4 +26,8 @@ extern void apic_nmi_enab(void);
 
 extern void apic_disab(void);
 
+extern void apic_timer_calib(uint8_t id);
+
+extern uint8_t apic_get_bsp_id(void);
+
 #endif /* DRIVERS_APIC_APIC_INIT_H */

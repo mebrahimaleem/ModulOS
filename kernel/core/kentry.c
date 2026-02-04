@@ -55,6 +55,7 @@ void kentry(void) {
 	logging_log_debug("APIC and IOAPIC init");
 	pic_disab();
 	apic_init();
+	apic_timer_calib(apic_get_bsp_id());
 	apic_nmi_enab();
 	ioapic_init();
 	logging_log_debug("APIC and IOAPIC init done");

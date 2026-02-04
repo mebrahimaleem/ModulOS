@@ -46,3 +46,7 @@ uint64_t time_busy_wait(uint64_t min_ns) {
 uint64_t time_since_init_ns(void) {
 	return clock->counter(clock->meta) * clock->period_fs / TIME_CONV_NS_TO_FS;
 }
+
+uint64_t time_since_init_fs(void) {
+	return clock->counter(clock->meta) * clock->period_fs;
+}

@@ -1,5 +1,5 @@
-/* clock_src.h - generic clock source interface */
-/* Copyright (C) 2026  Ebrahim Aleem
+/* lock.h - spinlock interface */
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,22 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_CLOCK_SRC_H
-#define KERNEL_CORE_CLOCK_SRC_H
-
 #include <stdint.h>
 
-struct clock_src_t {
-	uint64_t period_fs;
-	uint64_t (*counter)(void*);
-	void (*reset)(void*, uint64_t);
-	void* meta;
-};
+#ifndef KERNEL_INCLUDE_CORE_LOCK_H
+#define KERNEL_INCLUDE_CORE_LOCK_H
 
-extern void clock_src_init(void);
+extern void lock_acquire(uint8_t* lock);
+extern void lock_release(uint8_t* lock);
 
-extern void clock_src_register(struct clock_src_t* clock);
-
-extern struct clock_src_t* clock_src_alloc(void);
-
-#endif /* KERNEL_CORE_CLOCK_SRC_H */
+#endif /* KERNEL_INCLUDE_CORE_LOCK_H */

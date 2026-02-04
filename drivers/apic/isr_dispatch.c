@@ -22,11 +22,17 @@
 
 #include <kernel/core/logging.h>
 
+#include <kernel/core/time.h>
+
 #define ESR_IRA	0x80
 #define ESR_RIV	0x40
 #define ESR_SIV	0x20
 #define ESR_RAE	0x08
 #define ESR_SAE	0x04
+
+void apic_timer_dispatch(void) {
+	apic_write_reg(APIC_REG_EOI, APIC_EOI);
+}
 
 void apic_error_dispatch(void) {
 	const char* ira = "";
