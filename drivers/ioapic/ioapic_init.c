@@ -56,7 +56,7 @@ void ioapic_init(void) {
 			handle != 0;
 			acpi_parse_madt_ics((void*)&ioapic, &handle, MADT_ICS_IO_APIC)) {
 
-		logging_log_info("Initializing IO APIC 0x%X64", (uint64_t)ioapic->IOAPICID);
+		logging_log_info("Initializing IO APIC 0x%lX", (uint64_t)ioapic->IOAPICID);
 		const uint64_t ioapic_base = ioapic->IOAPICAddress;
 		paging_map(ioapic_base, ioapic_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 

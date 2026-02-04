@@ -79,24 +79,10 @@ static void serial_print(const char* s, void (*printer)(uint8_t));
 	}
 
 #define CHOSE_SIZE(m, b, c) \
-					s++; \
-					switch (*s) { \
-						case '6': \
-							s++; \
-							print_##m##64(va_arg(args, m##64_t), b, c##_charset, printer, flg, width); \
-							break; \
-						case '3': \
-							s++; \
-							print_##m##32(va_arg(args, m##32_t), b, c##_charset, printer, flg, width); \
-							break; \
-						default: \
-							if ((flg & FLG_LL) == FLG_LL) \
-								print_##m##64(va_arg(args, m##64_t), b, c##_charset, printer, flg, width); \
-							else \
-								print_##m##32(va_arg(args, m##32_t), b, c##_charset, printer, flg, width); \
-							s--; \
-							break; \
-					}
+			if ((flg & FLG_LL) == FLG_LL) \
+				print_##m##64(va_arg(args, m##64_t), b, c##_charset, printer, flg, width); \
+			else \
+				print_##m##32(va_arg(args, m##32_t), b, c##_charset, printer, flg, width); \
 
 _PRINT_UINT(64)
 _PRINT_UINT(32)

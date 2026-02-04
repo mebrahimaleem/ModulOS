@@ -63,7 +63,7 @@ void* AcpiOsAllocate(ACPI_SIZE size) {
 
 void AcpiOsFree(void* ptr) {
 	//TODO: implement
-	//logging_log_warning("Call to unfinished AcpiOsFree 0x%x64", ptr);
+	//logging_log_warning("Call to unfinished AcpiOsFree 0x%lx", ptr);
 	(void)ptr;
 }
 
@@ -147,7 +147,7 @@ ACPI_STATUS AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS paddr, UINT64 val, UINT32 wi
 
 ACPI_STATUS AcpiOsReadPort(ACPI_IO_ADDRESS port, UINT32* val, UINT32 width) {
 	if ((uint16_t)port != port) {
-		logging_log_error("Truncating port to uint16_t changes value: 0x%x64", port);
+		logging_log_error("Truncating port to uint16_t changes value: 0x%lx", port);
 		return AE_SUPPORT;
 	}
 
@@ -162,14 +162,14 @@ ACPI_STATUS AcpiOsReadPort(ACPI_IO_ADDRESS port, UINT32* val, UINT32 width) {
 			*val = ind((uint16_t)port);
 			return AE_OK;
 		default:
-			logging_log_error("Cannot read port @ 0x%x64 with width %d64", (uint64_t)port, (uint64_t)width);
+			logging_log_error("Cannot read port @ 0x%lx with width %lu", (uint64_t)port, (uint64_t)width);
 			return AE_SUPPORT;
 	}
 }
 
 ACPI_STATUS AcpiOsWritePort(ACPI_IO_ADDRESS port, UINT32 val, UINT32 width) {
 	if ((uint16_t)port != port) {
-		logging_log_error("Truncating port to uint16_t changes value: 0x%x64", port);
+		logging_log_error("Truncating port to uint16_t changes value: 0x%lx", port);
 		return AE_SUPPORT;
 	}
 
@@ -184,7 +184,7 @@ ACPI_STATUS AcpiOsWritePort(ACPI_IO_ADDRESS port, UINT32 val, UINT32 width) {
 			outd((uint16_t)port, (uint32_t)val);
 			return AE_OK;
 		default:
-			logging_log_error("Cannot write port @ 0x%x64 with width %d64", (uint64_t)port, (uint64_t)width);
+			logging_log_error("Cannot write port @ 0x%lx with width %lu", (uint64_t)port, (uint64_t)width);
 			return AE_SUPPORT;
 	}
 }
@@ -240,12 +240,12 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS paddr, ACPI_SIZE len) {
 	len += adj;
 	uint64_t order = mm_lowest_order(len);
 	if (order == (uint64_t)-1) {
-		logging_log_error("Could not allocate contigious virtual block of 0x%x64", (uint64_t)len);
+		logging_log_error("Could not allocate contigious virtual block of 0x%lx", (uint64_t)len);
 		panic(PANIC_NO_MEM);
 	}
 	const uint64_t vaddr = mm_alloc_dv((enum mm_order_t)order);
 	if (!vaddr) {
-		logging_log_error("Could not allocate contigious virtual block of 0x%x64", (uint64_t)len);
+		logging_log_error("Could not allocate contigious virtual block of 0x%lx", (uint64_t)len);
 		panic(PANIC_NO_MEM);
 	}
 

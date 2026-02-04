@@ -78,12 +78,12 @@ void mm_init(
 
 	first_segment(&handle);
 	for (early_next_segment(&handle, &seg); seg.size || seg.base; next_segment(&handle, &seg)) {
-		logging_log_debug("Memory segment 0x%X64 (base) 0x%X64 (size) 0x%X64 (type)",
+		logging_log_debug("Memory segment 0x%lX (base) 0x%lX (size) 0x%lX (type)",
 				(uint64_t)seg.base, (uint64_t)seg.size, (uint64_t)seg.type);
 		if (seg.type == MEM_AVL && seg.base + seg.size > mem_limit) mem_limit = seg.base + seg.size;
 	}
 
-	logging_log_info("Detected 0x%X64 bytes (0x%X64 GiB) of memory", mem_limit, (uint64_t)(mem_limit / SIZE_GIB));
+	logging_log_info("Detected 0x%lX bytes (0x%lX GiB) of memory", mem_limit, (uint64_t)(mem_limit / SIZE_GIB));
 
 	// find number of pages
 	page_frames_num = (mem_limit + PAGE_SIZE - 1) / PAGE_SIZE;

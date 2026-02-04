@@ -87,7 +87,7 @@ void apic_init(void) {
 
 	const uint8_t apic_id = (uint8_t)(apic_read_reg(APIC_REG_IDR) >> APIC_ID_SHFT);
 	bsp_apic_id = apic_id;
-	logging_log_info("Initializing Local APIC 0x%X64", (uint64_t)apic_id);
+	logging_log_info("Initializing Local APIC 0x%lX", (uint64_t)apic_id);
 
 	// get ACPI uid
 	uint64_t handle;
@@ -99,13 +99,13 @@ void apic_init(void) {
 			acpi_parse_madt_ics((void*)&local_apic, &handle, MADT_ICS_PROCESSOR_LOCAL_APIC)) {
 		if (local_apic->APICID == apic_id) {
 			acpi_uid = local_apic->ACPIProcessorUID;
-			logging_log_debug("ACPI UID 0x%X64 -> APIC ID 0x%X64", (uint64_t)acpi_uid, (uint64_t)apic_id);
+			logging_log_debug("ACPI UID 0x%lX -> APIC ID 0x%lX", (uint64_t)acpi_uid, (uint64_t)apic_id);
 			break;
 		}
 	}
 
 	if (acpi_uid == ACPI_UID_ALL_PROC) {
-		logging_log_error("No ACPI ID for APIC 0x%X64", (uint64_t)apic_id);
+		logging_log_error("No ACPI ID for APIC 0x%lX", (uint64_t)apic_id);
 		panic(PANIC_APIC);
 	}
 
@@ -114,7 +114,7 @@ void apic_init(void) {
 	// check eas, if set then mask ext lvt based on xlc
 	if ((apic_read_reg(APIC_REG_VER) & APIC_VER_EAS) == APIC_VER_EAS) {
 		const uint8_t xlc = (apic_read_reg(APIC_REG_EFR) >> APIC_XLC_SHFT) & APIC_XLC_MASK;
-		logging_log_debug("Found %u64 extended lvt registers", (uint64_t)xlc);
+		logging_log_debug("Found %lu extended lvt registers", (uint64_t)xlc);
 		if (xlc >= 1) {
 			apic_write_lve(APIC_REG_EE0, 0, 0, APIC_LVT_MASK);
 		}
@@ -140,7 +140,7 @@ void apic_init(void) {
 			handle != 0;
 			acpi_parse_madt_ics((void*)&local_nmi, &handle, MADT_ICS_LOCAL_APIC_NMI)) {
 		if (local_nmi->ACPIProcessorUID == acpi_uid || local_nmi->ACPIProcessorUID == ACPI_UID_ALL_PROC) {
-			logging_log_debug("Found local NMI on LINT%u64", (uint64_t)local_nmi->LocalAPICLINTNum);
+			logging_log_debug("Found local NMI on LINT%lu", (uint64_t)local_nmi->LocalAPICLINTNum);
 			const uint8_t tgm = 
 				((local_nmi->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_TRIGGER_MASK) == MADT_ICS_MPS_TRIGGER_LEVL) ?
 				APIC_LVT_TRG_LEVL : APIC_LVT_TRG_EDGE; // default to edge since its more probable
@@ -156,7 +156,7 @@ void apic_init(void) {
 							APIC_LVT_MT_NMI | tgm, 0); // nmi, v is ignored
 					break;
 				default:
-					logging_log_error("NMI on non-existent LINT%u64", (uint64_t)local_nmi->LocalAPICLINTNum);
+					logging_log_error("NMI on non-existent LINT%lu", (uint64_t)local_nmi->LocalAPICLINTNum);
 					panic(PANIC_APIC);
 			}
 		}
@@ -232,7 +232,7 @@ void apic_timer_calib(uint8_t id) {
 	} while (max - min > APIC_CAL_TOL);
 
 	rate = sum / APIC_CAL_BATCH;
-	logging_log_debug("Apic timer rate: %d64 fs/tick (%d64/%d64)", rate, min, max);
+	logging_log_debug("Apic timer rate: %lu fs/tick (%lu/%lu)", rate, min, max);
 
 	apic_write_lve(APIC_REG_TME, timer_vector,
 			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, APIC_LVT_TMR_PER);

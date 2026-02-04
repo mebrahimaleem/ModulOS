@@ -88,7 +88,7 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 	sts = AcpiGetObjectInfo(obj, &info);
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to get object info : 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to get object info : 0x%lx", (uint64_t)sts);
 		return sts;
 	}
 
@@ -99,12 +99,12 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 
 			sts = AcpiEvaluateObject(obj, NULL, NULL, &buf);
 			if (ACPI_FAILURE(sts)) {
-				logging_log_error("Failed to evaluate ACPI _CRS object: 0x%x64", (uint64_t)sts);
+				logging_log_error("Failed to evaluate ACPI _CRS object: 0x%lx", (uint64_t)sts);
 				goto cleanup;
 			}
 
 			if (((ACPI_OBJECT*)buf.Pointer)->Type != ACPI_TYPE_BUFFER) {
-				logging_log_error("ACPI _CRS has wrong type: 0x%x64", ((ACPI_OBJECT*)buf.Pointer)->Type);
+				logging_log_error("ACPI _CRS has wrong type: 0x%lx", ((ACPI_OBJECT*)buf.Pointer)->Type);
 				sts = AE_TYPE;
 				goto cleanup;
 			}
@@ -113,7 +113,7 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 			while (1) {
 				switch (elem->type & CRS_TYPE_SIZE_MASK) {
 					case (CRS_TYPE_SIZE_SMALL):
-						//logging_log_info("Found small CRS entry type: 0x%x64", elem->type & CRS_SMALL_TYPE_MASK);
+						//logging_log_info("Found small CRS entry type: 0x%lx", elem->type & CRS_SMALL_TYPE_MASK);
 						switch (elem->type & CRS_SMALL_TYPE_MASK) {
 							case CRS_TAG_END:
 								sts = AE_OK;
@@ -124,7 +124,7 @@ static ACPI_STATUS callback_walk_device(ACPI_HANDLE obj, UINT32 lvl, void* cntx,
 						}
 						break;
 					case (CRS_TYPE_SIZE_LARGE):
-						//logging_log_info("Found large CRS entry type: 0x%x64", elem->type & CRS_LARGE_TYPE_MASK);
+						//logging_log_info("Found large CRS entry type: 0x%lx", elem->type & CRS_LARGE_TYPE_MASK);
 						elem = (union crs_elem_t*)(
 								(uint64_t)elem + 3 + (uint64_t)(elem->large_res.len_lo) + ((uint64_t)elem->large_res.len_hi << 8));
 						break;
@@ -153,7 +153,7 @@ static ACPI_STATUS callback_walk_root(ACPI_HANDLE obj, UINT32 lvl, void* cntx, v
 	sts = AcpiGetObjectInfo(obj, &info);
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to get object info : 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to get object info : 0x%lx", (uint64_t)sts);
 		return sts;
 	}
 
@@ -171,13 +171,13 @@ static ACPI_STATUS callback_walk_root(ACPI_HANDLE obj, UINT32 lvl, void* cntx, v
 
 			sts = AcpiEvaluateObject(obj, NULL, NULL, &buf);
 			if (ACPI_FAILURE(sts)) {
-				logging_log_error("Failed to evaluate ACPI _PRT object: 0x%x64", (uint64_t)sts);
+				logging_log_error("Failed to evaluate ACPI _PRT object: 0x%lx", (uint64_t)sts);
 				goto cleanup;
 			}
 
 			ACPI_OBJECT* prt = buf.Pointer;
 			if (prt->Type != ACPI_TYPE_PACKAGE) {
-				logging_log_error("_PRT has wrong type: 0x%x64", (uint64_t)prt->Type);
+				logging_log_error("_PRT has wrong type: 0x%lx", (uint64_t)prt->Type);
 				sts = AE_TYPE;
 				goto cleanup;
 			}
@@ -186,13 +186,13 @@ static ACPI_STATUS callback_walk_root(ACPI_HANDLE obj, UINT32 lvl, void* cntx, v
 				volatile ACPI_OBJECT* entry = &(prt->Package.Elements[i]);
 
 				if (entry->Type != ACPI_TYPE_PACKAGE) {
-					logging_log_error("_PRT package entry has wrong type: 0x%x64", (uint64_t)entry->Type);
+					logging_log_error("_PRT package entry has wrong type: 0x%lx", (uint64_t)entry->Type);
 					sts = AE_TYPE;
 					goto cleanup;
 				}
 
 				if (entry->Package.Count != 4) {
-					logging_log_error("_PRT package entry has wrong count: 0x%d64", (uint64_t)entry->Package.Count);
+					logging_log_error("_PRT package entry has wrong count: 0x%lu", (uint64_t)entry->Package.Count);
 					sts = AE_TYPE;
 					goto cleanup;
 				}
@@ -236,7 +236,7 @@ static ACPI_STATUS callback_walk_root(ACPI_HANDLE obj, UINT32 lvl, void* cntx, v
 					pci_routing->n = tmp_routing;
 				}
 				else {
-					logging_log_error("_PRT package entry has bad source type %d64", field->Type);
+					logging_log_error("_PRT package entry has bad source type %lu", field->Type);
 					sts = AE_TYPE;
 					goto cleanup;
 				}
@@ -273,12 +273,12 @@ void acpica_index_all(void) {
 			NULL);
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to ACPICA walk the namespace: 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to ACPICA walk the namespace: 0x%lx", (uint64_t)sts);
 		panic(PANIC_ACPI);
 	}
 
 	if (index_res ^ (INDEX_PRT)) {
-		logging_log_error("Failed to index all required namespaces. index_res: 0x%x64", index_res);
+		logging_log_error("Failed to index all required namespaces. index_res: 0x%lx", index_res);
 	}
 }
 

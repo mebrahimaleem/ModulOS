@@ -82,7 +82,7 @@ void ioapic_routing_init(uint64_t num_gsi) {
 			handle != 0;
 			acpi_parse_madt_ics((void*)&override, &handle, MADT_ICS_INTERRUPT_SOURCE_OVERRIDE)) {
 
-		logging_log_debug("GSI 0x%X64 -> ISA IRQ 0x%X64, 0x%X64 (pol) 0x%X64 (trg)",
+		logging_log_debug("GSI 0x%lX -> ISA IRQ 0x%lX, 0x%lX (pol) 0x%lX (trg)",
 				(uint64_t)override->GlobalSystemInterrupt,
 				(uint64_t)override->Source,
 				(uint64_t)(override->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_POLARITY_MASK),
@@ -121,7 +121,7 @@ void ioapic_routing_init(uint64_t num_gsi) {
 	for (acpi_parse_madt_ics((void*)&nmi_source, &handle, MADT_ICS_NMI_SOURCE);
 			handle != 0;
 			acpi_parse_madt_ics((void*)&nmi_source, &handle, MADT_ICS_NMI_SOURCE)) {
-		logging_log_info("Found IO APIC NMI source on GSI 0x%X64", (uint64_t)nmi_source->GlobalSystemInterrupt);
+		logging_log_info("Found IO APIC NMI source on GSI 0x%lX", (uint64_t)nmi_source->GlobalSystemInterrupt);
 		const uint32_t flg = IOAPIC_REDIR_TRG_EDG | IOAPIC_REDIR_NMI | //NMI is always edge
 			(((nmi_source->Flags.PolarityAndTriggerMode & MADT_ICS_MPS_POLARITY_MASK)
 				== MADT_ICS_MPS_POLARITY_LO) ? IOAPIC_REDIR_POL_LO : IOAPIC_REDIR_POL_HI);
@@ -136,7 +136,7 @@ void ioapic_routing_init(uint64_t num_gsi) {
 		sci_gsi = legacy_routing[sci_gsi];
 	}
 
-	logging_log_info("Found SCI on GSI 0x%X64", sci_gsi);
+	logging_log_info("Found SCI on GSI 0x%lX", sci_gsi);
 	const uint8_t sci_v = idt_get_vector();
 	idt_install(sci_v, (uint64_t)sci_isr, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 	ioapic_conf_gsi(sci_gsi, sci_v, IOAPIC_REDIR_TRG_LVL | IOAPIC_REDIR_POL_LO, bsp_apic_id);

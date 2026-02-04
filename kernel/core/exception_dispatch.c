@@ -24,12 +24,12 @@
 void exception_dispatch(struct exception_context_t* context) {
 	//TODO: handle from userland	
 
-	logging_log_error("Unrecoverable exception 0x%X64 (0x%X64) @ 0x%X64",
+	logging_log_error("Unrecoverable exception 0x%lX (0x%lX) @ 0x%lX",
 			context->vector, context->code, context->rip);
 
-	logging_log_debug("Register Dump:\r\nrax 0x%X64\r\nrbx 0x%X64\r\nrcx 0x%X64\r\nrdx 0x%X64\
-\r\nrsi 0x%X64\r\nrdi 0x%X64\r\nrbp 0x%X64\r\nrsp 0x%X64\r\nr8  0x%X64\r\nr9  0x%X64\r\nr10 0x%X64\
-\r\nr11 0x%X64\r\nr12 0x%X64\r\nr13 0x%X64\r\nr14 0x%X64\r\nr15 0x%X64\r\nrfl 0x%X64\r\ncs  0x%X64\r\nrip 0x%X64",
+	logging_log_debug("Register Dump:\r\nrax 0x%lX\r\nrbx 0x%lX\r\nrcx 0x%lX\r\nrdx 0x%lX\
+\r\nrsi 0x%lX\r\nrdi 0x%lX\r\nrbp 0x%lX\r\nrsp 0x%lX\r\nr8  0x%lX\r\nr9  0x%lX\r\nr10 0x%lX\
+\r\nr11 0x%lX\r\nr12 0x%lX\r\nr13 0x%lX\r\nr14 0x%lX\r\nr15 0x%lX\r\nrfl 0x%lX\r\ncs  0x%lX\r\nrip 0x%lX",
 			context->rax, context->rbx, context->rcx, context->rdx,
 			context->rsi, context->rdi, context->rbp, context->rsp,
 			context->r8, context->r9, context->r10, context->r11,

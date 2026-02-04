@@ -211,7 +211,7 @@ static uint8_t hpet_count;
 			if (verify_checksum(gen)) { \
 				CHECK_FAIL(sig); \
 			} \
-			logging_log_info("Found ACPI "  tbl " @ 0x%X64", (uint64_t)gen); \
+			logging_log_info("Found ACPI "  tbl " @ 0x%lX", (uint64_t)gen); \
 			store = kmalloc(gen->Length); \
 			kmemcpy((void*)store, (void*)gen, gen->Length); \
 			found |= fnd; \
@@ -287,7 +287,7 @@ fallback:
 				panic(PANIC_ACPI);
 			}
 
-			logging_log_info("Parsing ACPI RSDT entries @ 0x%X64", (uint64_t)&rsdt->Entry[0]);
+			logging_log_info("Parsing ACPI RSDT entries @ 0x%lX", (uint64_t)&rsdt->Entry[0]);
 
 			for (const volatile uint32_t* entry = &rsdt->Entry[0];
 					(uint64_t)entry < (uint64_t)rsdt + rsdt->Length; entry++) {
@@ -339,7 +339,7 @@ fallback:
 				goto fallback;
 			}
 
-			logging_log_info("Parsing ACPI XSDT entries @ 0x%X64", (uint64_t)&xsdt->Entry[0]);
+			logging_log_info("Parsing ACPI XSDT entries @ 0x%lX", (uint64_t)&xsdt->Entry[0]);
 
 			for (const volatile uint64_t* entry = &xsdt->Entry[0];
 					(uint64_t)entry < (uint64_t)xsdt + xsdt->Length; entry++) {
@@ -395,7 +395,7 @@ void acpi_get_hpet_bases(uint64_t* bases) {
 	for (uint8_t i = 0; i < hpet_count; i++) {
 		if (acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_SYS &&
 				acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_IO) {
-			logging_log_error("HPET base addr type must be sys or io. got: 0x%x64", 
+			logging_log_error("HPET base addr type must be sys or io. got: 0x%lx", 
 					(uint64_t)acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID);
 			panic(PANIC_ACPI);
 		}

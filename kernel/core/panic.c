@@ -33,7 +33,7 @@ static const char* panic_names[] = {
 };
 
 void panic(enum panic_code_t code) {
-	logging_log_error("Panic 0x%X64 %s\r\nHalt", (uint64_t)code, 
+	logging_log_error("Panic 0x%lX %s\r\nHalt", (uint64_t)code, 
 			panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK]);
 
 	cpu_halt_loop();

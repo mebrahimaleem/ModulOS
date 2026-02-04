@@ -28,28 +28,28 @@ void acpica_init(void) {
 	ACPI_STATUS sts = AcpiInitializeSubsystem();
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to init ACPICA: 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to init ACPICA: 0x%lx", (uint64_t)sts);
 		panic(PANIC_ACPI);
 	}
 
 	sts = AcpiInitializeTables(NULL, 16, FALSE);
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to init ACPICA tables: 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to init ACPICA tables: 0x%lx", (uint64_t)sts);
 		panic(PANIC_ACPI);
 	}
 
 	sts = AcpiLoadTables();
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to load ACPICA tables: 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to load ACPICA tables: 0x%lx", (uint64_t)sts);
 		panic(PANIC_ACPI);
 	}
 
 	sts = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
 
 	if (ACPI_FAILURE(sts)) {
-		logging_log_error("Failed to init ACPICA namespace: 0x%x64", (uint64_t)sts);
+		logging_log_error("Failed to init ACPICA namespace: 0x%lx", (uint64_t)sts);
 		panic(PANIC_ACPI);
 	}
 

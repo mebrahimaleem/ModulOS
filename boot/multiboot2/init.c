@@ -159,7 +159,7 @@ void multiboot2_init(struct mb2_info_t* info) {
 				mm_init(first_segment, next_segment);
 				break;
 			case MBITAG_TYPE_RSDPV2:
-				logging_log_info("Found RSDP @ 0x%X64", (uint64_t)&tag->tag.rsdpv2.rsdp);
+				logging_log_info("Found RSDP @ 0x%lX", (uint64_t)&tag->tag.rsdpv2.rsdp);
 				boot_context.rsdp = tag->tag.rsdpv2.rsdp;
 				break;
 #ifdef GRAPHICSBASE
