@@ -47,7 +47,7 @@
 #define VIDEO_XRGB8888_BLUEMASK	0x08
 #define VIDEO_XRGB8888_BPP				32
 
-static struct proc_data_t bsp_proc_data;
+struct proc_data_t bsp_proc_data;
 static struct proc_data_t* bsp_proc_data_ptr;
 
 struct mb2_tag_memmap_entry_t {

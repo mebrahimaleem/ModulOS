@@ -21,6 +21,7 @@
 #include <apic/apic_regs.h>
 #include <apic/isr.h>
 #include <acpi/tables.h>
+#include <apic/ipi.h>
 
 #include <kernel/core/logging.h>
 #include <kernel/core/msr.h>
@@ -32,6 +33,7 @@
 #include <kernel/core/time.h>
 #include <kernel/core/lock.h>
 #include <kernel/core/clock_src.h>
+#include <kernel/core/proc_data.h>
 
 #define APIC_BASE_MASK	0xFFFFFFFFFF000
 
@@ -75,10 +77,20 @@
 #define LINT0_SET	0x1
 #define LINT1_SET	0x2
 
+#define AP_ARB_BASE	0x9000
+
+#define INIT_STACK_SIZE	0x4000
+
 uint64_t apic_base;
 uint8_t bsp_apic_id;
 
 static uint8_t timer_vector;
+
+extern uint8_t gdt;
+extern uint8_t gdt_end;
+extern uint8_t kernel_pml4;
+
+static uint64_t* init_stacks;
 
 void apic_init(void) {
 	apic_base = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
@@ -90,6 +102,7 @@ void apic_init(void) {
 	logging_log_info("Initializing Local APIC 0x%lX", (uint64_t)apic_id);
 
 	// get ACPI uid
+	uint8_t num_apic = 0;
 	uint64_t handle;
 	uint8_t acpi_uid = ACPI_UID_ALL_PROC;
 	struct acpi_madt_ics_local_apic_t* local_apic;
@@ -102,7 +115,18 @@ void apic_init(void) {
 			logging_log_debug("ACPI UID 0x%lX -> APIC ID 0x%lX", (uint64_t)acpi_uid, (uint64_t)apic_id);
 			break;
 		}
+		num_apic++;
 	}
+
+	init_stacks = kmalloc(sizeof(uint64_t*) * num_apic);
+	proc_data_ptr = kmalloc(sizeof(struct proc_data_t*) * num_apic);
+	proc_data_ptr[0] = &bsp_proc_data;
+
+	for (--num_apic; num_apic; num_apic--) {
+		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
+		init_stacks[num_apic] = (uint64_t)kmalloc(INIT_STACK_SIZE) + INIT_STACK_SIZE - 16;
+	}
+
 
 	if (acpi_uid == ACPI_UID_ALL_PROC) {
 		logging_log_error("No ACPI ID for APIC 0x%lX", (uint64_t)apic_id);
@@ -245,4 +269,37 @@ void apic_timer_calib(uint8_t id) {
 
 uint8_t apic_get_bsp_id(void) {
 	return bsp_apic_id;
+}
+
+void apic_init_ap(void) {
+	*(volatile uint8_t*)paging_ident(AP_ARB_BASE + 0x0) = 0; // arb lock
+	*(volatile uint8_t*)paging_ident(AP_ARB_BASE + 0x1) = 0; // arb id
+	*(volatile uint16_t*)paging_ident(AP_ARB_BASE + 0x2) = 
+		(uint16_t)((uint64_t)&gdt_end - (uint64_t)&gdt - 1); // gdt32 ptr
+	*(volatile uint32_t*)paging_ident(AP_ARB_BASE + 0x4) = (uint32_t)(uint64_t)&gdt;
+	*(volatile uint16_t*)paging_ident(AP_ARB_BASE + 0x8) = 
+		(uint16_t)((uint64_t)&gdt_end - (uint64_t)&gdt - 1); // gdt64 ptr
+	*(volatile uint64_t*)paging_ident(AP_ARB_BASE + 0xa) = (uint64_t)&gdt;
+	*(volatile uint32_t*)paging_ident(AP_ARB_BASE + 0x12) = (uint32_t)(uint64_t)&kernel_pml4;
+	*(volatile uint64_t*)paging_ident(AP_ARB_BASE + 0x16) = (uint64_t)init_stacks;
+
+	uint64_t handle;
+	struct acpi_madt_ics_local_apic_t* local_apic;
+	acpi_parse_madt_ics_start(&handle);
+	for (acpi_parse_madt_ics((void*)&local_apic, &handle, MADT_ICS_PROCESSOR_LOCAL_APIC);
+			handle != 0;
+			acpi_parse_madt_ics((void*)&local_apic, &handle, MADT_ICS_PROCESSOR_LOCAL_APIC)) {
+		if (local_apic->APICID == apic_get_bsp_id()) {
+			continue;
+		}
+		apic_send_ipi_init_set(local_apic->APICID);
+		apic_wait_for_ipi();
+		apic_send_ipi_init_clear(local_apic->APICID);
+
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		apic_send_ipi_sipi(local_apic->APICID);
+
+		time_busy_wait(2000);
+		apic_send_ipi_sipi(local_apic->APICID);
+	}
 }

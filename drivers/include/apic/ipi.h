@@ -1,4 +1,4 @@
-/* 05_mp.ld - MP boostrap linker script */
+/* ipi.c - Inter Processor Interrupt interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,16 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-PHDRS {
-	mptext PT_LOAD FLAGS(1 | 4); /* XR */
-	mpdata PT_LOAD FLAGS(2 | 4); /* WR */
-}
+#ifndef DRIVERS_APIC_IPI_H
+#define DRIVERS_APIC_IPI_H
 
-SECTIONS {
-	. = 0x1000;
+#include <stdint.h>
 
-	.text.mpboot ALIGN(4K) : {
-		*(.text.mpboot)
-	} :mptext
+#define AP_ENTRY_PAGE	8
 
-	.data.mpboot ALIGN(4K) : {
-		*(.data.mpboot)
-	} :mpdata
+extern void apic_wait_for_ipi(void);
+extern void apic_send_ipi_init_set(uint8_t apic_id);
+extern void apic_send_ipi_init_clear(uint8_t apic_id);
+extern void apic_send_ipi_sipi(uint8_t apic_id);
 
-	ASSERT(. <= 0x9fc00, "Kernel has overlap with EBDA")
-}
+#endif /* DRIVERS_APIC_IPI_H */

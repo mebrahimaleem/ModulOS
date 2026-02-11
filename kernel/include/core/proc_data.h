@@ -29,6 +29,7 @@ struct proc_data_t {
 
 extern uint8_t proc_arb_id;
 
+extern struct proc_data_t bsp_proc_data;
 extern struct proc_data_t** proc_data_ptr;
 
 extern void proc_data_set_id(uint8_t id);

@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include <core/kentry.h>
+#include <core/paging.h>
 #include <core/tss.h>
 #include <core/idt.h>
 #include <core/cpu_instr.h>
@@ -26,13 +27,19 @@
 #include <core/time.h>
 #include <core/proc_data.h>
 
+#include <lib/kmemcpy.h>
+
 #include <drivers/acpi/tables.h>
 #include <drivers/acpica_osl/init.h>
 #include <drivers/pic_8259/pic.h>
 #include <drivers/apic/apic_init.h>
+#include <drivers/apic/ipi.h>
 #include <drivers/ioapic/ioapic_init.h>
 
 struct boot_context_t boot_context;
+
+extern uint8_t ap_bootstrap_start;
+extern uint8_t ap_bootstrap_end;
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
@@ -64,5 +71,20 @@ void kentry(void) {
 
 	logging_log_info("Boot Complete ModulOS");
 
+	logging_log_info("Begining AP bootstrap sequence");
+	kmemcpy(
+			(void*)paging_ident(AP_ENTRY_PAGE * PAGE_SIZE_4K),
+			&ap_bootstrap_start,
+			(uint64_t)&ap_bootstrap_end - (uint64_t)&ap_bootstrap_start);
+
+	apic_init_ap();
+
+	logging_log_info("AP bootstrap sequence done");
+
+	cpu_halt_loop();
+}
+
+void kapentry(uint64_t arb_id) {
+	logging_log_debug("AP %lx bootstrap complete", arb_id);
 	cpu_halt_loop();
 }

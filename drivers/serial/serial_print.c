@@ -21,6 +21,8 @@
 #include <serial/serial_print.h>
 #include <serial/serial.h>
 
+#include <kernel/core/lock.h>
+
 #define FLG_LL	0x1
 #define FLG_PD	0x2
 #define FLG_LM	0x4

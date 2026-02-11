@@ -268,6 +268,8 @@ gdt:
 		.quad 0
 		.quad 0
 	gdt.end:
+.globl gdt_end
+gdt_end:
 
 	.equ	CODE_SEG, gdt.codeseg - gdt
 	.equ	DATA_SEG, gdt.dataseg - gdt

@@ -41,4 +41,6 @@ extern struct boot_context_t boot_context;
 
 extern void kentry(void) __attribute__((noreturn));
 
+extern void kapentry(uint64_t arb_id) __attribute__((noreturn));
+
 #endif /* KERNEL_CORE_KENTRY_H */

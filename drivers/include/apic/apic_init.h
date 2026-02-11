@@ -30,4 +30,6 @@ extern void apic_timer_calib(uint8_t id);
 
 extern uint8_t apic_get_bsp_id(void);
 
+extern void apic_init_ap(void);
+
 #endif /* DRIVERS_APIC_APIC_INIT_H */
