@@ -43,5 +43,6 @@ ret
 
 .globl cpu_halt_loop
 cpu_halt_loop:
+cli
 hlt
 jmp cpu_halt_loop

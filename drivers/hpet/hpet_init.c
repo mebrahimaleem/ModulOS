@@ -75,7 +75,7 @@ void hpet_init(void) {
 	for (uint8_t i = 0; i < 8; i++) {
 		if (hpet_reg_bases[i]) {
 			logging_log_debug("Found HPET register base @ 0x%lx", hpet_reg_bases[i]);
-			const uint64_t temp = mm_alloc_dv(MM_ORDER_4K);
+			const uint64_t temp = mm_alloc_v(PAGE_SIZE_4K);
 			paging_map(
 					temp,
 					(uint64_t)hpet_reg_bases[i],

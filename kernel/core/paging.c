@@ -19,271 +19,123 @@
 #include <stddef.h>
 
 #include <core/paging.h>
+#include <core/alloc.h>
 #include <core/mm.h>
-#include <core/mm_init.h>
 #include <core/panic.h>
 #include <core/logging.h>
+#include <core/lock.h>
 
 #include <lib/kmemset.h>
 
 #define PAGE_PS 			0x80
-#define PAGE_TBL_FLG	(PAGE_PRESENT | PAGE_RW)
 
-#define PAGE_SIZE	0x1000
-
-#define TABLE_PADDR_MASK 	0xFFFFFFFFFFFFF000
-
-#define POOL_SIZE	0x200000
-
-#define GET_TABLE(entry) ((uint64_t*)((uint64_t)entry & TABLE_PADDR_MASK))
-
-#define PDPT_PADDR_MASK	0xFFFFFFFFC0000000
-#define PD_PADDR_MASK		0xFFFFFFFFFFE00000
+#define PAGE_ADDR_MASK				0x0000FFFFFFFFF000
+#define PAGE_ADDR_PAT_MASK		0x0000FFFFFFFFE000
 
 #define GET_PT_INDEX(addr) 		((addr & 0x1FF000) >> 12)
 #define GET_PD_INDEX(addr) 		((addr & 0x3FE00000) >> 21)
 #define GET_PDPT_INDEX(addr)	((addr & 0x7FC0000000) >> 30)
 #define GET_PML4_INDEX(addr)	((addr & 0xFF8000000000) >> 39)
 
-struct page_table_t;
-
 extern uint64_t kernel_pml4[512];
 
-static uint64_t bootstrap_pdpt[512] __attribute__((aligned(PAGE_SIZE)));
-static uint64_t bootstrap_pd[512] __attribute__((aligned(PAGE_SIZE)));
+static uint8_t paging_lock;
 
-struct paging_pool_header_t {
-	uint16_t used;
-	struct paging_pool_header_t* next;
-	uint8_t hint;
-	uint8_t ac;
-	uint8_t bitmap[64];
-	uint8_t resv[4020];
-} __attribute__((packed));
+static enum page_size_t page_walk(uint64_t vaddr, uint64_t** access) {
+	uint64_t entry;
+	*access = (uint64_t*)paging_ident((uint64_t)&kernel_pml4[0]);
 
-_Static_assert(sizeof(struct paging_pool_header_t) == PAGE_SIZE, "paging pool header must be 4K");
+	entry = (*access)[GET_PML4_INDEX(vaddr)];
+	*access = &(*access)[GET_PML4_INDEX(vaddr)];
+	if (!(entry & PAGE_PRESENT)) {
+		return _PAGE_512G;
+	}
+	*access = (uint64_t*)paging_ident((**access & PAGE_ADDR_MASK));
 
-struct paging_pool_header_t* root_pool;
-
-struct paging_pool_header_t* hint;
-
-static struct paging_pool_header_t* early_create_pool(void);
-static struct paging_pool_header_t* create_pool(void);
-
-static uint64_t early_alloc_page(void) {
-	if (hint->used == 512) {
-		// last pool is always empty
-		for (hint = root_pool; hint->used == 512; hint = hint->next);
-
-		if (hint->ac == 0) {
-			hint->ac = 1;
-			hint->next = early_create_pool();
-		}
+	entry = (*access)[GET_PDPT_INDEX(vaddr)];
+	*access = &(*access)[GET_PDPT_INDEX(vaddr)];
+	if (!(entry & PAGE_PRESENT)) {
+		return PAGE_1G;
 	}
 
-	for (; hint->hint < 64; hint->hint++) {
-		if (hint->bitmap[hint->hint] != 0xFF) {
-			for (uint8_t i = 0; i < 8; i++) {
-				if (((hint->bitmap[hint->hint] & (1 << i))) != (1 << i)) {
-					hint->bitmap[hint->hint] |= 1 << i;
-					hint->used++;
-					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
-					kmemset((void*)addr, 0, PAGE_SIZE);
-					return addr;
-				}
-			}
-		}
+	if (entry & PAGE_PS) {
+		return PAGE_1G;
+	}
+	*access = (uint64_t*)paging_ident((**access & PAGE_ADDR_MASK));
+
+	entry = (*access)[GET_PD_INDEX(vaddr)];
+	*access = &(*access)[GET_PD_INDEX(vaddr)];
+	if (!(entry & PAGE_PRESENT)) {
+		return PAGE_2M;
 	}
 
-	hint->hint = 0;
-	return early_alloc_page();
-}
-
-static uint64_t alloc_page(void) {
-	if (hint->used == 512) {
-		// last pool is always empty
-		for (hint = root_pool; hint->used == 512; hint = hint->next);
-
-		if (hint->ac == 0) {
-			hint->ac = 1;
-			hint->next = create_pool();
-		}
+	if (entry & PAGE_PS) {
+		return PAGE_2M;
 	}
+	*access = (uint64_t*)paging_ident((**access & PAGE_ADDR_MASK));
 
-	for (; hint->hint < 64; hint->hint++) {
-		if (hint->bitmap[hint->hint] != 0xFF) {
-			for (uint8_t i = 0; i < 8; i++) {
-				if (((hint->bitmap[hint->hint] & (1 << i))) != (1 << i)) {
-					hint->bitmap[hint->hint] |= 1 << i;
-					hint->used++;
-					const uint64_t addr = (uint64_t)hint + PAGE_SIZE * ((uint64_t)hint->hint * 8 + (uint64_t)i);
-					kmemset((void*)addr, 0, PAGE_SIZE);
-					return addr;
-				}
-			}
-		}
-	}
-
-	hint->hint = 0;
-	return alloc_page();
-}
-
-static struct paging_pool_header_t* early_create_pool(void) {
-	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_early_alloc_2m();
-	paging_early_map_2m((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW);
-
-	kmemset(addr, 0, POOL_SIZE);
-	addr->bitmap[0] = 0x01;
-
-	return addr;
-}
-
-static struct paging_pool_header_t* create_pool(void) {
-	struct paging_pool_header_t* const addr = (struct paging_pool_header_t*)mm_alloc(MM_ORDER_2M);
-	paging_map((uint64_t)addr, (uint64_t)addr, PAGE_PRESENT | PAGE_RW, PAGE_2M);
-
-	kmemset(addr, 0, POOL_SIZE);
-	addr->bitmap[0] = 0x01;
-
-	return addr;
+	*access = &(*access)[GET_PT_INDEX(vaddr)];
+	return PAGE_4K;
 }
 
 void paging_init(void) {
-	const uint64_t pool_base = mm_early_alloc_2m();
-
-	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(pool_base)];
-
-	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
-		pdpt = ((uint64_t)&bootstrap_pdpt[0] - KERNEL_VMA) | PAGE_PRESENT | PAGE_RW;
-		kernel_pml4[GET_PML4_INDEX(pool_base)] = pdpt;
-	}
-
-
-	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(pool_base)];
-
-	if ((pd & PAGE_PS) != PAGE_PS) {
-		GET_TABLE(pdpt)[GET_PDPT_INDEX(pool_base)] = ((uint64_t)&bootstrap_pd[0] - KERNEL_VMA) |
-			PAGE_PRESENT | PAGE_RW;
-
-		bootstrap_pd[GET_PD_INDEX(pool_base)] = pool_base | PAGE_PRESENT | PAGE_RW | PAGE_PS;
-	}
-
-	root_pool = (struct paging_pool_header_t*)pool_base;
-	hint = root_pool;
-
-	kmemset(root_pool, 0, POOL_SIZE);
-
-	root_pool->ac = 1;
-	root_pool->bitmap[0] = 0x01;
-	root_pool->next = early_create_pool();
+	lock_init(&paging_lock);
 }
 
-void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size) {
-	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(vaddr)];
+uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size) {
+	uint64_t* access;
+	enum page_size_t lvl = page_walk(vaddr, &access);
 
-	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
-		pdpt = alloc_page() | PAGE_TBL_FLG;
-		kernel_pml4[GET_PML4_INDEX(vaddr)] = pdpt;
+	if (lvl < page_size) {
+		logging_log_error("Cannot override page of finer granularity from 0x%lx-0x%lx (%u) to 0x%lx-0x%lx (%u)",
+				vaddr, *access - IDENT_BASE, (uint32_t)lvl, vaddr, paddr | flg, (uint32_t)page_size);
+		return *access - IDENT_BASE;
 	}
 
-	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)];
-
-	if ((pd & PAGE_PRESENT) == PAGE_PRESENT && (pd & PAGE_PS) == PAGE_PS) {
-		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
-			logging_log_warning("Already mapped 0x%lX -> 0x%lX", paddr, vaddr);
-			return;
-		}
-
-		panic(PANIC_PAGING);
+	if (*access & PAGE_PRESENT) {
+		logging_log_error("Cannot override page from 0x%lx-0x%lx (%u) to 0x%lx-0x%lx (%u)",
+				vaddr, *access, (uint32_t)lvl, vaddr, paddr | flg, (uint32_t)page_size);
+		return *access;
 	}
 
-	if (page_size == PAGE_1G) {
-		if ((pd & PAGE_PRESENT) == PAGE_PRESENT) {
-			panic(PANIC_PAGING);
-		}
+	for (; lvl > page_size; lvl--) {
+		*access = mm_alloc_p(0x1000) | PAGE_PRESENT | PAGE_RW;
+		access = (uint64_t*)paging_ident((*access & PAGE_ADDR_MASK));
+		kmemset(access, 0, 0x1000);
 
-		GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)] = paddr | flg | PAGE_PS;
+		switch (lvl) {
+			case _PAGE_512G:
+				access = &(access)[GET_PDPT_INDEX(vaddr)];
+				break;
+			case PAGE_1G:
+				access = &(access)[GET_PD_INDEX(vaddr)];
+				break;
+			default:
+				access = &(access)[GET_PT_INDEX(vaddr)];
+				break;
+		}
+	}
+
+	if (page_size != PAGE_4K) {
+		flg |= PAGE_PS;
+	}
+
+	*access = paddr | flg;
+	return paddr;
+}
+
+void paging_unmap(uint64_t vaddr, enum page_size_t page_size) {
+	uint64_t* access;
+	enum page_size_t lvl = page_walk(vaddr, &access);
+
+	if (lvl != page_size) {
+		logging_log_error("Cannot unmap page of different granularity");
 		return;
 	}
 
-	if ((pd & PAGE_PRESENT) != PAGE_PRESENT) {
-		pd = alloc_page() | PAGE_TBL_FLG;
-		GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)] = pd;
-	}
-
-	uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
-
-	if ((pt & PAGE_PRESENT) == PAGE_PRESENT && (pt & PAGE_PS) == PAGE_PS) {
-		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
-			logging_log_warning("Already mapped 0x%lX -> 0x%lX", paddr, vaddr);
-			return;
-		}
-
-		panic(PANIC_PAGING);
-	}
-
-	if (page_size == PAGE_2M) {
-		if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
-			panic(PANIC_PAGING);
-		}
-
-		GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = paddr | flg | PAGE_PS;
-		return;
-	}
-
-	if ((pt & PAGE_PRESENT) != PAGE_PRESENT) {
-		pt = alloc_page() | PAGE_TBL_FLG;
-		GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = pt;
-	}
-
-	const uint64_t addr = GET_TABLE(pt)[GET_PT_INDEX(vaddr)];
-
-	if ((addr & PAGE_PRESENT) == PAGE_PRESENT) {
-		if ((addr & TABLE_PADDR_MASK) == paddr) {
-			logging_log_warning("Already mapped 0x%lX -> 0x%lX", paddr, vaddr);
-			return;
-		}
-
-		panic(PANIC_PAGING);
-	}
-
-	GET_TABLE(pt)[GET_PT_INDEX(vaddr)] = paddr | flg;
+	*access = 0;
 }
 
-void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg) {
-	uint64_t pdpt = (uint64_t)kernel_pml4[GET_PML4_INDEX(vaddr)];
-
-	if ((pdpt & PAGE_PRESENT) != PAGE_PRESENT) {
-		pdpt = early_alloc_page() | PAGE_TBL_FLG;
-		kernel_pml4[GET_PML4_INDEX(vaddr)] = pdpt;
-	}
-
-	uint64_t pd = GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)];
-
-	if ((pd & PAGE_PS) == PAGE_PS) {
-		if ((pd & TABLE_PADDR_MASK) == (paddr & PDPT_PADDR_MASK)) {
-			logging_log_warning("Already mapped 0x%lX -> 0x%lX", paddr, vaddr);
-			return;
-		}
-
-		panic(PANIC_PAGING);
-	}
-
-	if ((pd & PAGE_PRESENT) != PAGE_PRESENT) {
-		pd = early_alloc_page() | PAGE_TBL_FLG;
-		GET_TABLE(pdpt)[GET_PDPT_INDEX(vaddr)] = pd;
-	}
-
-	const uint64_t pt = GET_TABLE(pd)[GET_PD_INDEX(vaddr)];
-
-	if ((pt & PAGE_PRESENT) == PAGE_PRESENT) {
-		if ((pt & TABLE_PADDR_MASK) == (paddr & PD_PADDR_MASK)) {
-			logging_log_warning("Already mapped 0x%lX -> 0x%lX", paddr, vaddr);
-			return;
-		}
-
-		panic(PANIC_PAGING);
-	}
-
-	GET_TABLE(pd)[GET_PD_INDEX(vaddr)] = paddr | flg | PAGE_PS;
+uint64_t paging_ident(uint64_t paddr) {
+	return paddr + IDENT_BASE;
 }

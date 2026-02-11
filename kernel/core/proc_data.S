@@ -1,4 +1,4 @@
-/* lock.h - spinlock interface */
+/* proc_data.S - per procesor data routines */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,29 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <stdint.h>
+.section .text
 
-#ifndef KERNEL_INCLUDE_CORE_LOCK_H
-#define KERNEL_INCLUDE_CORE_LOCK_H
+.globl proc_data_get
+proc_data_get:
+movq %gs:0, %rax
+ret
 
-extern void lock_init(uint8_t* lock);
-extern void lock_acquire(uint8_t* lock);
-extern void lock_release(uint8_t* lock);
+.globl proc_data_set_id
+proc_data_set_id:
+movq proc_data_ptr, %rax
+movq (%rax,%rdi,8), %rax
+movl $0xC0000101, %ecx
+movq %rax, %rdx
+shrq $32,%rdx
+wrmsr
+ret
 
-#endif /* KERNEL_INCLUDE_CORE_LOCK_H */
+.section .data
+
+.globl proc_arb_id
+proc_arb_id:
+.byte 0
+
+.globl proc_data_ptr
+proc_data_ptr:
+.quad 0

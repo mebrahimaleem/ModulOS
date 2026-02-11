@@ -1,4 +1,4 @@
-/* mm_init.h - memory manager initialization interface */
+/* mergesort.h - mergesort interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,26 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_MM_INIT_H
-#define KERNEL_CORE_MM_INIT_H
+#ifndef KERNEL_LIB_MERGESORT_H
+#define KERNEL_LIB_MERGESORT_H
 
-#include <stdint.h>
-#include <stddef.h>
+extern void* mergesort_ll_inplace_ul(void* ll, void** (*next)(void*), unsigned long (*value)(void*));
 
-struct mem_segment_t {
-	uint64_t base;
-	size_t size;
-	enum {
-		MEM_AVL,
-		MEM_CLM,
-		MEM_PRS
-	} type;
-};
-
-extern void mm_init(
-		void (*first_segment)(uint64_t* handle),
-		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg));
-
-extern uint64_t mm_early_alloc_2m(void);
-
-#endif /* KERNEL_CORE_MM_INIT_H */
+#endif /* KERNEL_LIB_MERGESORT_H */

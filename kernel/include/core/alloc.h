@@ -18,12 +18,44 @@
 #ifndef KERNEL_CORE_ALLOC_H
 #define KERNEL_CORE_ALLOC_H
 
+#include <stdint.h>
 #include <stddef.h>
+
+enum slab_t {
+	SLAB_1,
+	SLAB_2,
+	SLAB_4,
+	SLAB_8,
+	SLAB_16,
+	SLAB_32,
+	SLAB_64,
+	SLAB_128,
+	SLAB_256,
+	SLAB_512,
+	SLAB_1K,
+	SLAB_2K,
+	SLAB_4K,
+	SLAB_8K,
+	SLAB_16K,
+	SLAB_32K,
+	SLAB_64K,
+	SLAB_128K,
+	SLAB_256K,
+	SLAB_512K,
+	SLAB_1M,
+	SLAB_2M,
+	SLAB_MAX
+};
+
+struct proc_alloc_caches_t {
+	uint8_t lock;
+	struct cache_node_t* avl;
+	struct cache_node_t* slabs[SLAB_MAX];
+};
 
 extern void alloc_init(void);
 
 extern void* kmalloc(size_t size);
-
-extern void* early_kmalloc(size_t size);
+extern void kfree(void* ptr);
 
 #endif /* KERNEL_CORE_ALLOC_H */

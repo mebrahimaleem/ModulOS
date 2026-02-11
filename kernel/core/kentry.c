@@ -15,7 +15,6 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include "core/clock_src.h"
 #include <stdint.h>
 
 #include <core/kentry.h>
@@ -25,6 +24,7 @@
 #include <core/logging.h>
 #include <core/clock_src.h>
 #include <core/time.h>
+#include <core/proc_data.h>
 
 #include <drivers/acpi/tables.h>
 #include <drivers/acpica_osl/init.h>
@@ -33,8 +33,6 @@
 #include <drivers/ioapic/ioapic_init.h>
 
 struct boot_context_t boot_context;
-
-extern void test_tt(void);
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");

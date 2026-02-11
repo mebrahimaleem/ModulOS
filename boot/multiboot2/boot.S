@@ -288,9 +288,10 @@ gdt_ptr64.addr:
 kernel_pml4:
 PML4:
 	.quad PDPT_0 + KERNEL_PAGE_FLAGS
-.rept 0x200 - 2
+.rept 0x200 - 3
 	.quad 0
 .endr
+	.quad PDPT_510 + KERNEL_PAGE_FLAGS
 	.quad PDPT_511 + KERNEL_PAGE_FLAGS
 
 PDPT_0:
@@ -298,6 +299,13 @@ PDPT_0:
 	.quad (1 * PAGING_1GIB) + KERNEL_PAGE_FLAGS + PAGE_SZ
 .rept 0x200 - 2
 	.quad 0
+.endr
+
+PDPT_510:
+.set i, 0
+.rept 0x200
+	.quad (i * PAGING_1GIB) + KERNEL_PAGE_FLAGS + PAGE_SZ
+	.set i, i+1
 .endr
 
 PDPT_511:

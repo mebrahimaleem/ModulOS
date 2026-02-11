@@ -19,100 +19,221 @@
 #include <stddef.h>
 
 #include <core/alloc.h>
+#include <core/lock.h>
 #include <core/mm.h>
-#include <core/mm_init.h>
 #include <core/paging.h>
-#include <core/logging.h>
+#include <core/proc_data.h>
 
-#include <lib/kmemset.h>
+#define SLAB_SIZE_1			0x1
+#define SLAB_SIZE_2			0x2
+#define SLAB_SIZE_4			0x4
+#define SLAB_SIZE_8			0x8
+#define SLAB_SIZE_16		0x10
+#define SLAB_SIZE_32		0x20
+#define SLAB_SIZE_64		0x40
+#define SLAB_SIZE_128		0x80
+#define SLAB_SIZE_256		0x100
+#define SLAB_SIZE_512		0x200
+#define SLAB_SIZE_1K		0x400
+#define SLAB_SIZE_2K		0x800
+#define SLAB_SIZE_4K		0x1000
+#define SLAB_SIZE_8K		0x2000
+#define SLAB_SIZE_16K		0x4000
+#define SLAB_SIZE_32K		0x8000
+#define SLAB_SIZE_64K		0x10000
+#define SLAB_SIZE_128K	0x20000
+#define SLAB_SIZE_256K	0x40000
+#define SLAB_SIZE_512K	0x80000
+#define SLAB_SIZE_1M		0x100000
+#define SLAB_SIZE_2M		0x200000
 
-#define ARENA_SIZE	0x200000
-
-#define EXTENT_FREE	0
-#define EXTENT_USED	1
-
-struct arena_t {
-	struct arena_t* next;
-	uint64_t* hint;
-	uint64_t left;
-	uint64_t arena[(ARENA_SIZE
-			- sizeof(struct arena_t*)
-			- sizeof(uint64_t)
-			- sizeof(uint64_t)) / sizeof(uint64_t)];
+struct cache_node_t {
+	uint64_t base;
+	struct cache_node_t* next;
 };
 
-_Static_assert(sizeof(struct arena_t) == ARENA_SIZE, "arena must be 2M");
+static struct cache_node_t* create_node_block(struct cache_node_t** tail) {
+	uint64_t i;
 
-static struct arena_t* base;
-static struct arena_t* head;
+	struct cache_node_t* list = (struct cache_node_t*)paging_ident(mm_alloc_p2m());
+
+	for (i = 0; i < SIZE_2M / sizeof(struct cache_node_t) - 1; i++) {
+		list[i].next = &list[i+1];
+		*tail = &list[i+1];
+	}
+
+	return list;
+}
+
+static struct cache_node_t* alloc_cache_node(void) {
+	struct proc_data_t* data = proc_data_get();
+	struct cache_node_t* t;
+
+	lock_acquire(&data->alloc_caches.lock);
+	t = data->alloc_caches.avl;
+	if (t) {
+		data->alloc_caches.avl = t->next;
+	}
+	lock_release(&data->alloc_caches.lock);
+
+	if (t) {
+		return t;
+	}
+
+	struct cache_node_t* tail;
+	t = create_node_block(&tail);
+	if (t) {
+		lock_acquire(&data->alloc_caches.lock);
+		tail->next = data->alloc_caches.avl;
+		data->alloc_caches.avl = t->next;
+		lock_release(&data->alloc_caches.lock);
+	}
+
+	return t;
+}
+
+static enum slab_t min_slab(size_t size) {
+	if (size <= SLAB_SIZE_1) {
+		return SLAB_1;
+	}
+	if (size <= SLAB_SIZE_2) {
+		return SLAB_2;
+	}
+	if (size <= SLAB_SIZE_4) {
+		return SLAB_4;
+	}
+	if (size <= SLAB_SIZE_8) {
+		return SLAB_8;
+	}
+	if (size <= SLAB_SIZE_16) {
+		return SLAB_16;
+	}
+	if (size <= SLAB_SIZE_32) {
+		return SLAB_32;
+	}
+	if (size <= SLAB_SIZE_64) {
+		return SLAB_64;
+	}
+	if (size <= SLAB_SIZE_128) {
+		return SLAB_128;
+	}
+	if (size <= SLAB_SIZE_256) {
+		return SLAB_256;
+	}
+	if (size <= SLAB_SIZE_512) {
+		return SLAB_512;
+	}
+	if (size <= SLAB_SIZE_1K) {
+		return SLAB_1K;
+	}
+	if (size <= SLAB_SIZE_2K) {
+		return SLAB_2K;
+	}
+	if (size <= SLAB_SIZE_4K) {
+		return SLAB_4K;
+	}
+	if (size <= SLAB_SIZE_8K) {
+		return SLAB_8K;
+	}
+	if (size <= SLAB_SIZE_16K) {
+		return SLAB_16K;
+	}
+	if (size <= SLAB_SIZE_32K) {
+		return SLAB_32K;
+	}
+	if (size <= SLAB_SIZE_64K) {
+		return SLAB_64K;
+	}
+	if (size <= SLAB_SIZE_128K) {
+		return SLAB_128K;
+	}
+	if (size <= SLAB_SIZE_256K) {
+		return SLAB_256K;
+	}
+	if (size <= SLAB_SIZE_512K) {
+		return SLAB_512K;
+	}
+	if (size <= SLAB_SIZE_1M) {
+		return SLAB_1M;
+	}
+	if (size <= SLAB_SIZE_2M) {
+		return SLAB_2M;
+	}
+	return SLAB_MAX;
+}
+
+static struct cache_node_t* create_cache(enum slab_t slab, struct cache_node_t** tail) {
+	uint64_t i;
+
+	uint64_t slab_base = paging_ident(mm_alloc_p2m());
+
+	struct cache_node_t* cache = 0, * t;
+
+	for (i = 0; i < SIZE_2M; i += (1 << (uint64_t)slab)) {
+		t = alloc_cache_node();
+		if (!t) {
+			break;
+		}
+		t->next = cache;
+		t->base = i + slab_base;
+		if (!cache) {
+			*tail = t;
+		}
+		cache = t;
+	}
+
+	return cache;
+}
 
 void alloc_init(void) {
-	base = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
-	head = base;
-	paging_early_map_2m((uint64_t)base, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
+	struct proc_data_t* data = proc_data_get();
+	uint64_t i;
 
-	logging_log_debug("New arena @ 0x%lX", head);
+	data->alloc_caches.avl = 0;
+	lock_init(&data->alloc_caches.lock);
 
-	// preallocate prevents mm/alloc deadlock
-	kmemset(base, 0, ARENA_SIZE);
-	base->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
-	paging_early_map_2m((uint64_t)base->next, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
-	base->left = sizeof(base->arena);
-	base->hint = &base->arena[0];
+	for (i = 0; i < SLAB_MAX; i++) {
+		data->alloc_caches.slabs[i] = 0;
+	}
 }
 
-//TODO: allow chosing arena
 void* kmalloc(size_t size) {
-	// TODO: reclaim freed
-	
-	// round to 8
-	if (size % sizeof(uint64_t) != 0) {
-		size += sizeof(uint64_t) - (size % sizeof(uint64_t));
+	enum slab_t slab = min_slab(size);
+	if (slab == SLAB_MAX) {
+		return 0;
 	}
 
-	// TODO: check if hint is free
-	if ((uint64_t)head->hint + size >= (uint64_t)head + ARENA_SIZE) {	
-		head = head->next;
-		logging_log_debug("New arena @ 0x%lX", head);
-		kmemset(head, 0, ARENA_SIZE);
-		head->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
-		paging_map((uint64_t)head->next, mm_alloc(MM_ORDER_2M), PAGE_PRESENT | PAGE_RW, PAGE_2M);
-		head->left = sizeof(head->arena);
-		head->hint = &head->arena[0];
+	uint64_t ret;
+	struct proc_data_t* data = proc_data_get();
+	lock_acquire(&data->alloc_caches.lock);
+	struct cache_node_t* cache = data->alloc_caches.slabs[slab], * tail;
+	if (cache) {
+		ret = cache->base;
+		data->alloc_caches.slabs[slab] = cache->next;
+
+		//TODO: track cache for freeing
+		lock_release(&data->alloc_caches.lock);
+	}
+	else {
+		lock_release(&data->alloc_caches.lock);
+		cache = create_cache(slab, &tail);
+		if (!cache) {
+			return 0;
+		}
+
+		lock_acquire(&data->alloc_caches.lock);
+		tail->next = data->alloc_caches.slabs[slab];
+		data->alloc_caches.slabs[slab] = cache->next;
+
+		ret = cache->base;
+
+		//TODO: track cache for freeing
+		lock_release(&data->alloc_caches.lock);
 	}
 
-	void* const ret = &head->hint[1];
-
-	head->hint[0] = EXTENT_USED | size;
-	head->hint = (uint64_t*)((uint64_t)&head->hint[1] + size);
-	head->left -= size + sizeof(uint64_t);
-
-	return ret;
+	return (void*)ret;
 }
 
-void* early_kmalloc(size_t size) {
-	// TODO: reclaim freed
-	
-	// round to 8
-	if (size % sizeof(uint64_t) != 0) {
-		size += sizeof(uint64_t) - (size % sizeof(uint64_t));
-	}
-
-	// TODO: check if hint is free
-	if ((uint64_t)head->hint + size >= (uint64_t)head + ARENA_SIZE) {	
-		head = head->next;
-		kmemset(head, 0, ARENA_SIZE);
-		head->next = (struct arena_t*)mm_alloc_dv(MM_ORDER_2M);
-		paging_early_map_2m((uint64_t)head->next, mm_early_alloc_2m(), PAGE_PRESENT | PAGE_RW);
-		head->left = sizeof(head->arena);
-		head->hint = &head->arena[0];
-	}
-
-	void* const ret = &head->hint[1];
-
-	head->hint[0] = EXTENT_USED | size;
-	head->hint = (uint64_t*)((uint64_t)&head->hint[1] + size);
-	head->left -= size + sizeof(uint64_t);
-
-	return ret;
+void kfree(void* ptr) {
+	(void)ptr;
 }

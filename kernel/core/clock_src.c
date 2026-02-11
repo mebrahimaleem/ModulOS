@@ -48,7 +48,7 @@ struct clock_src_t* clock_src_alloc(void) {
 	if (clocks) {
 		source = clocks->clock;
 		clocks = clocks->next;
-		//TODO: free clock
+		kfree(clocks);
 	}
 
 	return source;

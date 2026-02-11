@@ -1,4 +1,4 @@
-/* lock.h - spinlock interface */
+/* proc_data.h - per procesor data interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_CORE_PROC_DATA_H
+#define KERNEL_CORE_PROC_DATA_H
+
 #include <stdint.h>
 
-#ifndef KERNEL_INCLUDE_CORE_LOCK_H
-#define KERNEL_INCLUDE_CORE_LOCK_H
+#include <kernel/core/alloc.h>
 
-extern void lock_init(uint8_t* lock);
-extern void lock_acquire(uint8_t* lock);
-extern void lock_release(uint8_t* lock);
+struct proc_data_t {
+	uint8_t arb_id;
+	struct proc_alloc_caches_t alloc_caches;
+};
 
-#endif /* KERNEL_INCLUDE_CORE_LOCK_H */
+extern uint8_t proc_arb_id;
+
+extern struct proc_data_t** proc_data_ptr;
+
+extern void proc_data_set_id(uint8_t id);
+extern struct proc_data_t* proc_data_get(void);
+
+#endif /* KERNEL_CORE_PROC_DATA_H */

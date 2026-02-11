@@ -20,9 +20,10 @@
 #include <multiboot2/init.h>
 
 #include <kernel/core/kentry.h>
-#include <kernel/core/mm_init.h>
+#include <kernel/core/mm.h>
 #include <kernel/core/gdt.h>
 #include <kernel/core/logging.h>
+#include <kernel/core/proc_data.h>
 
 #include <drivers/acpi/tables.h>
 
@@ -45,6 +46,9 @@
 #define VIDEO_XRGB8888_GREENMASK	0x08
 #define VIDEO_XRGB8888_BLUEMASK	0x08
 #define VIDEO_XRGB8888_BPP				32
+
+static struct proc_data_t bsp_proc_data;
+static struct proc_data_t* bsp_proc_data_ptr;
 
 struct mb2_tag_memmap_entry_t {
 	uint64_t base;
@@ -134,6 +138,10 @@ static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
 
 
 void multiboot2_init(struct mb2_info_t* info) {
+	bsp_proc_data_ptr = &bsp_proc_data;
+	proc_data_ptr = &bsp_proc_data_ptr;
+	proc_data_set_id(0);
+	proc_data_get()->arb_id = ++proc_arb_id;
 	logging_init();
 
 #ifdef SERIAL

@@ -15,6 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+.globl lock_init
+lock_init:
+movq $0, (%rdi)
+ret
+
 .globl lock_acquire
 lock_acquire:
 movq $1, %rax
