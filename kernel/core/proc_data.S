@@ -34,10 +34,6 @@ ret
 
 .section .data
 
-.globl proc_arb_id
-proc_arb_id:
-.byte 0
-
 .globl proc_data_ptr
 proc_data_ptr:
 .quad 0

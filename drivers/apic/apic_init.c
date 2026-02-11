@@ -83,8 +83,10 @@
 
 uint64_t apic_base;
 uint8_t bsp_apic_id;
+static uint8_t num_apic;
 
 static uint8_t timer_vector;
+static uint8_t error_vector;
 
 extern uint8_t gdt;
 extern uint8_t gdt_end;
@@ -97,12 +99,33 @@ void apic_init(void) {
 	paging_map(apic_base, apic_base,
 			PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 
+	timer_vector = idt_get_vector();
+	error_vector = idt_get_vector();
+
+	// install idts
+	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+
+	apic_init_ap();
+
+	// init stacks
+	init_stacks = kmalloc(sizeof(uint64_t*) * num_apic);
+	proc_data_ptr = kmalloc(sizeof(struct proc_data_t*) * num_apic);
+	proc_data_ptr[0] = &bsp_proc_data;
+
+	for (--num_apic; num_apic; num_apic--) {
+		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
+		init_stacks[num_apic] = (uint64_t)kmalloc(INIT_STACK_SIZE) + INIT_STACK_SIZE - 16;
+	}
+}
+
+void apic_init_ap(void) {
 	const uint8_t apic_id = (uint8_t)(apic_read_reg(APIC_REG_IDR) >> APIC_ID_SHFT);
 	bsp_apic_id = apic_id;
 	logging_log_info("Initializing Local APIC 0x%lX", (uint64_t)apic_id);
 
 	// get ACPI uid
-	uint8_t num_apic = 0;
+	num_apic = 0;
 	uint64_t handle;
 	uint8_t acpi_uid = ACPI_UID_ALL_PROC;
 	struct acpi_madt_ics_local_apic_t* local_apic;
@@ -113,20 +136,9 @@ void apic_init(void) {
 		if (local_apic->APICID == apic_id) {
 			acpi_uid = local_apic->ACPIProcessorUID;
 			logging_log_debug("ACPI UID 0x%lX -> APIC ID 0x%lX", (uint64_t)acpi_uid, (uint64_t)apic_id);
-			break;
 		}
 		num_apic++;
 	}
-
-	init_stacks = kmalloc(sizeof(uint64_t*) * num_apic);
-	proc_data_ptr = kmalloc(sizeof(struct proc_data_t*) * num_apic);
-	proc_data_ptr[0] = &bsp_proc_data;
-
-	for (--num_apic; num_apic; num_apic--) {
-		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
-		init_stacks[num_apic] = (uint64_t)kmalloc(INIT_STACK_SIZE) + INIT_STACK_SIZE - 16;
-	}
-
 
 	if (acpi_uid == ACPI_UID_ALL_PROC) {
 		logging_log_error("No ACPI ID for APIC 0x%lX", (uint64_t)apic_id);
@@ -152,9 +164,6 @@ void apic_init(void) {
 			apic_write_lve(APIC_REG_EE3, 0, 0, APIC_LVT_MASK);
 		}
 	}
-
-	timer_vector = idt_get_vector();
-	const uint8_t error_vector = idt_get_vector();
 
 	// set NMI
 	uint8_t lint_state = 0;
@@ -207,10 +216,6 @@ void apic_init(void) {
 
 	apic_write_lve(APIC_REG_ERE, error_vector,
 			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, 0);
-
-	// install idts, init timer first
-	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
-	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 
 	// enable apic
 	apic_write_reg(APIC_REG_ESR, 0);
@@ -271,7 +276,7 @@ uint8_t apic_get_bsp_id(void) {
 	return bsp_apic_id;
 }
 
-void apic_init_ap(void) {
+void apic_start_ap(void) {
 	*(volatile uint8_t*)paging_ident(AP_ARB_BASE + 0x0) = 0; // arb lock
 	*(volatile uint8_t*)paging_ident(AP_ARB_BASE + 0x1) = 0; // arb id
 	*(volatile uint16_t*)paging_ident(AP_ARB_BASE + 0x2) = 

@@ -77,6 +77,10 @@ void idt_init(void) {
 
 	next_vector = 0x30; // leave 0x20 and 0x28 for legacy PIC IRQs
 
+	idt_init_ap();
+}
+
+void idt_init_ap(void) {
 	cpu_lidt((uint64_t)&idt_ptr);
 }
 

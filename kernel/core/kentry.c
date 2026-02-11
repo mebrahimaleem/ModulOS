@@ -19,6 +19,7 @@
 
 #include <core/kentry.h>
 #include <core/paging.h>
+#include <core/alloc.h>
 #include <core/tss.h>
 #include <core/idt.h>
 #include <core/cpu_instr.h>
@@ -77,7 +78,7 @@ void kentry(void) {
 			&ap_bootstrap_start,
 			(uint64_t)&ap_bootstrap_end - (uint64_t)&ap_bootstrap_start);
 
-	apic_init_ap();
+	apic_start_ap();
 
 	logging_log_info("AP bootstrap sequence done");
 
@@ -86,5 +87,26 @@ void kentry(void) {
 
 void kapentry(uint64_t arb_id) {
 	logging_log_debug("AP %lx bootstrap complete", arb_id);
+
+	proc_data_set_id((uint8_t)arb_id);
+	proc_data_get()->arb_id = (uint8_t)arb_id;
+
+	alloc_init();
+
+	logging_log_debug("AP TSS and IDT init");
+	tss_init();
+	idt_init_ap();
+	logging_log_debug("AP TSS and IDT init done");
+
+	logging_log_debug("AP APIC init");
+	pic_disab();
+	apic_init_ap();
+	apic_timer_calib(apic_get_bsp_id());
+	apic_nmi_enab();
+	ioapic_init();
+	logging_log_debug("AP APIC init done");
+
+	logging_log_info("AP init complete");
+
 	cpu_halt_loop();
 }

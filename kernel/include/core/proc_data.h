@@ -27,8 +27,6 @@ struct proc_data_t {
 	struct proc_alloc_caches_t alloc_caches;
 };
 
-extern uint8_t proc_arb_id;
-
 extern struct proc_data_t bsp_proc_data;
 extern struct proc_data_t** proc_data_ptr;
 

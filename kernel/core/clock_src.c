@@ -17,6 +17,7 @@
 
 #include <core/clock_src.h>
 #include <core/alloc.h>
+#include <core/lock.h>
 
 #include <drivers/hpet/hpet_init.h>
 
@@ -26,10 +27,12 @@ struct clock_src_list_t {
 };
 
 static struct clock_src_list_t* clocks;
+static uint8_t clock_lock;
 
 void clock_src_init(void) {
 	clocks = 0;
 
+	lock_init(&clock_lock);
 #ifdef HPET
 	hpet_init();
 #endif /* HPET */
@@ -37,19 +40,23 @@ void clock_src_init(void) {
 
 void clock_src_register(struct clock_src_t* clock) {
 	struct clock_src_list_t* node = kmalloc(sizeof(struct clock_src_list_t));
+	lock_acquire(&clock_lock);
 	node->clock = clock;
 	node->next = clocks;
 	clocks = node;
+	lock_release(&clock_lock);
 }
 
 struct clock_src_t* clock_src_alloc(void) {
 	struct clock_src_t* source = 0;
 
+	lock_acquire(&clock_lock);
 	if (clocks) {
 		source = clocks->clock;
 		clocks = clocks->next;
 		kfree(clocks);
 	}
+	lock_release(&clock_lock);
 
 	return source;
 }

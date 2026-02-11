@@ -141,12 +141,13 @@ void multiboot2_init(struct mb2_info_t* info) {
 	bsp_proc_data_ptr = &bsp_proc_data;
 	proc_data_ptr = &bsp_proc_data_ptr;
 	proc_data_set_id(0);
-	proc_data_get()->arb_id = ++proc_arb_id;
+	proc_data_get()->arb_id = 0;
 	logging_init();
 
 #ifdef SERIAL
 	serial_init_com1();
 	serial_init_com2();
+	serial_print_init();
 
 	serial_print_com1("COM1\r\n");
 	serial_print_com2("COM2\r\n");

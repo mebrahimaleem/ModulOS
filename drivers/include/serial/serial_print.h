@@ -30,4 +30,6 @@ extern void serial_printf_com2(const char* s, ...);
 
 extern void serial_log(enum log_severity_t severity, const char* s, va_list args);
 
+extern void serial_print_init(void);
+
 #endif /* DRIVERS_SERIAL_SERIAL_PRINT */

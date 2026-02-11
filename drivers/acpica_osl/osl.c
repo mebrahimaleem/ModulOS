@@ -43,7 +43,7 @@ ACPI_STATUS AcpiOsInitialize(void) {
 }
 
 ACPI_THREAD_ID AcpiOsGetThreadId(void) {
-	return proc_data_get()->arb_id;
+	return proc_data_get()->arb_id + 1; //bsp is zero, acpica wants non zero
 }
 
 void ACPI_INTERNAL_XFACE AcpiOsPrintf(const char* fmt, ...) {

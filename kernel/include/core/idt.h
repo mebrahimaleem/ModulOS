@@ -36,6 +36,7 @@ struct idt_entry_t {
 } __attribute__((packed));
 
 extern void idt_init(void);
+extern void idt_init_ap(void);
 
 extern void idt_install(
 		uint8_t v,
