@@ -24,7 +24,6 @@
 #include <kernel/core/mm.h>
 #include <kernel/core/alloc.h>
 #include <kernel/core/clock_src.h>
-#include <kernel/core/lock.h>
 
 #define HPET_GROUP_ENA		0x1
 #define HPET_INT_ENA			0x4
@@ -54,29 +53,21 @@ static volatile struct hpet_group_t {
 	struct hpet_timer_t timers[32];
 } __attribute__((packed))* hpet_reg_bases[8];
 
-static uint8_t hpet_lock;
-
 static uint64_t hpet_get_counter(void* meta) {
 	volatile struct hpet_group_t* hpet = meta;
-	lock_acquire(&hpet_lock);
 	const uint64_t ret = hpet->counter;
-	lock_release(&hpet_lock);
 	return ret;
 }
 
 static void hpet_set_counter(void* meta, uint64_t counter) {
 	volatile struct hpet_group_t* hpet = meta;
-	lock_acquire(&hpet_lock);
 	hpet->gen_conf &= ~(uint64_t)HPET_GROUP_ENA;
 	hpet->counter = counter;
 	hpet->gen_conf |= HPET_GROUP_ENA;
-	lock_release(&hpet_lock);
 }
 
 void hpet_init(void) {
 	acpi_get_hpet_bases((uint64_t*)&hpet_reg_bases[0]);
-
-	lock_init(&hpet_lock);
 
 	struct clock_src_t* clock;
 

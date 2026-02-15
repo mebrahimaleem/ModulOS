@@ -21,7 +21,6 @@
 #include <stdint.h>
 
 struct exception_context_t {
-	uint64_t rsp;
 	uint64_t rbp;
 	uint64_t r15;
 	uint64_t r14;
@@ -42,8 +41,8 @@ struct exception_context_t {
 	uint64_t rip;
 	uint64_t cs;
 	uint64_t rflags;
-	uint64_t inter_rsp;
-	uint64_t inter_ss;
+	uint64_t rsp;
+	uint64_t ss;
 } __attribute__((packed));
 
 extern void exception_dispatch(struct exception_context_t* context) __attribute__((noreturn));

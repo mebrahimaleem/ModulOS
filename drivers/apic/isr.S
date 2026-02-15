@@ -18,6 +18,7 @@
 .globl apic_isr_timer
 apic_isr_timer:
 pushq %rax
+pushq %rbx
 pushq %rcx
 pushq %rdx
 pushq %rsi
@@ -26,28 +27,13 @@ pushq %r8
 pushq %r9
 pushq %r10
 pushq %r11
+pushq %r12
+pushq %r13
+pushq %r14
+pushq %r15
 pushq %rbp
-
-movq %rsp, %rbp
-movq %rsp, %rax
-andq $0xF, %rax
-jz .aligned_timer
-subq %rax, %rsp
-.aligned_timer:
-call apic_timer_dispatch
-movq %rbp, %rsp
-
-popq %rbp
-popq %r11
-popq %r10
-popq %r9
-popq %r8
-popq %rdi
-popq %rsi
-popq %rdx
-popq %rcx
-popq %rax
-iretq
+movq %rsp, %rdi
+jmp process_preempt_entry
 
 .globl apic_isr_error
 apic_isr_error:

@@ -22,19 +22,19 @@
 #include <core/panic.h>
 
 void exception_dispatch(struct exception_context_t* context) {
-	//TODO: handle from userland	
-
+	//TODO: remove reduntant rsp push
 	logging_log_error("Unrecoverable exception 0x%lX (0x%lX) @ 0x%lX",
 			context->vector, context->code, context->rip);
 
 	logging_log_debug("Register Dump:\r\nrax 0x%lX\r\nrbx 0x%lX\r\nrcx 0x%lX\r\nrdx 0x%lX\
 \r\nrsi 0x%lX\r\nrdi 0x%lX\r\nrbp 0x%lX\r\nrsp 0x%lX\r\nr8  0x%lX\r\nr9  0x%lX\r\nr10 0x%lX\
-\r\nr11 0x%lX\r\nr12 0x%lX\r\nr13 0x%lX\r\nr14 0x%lX\r\nr15 0x%lX\r\nrfl 0x%lX\r\ncs  0x%lX\r\nrip 0x%lX",
+\r\nr11 0x%lX\r\nr12 0x%lX\r\nr13 0x%lX\r\nr14 0x%lX\r\nr15 0x%lX\r\nrfl 0x%lX\r\ncs  0x%lX\
+\r\nss  0x%lX\r\nrip 0x%lX",
 			context->rax, context->rbx, context->rcx, context->rdx,
 			context->rsi, context->rdi, context->rbp, context->rsp,
 			context->r8, context->r9, context->r10, context->r11,
 			context->r12, context->r13, context->r14, context->r15,
-			context->rflags, context->cs, context->rip);
+			context->rflags, context->cs, context->ss, context->rip);
 
 	panic(PANIC_STATE);
 }

@@ -18,8 +18,6 @@
 #ifndef DRIVERS_APIC_ISR_DISPATCH_H
 #define DRIVERS_APIC_ISR_DISPATCH_H
 
-extern void apic_timer_dispatch(void);
-
 extern void apic_error_dispatch(void);
 
 #endif /* DIRVERS_APIC_ISR_DISPATCH_H */

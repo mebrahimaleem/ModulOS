@@ -30,10 +30,6 @@
 #define ESR_RAE	0x08
 #define ESR_SAE	0x04
 
-void apic_timer_dispatch(void) {
-	apic_write_reg(APIC_REG_EOI, APIC_EOI);
-}
-
 void apic_error_dispatch(void) {
 	const char* ira = "";
 	const char* riv = "";

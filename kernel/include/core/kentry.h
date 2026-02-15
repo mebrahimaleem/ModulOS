@@ -25,6 +25,8 @@
 
 #include <drivers/acpi/tables.h>
 
+#define INIT_STACK_SIZE	0x4000
+
 #ifdef GRAPHICSBASE
 #include <kernel/graphicsbase/framebuffer.h>
 #endif /* GRAPHICSBASE */

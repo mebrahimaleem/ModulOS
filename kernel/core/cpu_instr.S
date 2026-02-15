@@ -41,6 +41,11 @@ cpu_pause:
 pause
 ret
 
+.globl cpu_wait_loop
+cpu_wait_loop:
+hlt
+jmp cpu_wait_loop
+
 .globl cpu_halt_loop
 cpu_halt_loop:
 cli

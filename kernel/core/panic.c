@@ -20,6 +20,7 @@
 #include <core/panic.h>
 #include <core/cpu_instr.h>
 #include <core/logging.h>
+#include <core/process.h>
 
 
 static const char* panic_names[] = {
@@ -33,8 +34,8 @@ static const char* panic_names[] = {
 };
 
 void panic(enum panic_code_t code) {
-	logging_log_error("Panic 0x%lX %s\r\nHalt", (uint64_t)code, 
+	logging_log_error("Panic 0x%lX %s", (uint64_t)code, 
 			panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK]);
 
-	cpu_halt_loop();
+	process_kill_current();
 }

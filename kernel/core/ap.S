@@ -84,6 +84,7 @@ movl %cr0, %ecx
 orl $0x80000001, %ecx
 movl %ecx, %cr0
 
+// boostrap using bsp gdt
 lgdt AP_GDT32
 
 pushw $0
@@ -92,7 +93,7 @@ pushw $0
 pushw $0x807d
 lretl
 
-// 0x2083
+// 0x807d
 
 .code64
 
@@ -111,13 +112,24 @@ movb %bl, %dil
 movq AP_STACKS, %rax
 movq (%rax,%rdi,8), %rsp
 
+// switch to correct gdt
+movq ap_gdt_ptr_64, %rax
+movq (%rax,%rdi,8), %rax
+lgdt (%rax)
+
+movw $0x10, %ax
+movw %ax, %ds
+movw %ax, %es
+movw %ax, %fs
+movw %ax, %gs
+movw %ax, %ss
+
 pushq $0
 popfq
 
 pushq $0x8
 pushq $kapentry
 lretq
-
 
 .globl ap_bootstrap_end
 ap_bootstrap_end:

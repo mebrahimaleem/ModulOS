@@ -33,7 +33,12 @@
 #include <kernel/core/time.h>
 #include <kernel/core/lock.h>
 #include <kernel/core/clock_src.h>
+#include <kernel/core/kentry.h>
 #include <kernel/core/proc_data.h>
+#include <kernel/core/mm.h>
+#include <kernel/core/gdt.h>
+
+#include <kernel/lib/kmemcpy.h>
 
 #define APIC_BASE_MASK	0xFFFFFFFFFF000
 
@@ -60,7 +65,7 @@
 
 #define APIC_CAL_ITR_MS		50
 #define APIC_CAL_BATCH		20
-#define APIC_CAL_TOL			5000
+#define APIC_CAL_TOL			8000
 
 #define APIC_CLOCK_MS			50
 
@@ -79,8 +84,6 @@
 
 #define AP_ARB_BASE	0x9000
 
-#define INIT_STACK_SIZE	0x4000
-
 uint64_t apic_base;
 uint8_t bsp_apic_id;
 static uint8_t num_apic;
@@ -92,7 +95,10 @@ extern uint8_t gdt;
 extern uint8_t gdt_end;
 extern uint8_t kernel_pml4;
 
-static uint64_t* init_stacks;
+uint64_t* init_stacks;
+volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
+volatile struct gdt_ptr_64_t** ap_gdt_ptr_64;
+uint8_t* ap_init_locks;
 
 void apic_init(void) {
 	apic_base = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
@@ -103,7 +109,7 @@ void apic_init(void) {
 	error_vector = idt_get_vector();
 
 	// install idts
-	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, IST_SCHED, IDT_GATE_INT, 0);
 	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 
 	apic_init_ap();
@@ -113,9 +119,24 @@ void apic_init(void) {
 	proc_data_ptr = kmalloc(sizeof(struct proc_data_t*) * num_apic);
 	proc_data_ptr[0] = &bsp_proc_data;
 
+	// init gdts
+	ap_gdts = kmalloc(sizeof(struct gdt_t(*)[GDT_NUM_ENTRIES]) * num_apic);
+	ap_gdt_ptr_64 = kmalloc(sizeof(struct gdt_ptr_64_t*) * num_apic);
+	ap_init_locks = kmalloc(sizeof(uint8_t) * num_apic);
+
 	for (--num_apic; num_apic; num_apic--) {
 		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
-		init_stacks[num_apic] = (uint64_t)kmalloc(INIT_STACK_SIZE) + INIT_STACK_SIZE - 16;
+		init_stacks[num_apic] = (uint64_t)kmalloc(INIT_STACK_SIZE) + INIT_STACK_SIZE;
+
+		ap_gdts[num_apic] = kmalloc(sizeof(struct gdt_t[GDT_NUM_ENTRIES]));
+		ap_gdt_ptr_64[num_apic] = kmalloc(sizeof(struct gdt_ptr_64_t));
+
+		kmemcpy((void*)ap_gdts[num_apic], &gdt, (uint64_t)&gdt_end - (uint64_t)&gdt);
+		ap_gdt_ptr_64[num_apic]->addr = (uint64_t)ap_gdts[num_apic];
+		ap_gdt_ptr_64[num_apic]->limit = (uint16_t)((uint64_t)&gdt_end - (uint64_t)&gdt - 1);
+
+		lock_init(&ap_init_locks[num_apic]);
+		lock_acquire(&ap_init_locks[num_apic]);
 	}
 }
 

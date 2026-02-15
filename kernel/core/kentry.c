@@ -27,6 +27,9 @@
 #include <core/clock_src.h>
 #include <core/time.h>
 #include <core/proc_data.h>
+#include <core/scheduler.h>
+#include <core/process.h>
+#include <core/lock.h>
 
 #include <lib/kmemcpy.h>
 
@@ -40,13 +43,18 @@
 struct boot_context_t boot_context;
 
 extern uint8_t ap_bootstrap_start;
+extern uint64_t* init_stacks;
 extern uint8_t ap_bootstrap_end;
+extern volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
+extern uint8_t* ap_init_locks;
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
 	logging_log_debug("TSS and IDT init");
-	tss_init();
+	tss_init((void*)paging_ident((uint64_t)boot_context.gdt));
+	process_init(0);
 	idt_init();
+	scheduler_init();
 	logging_log_debug("TSS and IDT init done");
 
 	logging_log_debug("ACPI init");
@@ -82,10 +90,11 @@ void kentry(void) {
 
 	logging_log_info("AP bootstrap sequence done");
 
-	cpu_halt_loop();
+	process_kill_current();
 }
 
 void kapentry(uint64_t arb_id) {
+	lock_release(&ap_init_locks[arb_id]);
 	logging_log_debug("AP %lx bootstrap complete", arb_id);
 
 	proc_data_set_id((uint8_t)arb_id);
@@ -94,7 +103,8 @@ void kapentry(uint64_t arb_id) {
 	alloc_init();
 
 	logging_log_debug("AP TSS and IDT init");
-	tss_init();
+	tss_init(ap_gdts[proc_data_get()->arb_id]);
+	process_init_ap(init_stacks[arb_id]);
 	idt_init_ap();
 	logging_log_debug("AP TSS and IDT init done");
 
@@ -108,5 +118,5 @@ void kapentry(uint64_t arb_id) {
 
 	logging_log_info("AP init complete");
 
-	cpu_halt_loop();
+	process_kill_current();
 }

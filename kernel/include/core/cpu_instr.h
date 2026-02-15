@@ -30,6 +30,8 @@ extern void cpu_sti(void);
 
 extern void cpu_pause(void);
 
+extern void cpu_wait_loop(void) __attribute__((noreturn));
+
 extern void cpu_halt_loop(void) __attribute__((noreturn));
 
 #endif /* KERNEL_CORE_CPU_INSTR_H */

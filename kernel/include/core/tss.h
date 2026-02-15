@@ -18,8 +18,41 @@
 #ifndef KERNEL_CORE_TSS_H
 #define KERNEL_CORE_TSS_H
 
-#define IST_ABORT	1
+#include <kernel/core/gdt.h>
 
-extern void tss_init(void);
+#define IST_ABORT	1
+#define IST_SCHED	2
+
+struct tss_t {
+	uint32_t resv0;
+	uint32_t rsp0_lo;
+	uint32_t rsp0_hi;
+	uint32_t rsp1_lo;
+	uint32_t rsp1_hi;
+	uint32_t rsp2_lo;
+	uint32_t rsp2_hi;
+	uint32_t resv1;
+	uint32_t resv2;
+	uint32_t ist1_lo;
+	uint32_t ist1_hi;
+	uint32_t ist2_lo;
+	uint32_t ist2_hi;
+	uint32_t ist3_lo;
+	uint32_t ist3_hi;
+	uint32_t ist4_lo;
+	uint32_t ist4_hi;
+	uint32_t ist5_lo;
+	uint32_t ist5_hi;
+	uint32_t ist6_lo;
+	uint32_t ist6_hi;
+	uint32_t ist7_lo;
+	uint32_t ist7_hi;
+	uint32_t resv3;
+	uint32_t resv4;
+	uint16_t resv5;
+	uint16_t iopb;
+} __attribute__((packed));
+
+extern void tss_init(volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES]);
 
 #endif /* KERNEL_CORE_TSS_H */

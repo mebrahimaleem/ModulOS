@@ -1,5 +1,5 @@
-/* proc_data.S - per procesor data routines */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* scheduler.h - kernel scheduler interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,25 +15,19 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.section .text
+#ifndef KERNEL_CORE_SCHEDULER_H
+#define KERNEL_CORE_SCHEDULER_H
 
-.globl proc_data_get
-proc_data_get:
-movq %gs:0, %rax
-ret
+#include <stdint.h>
 
-.globl proc_data_set_id
-proc_data_set_id:
-movq proc_data_ptr, %rax
-leaq (%rax,%rdi,8), %rax
-movl $0xC0000101, %ecx
-movq %rax, %rdx
-shrq $32,%rdx
-wrmsr
-ret
+#include <kernel/core/process.h>
 
-.section .data
+extern void scheduler_init(void);
 
-.globl proc_data_ptr
-proc_data_ptr:
-.quad 0
+extern void scheduler_start(void) __attribute__((noreturn));
+
+extern void scheduler_run(void) __attribute__((noreturn));
+
+extern void scheduler_schedule(struct pcb_t* pcb);
+
+#endif /* KERNEL_CORE_SCHEDULER_H */

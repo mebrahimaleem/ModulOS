@@ -167,7 +167,6 @@ pushq %r13
 pushq %r14
 pushq %r15
 pushq %rbp
-pushq %rsp
 movq %rsp, %rdi
 // align stack
 movq %rsp, %rax

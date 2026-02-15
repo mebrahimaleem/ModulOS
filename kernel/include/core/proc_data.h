@@ -21,10 +21,14 @@
 #include <stdint.h>
 
 #include <kernel/core/alloc.h>
+#include <kernel/core/tss.h>
+#include <kernel/core/process.h>
 
 struct proc_data_t {
 	uint8_t arb_id;
 	struct proc_alloc_caches_t alloc_caches;
+	volatile struct tss_t* tss;
+	struct pcb_t* current_process;
 };
 
 extern struct proc_data_t bsp_proc_data;

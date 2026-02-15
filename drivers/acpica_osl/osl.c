@@ -35,15 +35,15 @@
 #include <kernel/core/kentry.h>
 #include <kernel/core/time.h>
 #include <kernel/core/clock_src.h>
-#include <kernel/core/proc_data.h>
 #include <kernel/core/lock.h>
+#include <kernel/core/process.h>
 
 ACPI_STATUS AcpiOsInitialize(void) {
 	return AE_OK;
 }
 
 ACPI_THREAD_ID AcpiOsGetThreadId(void) {
-	return proc_data_get()->arb_id + 1; //bsp is zero, acpica wants non zero
+	return process_get_pid();
 }
 
 void ACPI_INTERNAL_XFACE AcpiOsPrintf(const char* fmt, ...) {
