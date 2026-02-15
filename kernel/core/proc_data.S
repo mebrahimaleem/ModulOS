@@ -1,4 +1,4 @@
-/* mm_init.h - memory manager initialization interface */
+/* proc_data.S - per procesor data routines */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,26 +15,25 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_MM_INIT_H
-#define KERNEL_CORE_MM_INIT_H
+.section .text
 
-#include <stdint.h>
-#include <stddef.h>
+.globl proc_data_get
+proc_data_get:
+movq %gs:0, %rax
+ret
 
-struct mem_segment_t {
-	uint64_t base;
-	size_t size;
-	enum {
-		MEM_AVL,
-		MEM_CLM,
-		MEM_PRS
-	} type;
-};
+.globl proc_data_set_id
+proc_data_set_id:
+movq proc_data_ptr, %rax
+leaq (%rax,%rdi,8), %rax
+movl $0xC0000101, %ecx
+movq %rax, %rdx
+shrq $32,%rdx
+wrmsr
+ret
 
-extern void mm_init(
-		void (*first_segment)(uint64_t* handle),
-		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg));
+.section .data
 
-extern uint64_t mm_early_alloc_2m(void);
-
-#endif /* KERNEL_CORE_MM_INIT_H */
+.globl proc_data_ptr
+proc_data_ptr:
+.quad 0

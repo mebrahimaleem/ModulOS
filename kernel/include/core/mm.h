@@ -21,43 +21,38 @@
 #include <stdint.h>
 #include <stddef.h>
 
-enum mm_order_t {
-	MM_ORDER_4K,
-	MM_ORDER_8K,
-	MM_ORDER_16K,
-	MM_ORDER_32K,
-	MM_ORDER_64K,
-	MM_ORDER_128K,
-	MM_ORDER_256K,
-	MM_ORDER_512K,
-	MM_ORDER_1M,
-	MM_ORDER_2M,
-	MM_MAX_ORDER
-};
+#define CANON_HIGH			0xFFFF800000000000
+#define VIRTUAL_LIMIT		IDENT_BASE
+#define SIZE_2M					0x200000
 
-struct page_frame_t {
-	uint8_t flg;
-} __attribute__((packed));
-
-struct mm_free_buddy_t {
+struct mem_segment_t {
 	uint64_t base;
-	struct mm_free_buddy_t* next;
+	size_t size;
+	enum {
+		MEM_AVL,
+		MEM_CLM,
+		MEM_PRS
+	} type;
 };
 
-struct mm_order_entry_t {
-	struct mm_free_buddy_t* free;
-	uint8_t* bitmap;
-};
+extern void mm_init(
+		void (*first_segment)(uint64_t* handle),
+		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg));
+extern uint64_t mm_early_alloc_2m(void);
 
-extern uint64_t mm_alloc(enum mm_order_t order);
+uint64_t mm_alloc_p(size_t size);
+uint64_t mm_alloc_v(size_t size);
 
-extern uint64_t mm_alloc_pv(size_t size);
+uint64_t mm_alloc_p2m(void);
+uint64_t mm_alloc_v2m(void);
 
-extern void mm_init_dv(void);
+void mm_free_p(uint64_t addr, size_t size);
+void mm_free_v(uint64_t addr, size_t size);
 
-extern uint64_t mm_alloc_dv(enum mm_order_t order);
+void mm_free_p2m(uint64_t addr);
+void mm_free_v2m(uint64_t addr);
 
-extern uint64_t mm_lowest_order(size_t size);
+void mm_defrag(void);
 
 #endif /* KERNEL_CORE_MM_H */
 

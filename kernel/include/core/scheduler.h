@@ -1,5 +1,5 @@
-/* lock.h - spinlock interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* scheduler.h - kernel scheduler interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,13 +15,19 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_CORE_SCHEDULER_H
+#define KERNEL_CORE_SCHEDULER_H
+
 #include <stdint.h>
 
-#ifndef KERNEL_INCLUDE_CORE_LOCK_H
-#define KERNEL_INCLUDE_CORE_LOCK_H
+#include <kernel/core/process.h>
 
-extern void lock_init(uint8_t* lock);
-extern void lock_acquire(uint8_t* lock);
-extern void lock_release(uint8_t* lock);
+extern void scheduler_init(void);
 
-#endif /* KERNEL_INCLUDE_CORE_LOCK_H */
+extern void scheduler_start(void) __attribute__((noreturn));
+
+extern void scheduler_run(void) __attribute__((noreturn));
+
+extern void scheduler_schedule(struct pcb_t* pcb);
+
+#endif /* KERNEL_CORE_SCHEDULER_H */

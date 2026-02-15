@@ -35,15 +35,15 @@
 #include <kernel/core/kentry.h>
 #include <kernel/core/time.h>
 #include <kernel/core/clock_src.h>
+#include <kernel/core/lock.h>
+#include <kernel/core/process.h>
 
 ACPI_STATUS AcpiOsInitialize(void) {
 	return AE_OK;
 }
 
 ACPI_THREAD_ID AcpiOsGetThreadId(void) {
-	//TODO: implement
-	//logging_log_warning("Call to unfinished AcpiOsGetThreadId");
-	return 1;
+	return process_get_pid();
 }
 
 void ACPI_INTERNAL_XFACE AcpiOsPrintf(const char* fmt, ...) {
@@ -62,9 +62,7 @@ void* AcpiOsAllocate(ACPI_SIZE size) {
 }
 
 void AcpiOsFree(void* ptr) {
-	//TODO: implement
-	//logging_log_warning("Call to unfinished AcpiOsFree 0x%lx", ptr);
-	(void)ptr;
+	kfree(ptr);
 }
 
 ACPI_STATUS AcpiOsCreateSemaphore(UINT32 cap, UINT32 init, ACPI_SEMAPHORE* handle) {
@@ -101,30 +99,26 @@ ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE handle, UINT32 units) {
 }
 
 ACPI_STATUS AcpiOsCreateLock(ACPI_SPINLOCK* handle) {
-	//TODO: implement
-	*handle = (void*)1;
-	//logging_log_warning("Call to unfinished AcpiOsCreateLock");
-	return AE_OK;
+	*handle = kmalloc(sizeof(uint8_t));
+	if (*handle) {
+		lock_init(*handle);
+		return AE_OK;
+	}
+	return AE_ERROR;
 }
 
 void AcpiOsDeleteLock(ACPI_SPINLOCK handle) {
-	//TODO: implement
-	//logging_log_warning("Call to unfinished AcpiOsCreateLock");
-	(void)handle;
+	kfree(handle);
 }
 
 ACPI_CPU_FLAGS AcpiOsAcquireLock(ACPI_SPINLOCK handle) {
-	//TODO: implement
-	//logging_log_warning("Call to unfinished AcpiOsAcquireLock");
-	(void)handle;
+	lock_acquire(handle);
 	return 0;
 }
 
 void AcpiOsReleaseLock(ACPI_SPINLOCK handle, ACPI_CPU_FLAGS flg) {
-	//TODO: implement
-	//logging_log_warning("Call to unfinished AcpiOsReleaseLock");
-	(void)handle;
 	(void)flg;
+	lock_release(handle);
 }
 
 ACPI_STATUS AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS paddr, UINT64* val, UINT32 width) {
@@ -238,15 +232,10 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS paddr, ACPI_SIZE len) {
 	const uint64_t page_base = paddr & PAGE_BASE_MASK;
 	const uint64_t adj = paddr - page_base;
 	len += adj;
-	uint64_t order = mm_lowest_order(len);
-	if (order == (uint64_t)-1) {
-		logging_log_error("Could not allocate contigious virtual block of 0x%lx", (uint64_t)len);
-		panic(PANIC_NO_MEM);
-	}
-	const uint64_t vaddr = mm_alloc_dv((enum mm_order_t)order);
+	const uint64_t vaddr = mm_alloc_v(len);
 	if (!vaddr) {
 		logging_log_error("Could not allocate contigious virtual block of 0x%lx", (uint64_t)len);
-		panic(PANIC_NO_MEM);
+		return 0;
 	}
 
 	for (uint64_t i = 0; i < len; i += PAGE_SIZE_4K) {
@@ -257,9 +246,12 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS paddr, ACPI_SIZE len) {
 }
 
 void AcpiOsUnmapMemory(void* vaddr, ACPI_SIZE len) {
-	//logging_log_warning("Call to unfinished AcpiOsUnmapMemory");
-	(void)vaddr;
-	(void)len;
+	const uint64_t page_base = (uint64_t)vaddr & PAGE_BASE_MASK;
+	const uint64_t adj = (uint64_t)vaddr - page_base;
+	len += adj;
+	for (uint64_t i = 0; i < len; i += PAGE_SIZE_4K) {
+		paging_unmap(page_base + i, PAGE_4K);
+	}
 }
 
 ACPI_STATUS AcpiOsTableOverride(ACPI_TABLE_HEADER* existing, ACPI_TABLE_HEADER** override) {

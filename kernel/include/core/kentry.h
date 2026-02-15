@@ -25,6 +25,8 @@
 
 #include <drivers/acpi/tables.h>
 
+#define INIT_STACK_SIZE	0x4000
+
 #ifdef GRAPHICSBASE
 #include <kernel/graphicsbase/framebuffer.h>
 #endif /* GRAPHICSBASE */
@@ -40,5 +42,7 @@ struct boot_context_t {
 extern struct boot_context_t boot_context;
 
 extern void kentry(void) __attribute__((noreturn));
+
+extern void kapentry(uint64_t arb_id) __attribute__((noreturn));
 
 #endif /* KERNEL_CORE_KENTRY_H */

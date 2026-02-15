@@ -1,4 +1,4 @@
-/* 05_mp.ld - MP boostrap linker script */
+/* mergesort.h - mergesort interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-PHDRS {
-	mptext PT_LOAD FLAGS(1 | 4); /* XR */
-	mpdata PT_LOAD FLAGS(2 | 4); /* WR */
-}
+#ifndef KERNEL_LIB_MERGESORT_H
+#define KERNEL_LIB_MERGESORT_H
 
-SECTIONS {
-	. = 0x1000;
+extern void* mergesort_ll_inplace_ul(void* ll, void** (*next)(void*), unsigned long (*value)(void*));
 
-	.text.mpboot ALIGN(4K) : {
-		*(.text.mpboot)
-	} :mptext
-
-	.data.mpboot ALIGN(4K) : {
-		*(.data.mpboot)
-	} :mpdata
-
-	ASSERT(. <= 0x9fc00, "Kernel has overlap with EBDA")
-}
+#endif /* KERNEL_LIB_MERGESORT_H */

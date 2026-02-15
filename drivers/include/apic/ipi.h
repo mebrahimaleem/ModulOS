@@ -1,4 +1,4 @@
-/* lock.h - spinlock interface */
+/* ipi.c - Inter Processor Interrupt interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,16 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef DRIVERS_APIC_IPI_H
+#define DRIVERS_APIC_IPI_H
+
 #include <stdint.h>
 
-#ifndef KERNEL_INCLUDE_CORE_LOCK_H
-#define KERNEL_INCLUDE_CORE_LOCK_H
+#define AP_ENTRY_PAGE	8
 
-extern void lock_init(uint8_t* lock);
-extern void lock_acquire(uint8_t* lock);
-extern void lock_release(uint8_t* lock);
+extern void apic_wait_for_ipi(void);
+extern void apic_send_ipi_init_set(uint8_t apic_id);
+extern void apic_send_ipi_init_clear(uint8_t apic_id);
+extern void apic_send_ipi_sipi(uint8_t apic_id);
 
-#endif /* KERNEL_INCLUDE_CORE_LOCK_H */
+#endif /* DRIVERS_APIC_IPI_H */

@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#define GDT_NUM_ENTRIES	6
+#define GDT_NUM_ENTRIES	7
 
 #define GDT_ACS_TSS	0x09
 #define GDT_ACS_P		0x80
@@ -43,6 +43,16 @@
 #define GDT_UDATA_INDEX	4
 #define GDT_TSS_INDEX		5
 
+#define GDT_KERNEL_CS		0x8
+#define GDT_KERNEL_SS		0x10
+#define GDT_USER_CS			0x18
+#define GDT_USER_SS			0x20
+
+struct gdt_ptr_64_t {
+	uint16_t limit;
+	uint64_t addr;
+} __attribute__((packed));
+
 struct gdt_t {
 	uint16_t ign0;
 	uint16_t ign1;
@@ -50,7 +60,7 @@ struct gdt_t {
 	uint8_t access;
 	uint8_t flg;
 	uint8_t ign3;
-};
+} __attribute__((packed));
 
 struct gdt_sys_t {
 	uint16_t limit0;

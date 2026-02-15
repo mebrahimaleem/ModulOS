@@ -227,6 +227,6 @@ static uint8_t _stub(void) {
 	} while (0)
 
 #define ACPI_SEMAPHORE 	uint64_t*
-#define ACPI_SPINLOCK		uint64_t*
+#define ACPI_SPINLOCK		uint8_t*
 
 #endif /* DRIVERS_ACPICA_PLATFORM_ACMODULOS_H */

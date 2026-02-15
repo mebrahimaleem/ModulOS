@@ -28,13 +28,15 @@ enum apic_reg_t {
 	APIC_REG_EOI = 0x00B0, // end of interrupt register
 	APIC_REG_SPR = 0x00F0, // spurious interrupt register
 	APIC_REG_ESR = 0x0270, // error status register
+	APIC_REG_ICL = 0x0300, // interrupt control register lo
+	APIC_REG_ICH = 0x0310, // interrupt control register hi
 	APIC_REG_TME = 0x0320, // timer LVT entry register
 	APIC_REG_THE = 0x0330, // thermal LVT entry register
 	APIC_REG_PRE = 0x0340, // performance LVT entry register
 	APIC_REG_L0E = 0x0350, // LINT0 LVT entry register
 	APIC_REG_L1E = 0x0360, // LINT1 LVT entry register
 	APIC_REG_ERE = 0x0370, // error LVT entry register
-	APIC_REG_ICR = 0x0380, // timer initial count register
+	APIC_REG_TCR = 0x0380, // timer initial count register
 	APIC_REG_DCR = 0x03E0, // divide configuration register
 	APIC_REG_EFR = 0x0400, // extended feature register
 	APIC_REG_EE0 = 0x0500, // extened lVT entry register 0

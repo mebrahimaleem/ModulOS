@@ -21,6 +21,8 @@
 #include <serial/serial_print.h>
 #include <serial/serial.h>
 
+#include <kernel/core/lock.h>
+
 #define FLG_LL	0x1
 #define FLG_PD	0x2
 #define FLG_LM	0x4
@@ -35,6 +37,8 @@ struct num_printer_t {
 	const char* charset;
 	void (*printer)(uint8_t);
 };
+
+static uint8_t serial_lock;
 
 static void serial_print(const char* s, void (*printer)(uint8_t));
 
@@ -209,6 +213,7 @@ void serial_printf_com2(const char* s, ...) {
 }
 
 void serial_log(enum log_severity_t severity, const char* s, va_list args) {
+	lock_acquire(&serial_lock);
 	switch (severity) {
 		case SEVERITY_DBG:
 			serial_print("DEBUG: ", serial_com12);
@@ -234,4 +239,9 @@ void serial_log(enum log_severity_t severity, const char* s, va_list args) {
 			serial_printf(s, serial_com12, args);
 			break;
 	}
+	lock_release(&serial_lock);
+}
+
+void serial_print_init(void) {
+	lock_init(&serial_lock);
 }

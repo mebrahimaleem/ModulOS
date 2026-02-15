@@ -28,18 +28,23 @@
 #define PAGE_BASE_MASK	0xFFFFFFFFFFFFF000	
 
 #define PAGE_SIZE_4K		0x1000
-#define KERNEL_VMA 	0xFFFFFFFF80000000
+#define PAGE_SIZE_2M		0x200000
+#define PAGE_SIZE_1G		0x40000000
+#define KERNEL_VMA 			0xFFFFFFFF80000000
+#define IDENT_BASE			0xFFFFFF0000000000
 
 enum page_size_t {
 	PAGE_4K,
 	PAGE_2M,
-	PAGE_1G
+	PAGE_1G,
+	_PAGE_512G, // reserved for internal
 };
 
 extern void paging_init(void);
 
-extern void paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size);
+extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size);
+extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
+extern uint64_t paging_ident(uint64_t paddr);
 
-extern void paging_early_map_2m(uint64_t vaddr, uint64_t paddr, uint8_t flg);
 
 #endif /* KERNEL_CORE_PAGING_H */

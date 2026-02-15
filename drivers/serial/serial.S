@@ -45,6 +45,8 @@
 
 //TODO: test ports via loopback
 
+.section .text
+
 .globl serial_init_com1
 serial_init_com1:
 mov $COM1, %rdi
@@ -103,4 +105,3 @@ mov $(COM2 + TRSM), %dx
 movb %dil, %al
 out %al, %dx
 ret
-

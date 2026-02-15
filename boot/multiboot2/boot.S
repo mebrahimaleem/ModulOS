@@ -56,17 +56,11 @@
 #define LME		0x100
 #define PG		(1 << 31)
 
-#define GDT_RW	(1 << 1)
-#define GDT_E		(1 << 3)
-#define GDT_S		(1 << 4)
-#define GDT_P		(1 << 7)
-#define GDT_L		(1 << 5)
-#define GDT_G		(1 << 7)
-
 #define KERNEL_PAGE_FLAGS	(1 + 2)
 #define PAGE_SZ						(1 << 7)
 
 #define PAGING_1GIB	0x40000000
+#define IDENT_BASE	0xFFFFFF0000000000
 
 	.code32
 	.section .text.multiboot2
@@ -230,7 +224,8 @@ enter64:
 
 	.section .text
 ktransfer:
-	addq $KERNEL_VMA, gdt_ptr64.addr
+	movq $IDENT_BASE, %rax
+	addq %rax, gdt_ptr64.addr
 	lgdt gdt_ptr64
 	addq $KERNEL_VMA, %rsp
 	pushq $0
@@ -250,24 +245,36 @@ gdt:
 		.short	0x0000	/* limit 0:15 */
 		.short	0x0000	/* base 0:15 */
 		.byte		0x00		/* base 16:23 */
-		.byte		GDT_RW + GDT_E + GDT_S + GDT_P	/* access: RW E S P */
-		.byte		GDT_L + GDT_G	/* limit 16:19 flag: L G */
+		.byte		0x98 		/* access: DPL=0 P */
+		.byte		0x20 		/* limit 16:19 flag: L */
 		.byte		0x00		/* base 24:31 */
 	gdt.dataseg:
 		.short	0x0000	/* limit 0:15 */
 		.short	0x0000	/* base 0:15 */
 		.byte		0x00		/* base 16:23 */
-		.byte		GDT_RW + GDT_S + GDT_P	/* access: RW S P */
-		.byte		GDT_G		/* limit 16:19 flag: G */
-		.byte		0x92		/* access: RW S P */
+		.byte		0x92 		/* access: P */
+		.byte		0x00		/* limit 16:19 flag: */
+		.byte		0x00		/* base 24:31 */
 	gdt.ucodeseg:
-		.quad 0
+		.short	0x0000	/* limit 0:15 */
+		.short	0x0000	/* base 0:15 */
+		.byte		0x00		/* base 16:23 */
+		.byte		0xF8 		/* access: DPL=3 P */
+		.byte		0x20 		/* limit 16:19 flag: L */
+		.byte		0x00		/* base 24:31 */
 	gdt.udataseg:
-		.quad 0
+		.short	0x0000	/* limit 0:15 */
+		.short	0x0000	/* base 0:15 */
+		.byte		0x00		/* base 16:23 */
+		.byte		0x92 		/* access: P */
+		.byte		0x00		/* limit 16:19 flag: */
+		.byte		0x00		/* base 24:31 */
 	gdt.tss:
 		.quad 0
 		.quad 0
 	gdt.end:
+.globl gdt_end
+gdt_end:
 
 	.equ	CODE_SEG, gdt.codeseg - gdt
 	.equ	DATA_SEG, gdt.dataseg - gdt
@@ -288,9 +295,10 @@ gdt_ptr64.addr:
 kernel_pml4:
 PML4:
 	.quad PDPT_0 + KERNEL_PAGE_FLAGS
-.rept 0x200 - 2
+.rept 0x200 - 3
 	.quad 0
 .endr
+	.quad PDPT_510 + KERNEL_PAGE_FLAGS
 	.quad PDPT_511 + KERNEL_PAGE_FLAGS
 
 PDPT_0:
@@ -298,6 +306,13 @@ PDPT_0:
 	.quad (1 * PAGING_1GIB) + KERNEL_PAGE_FLAGS + PAGE_SZ
 .rept 0x200 - 2
 	.quad 0
+.endr
+
+PDPT_510:
+.set i, 0
+.rept 0x200
+	.quad (i * PAGING_1GIB) + KERNEL_PAGE_FLAGS + PAGE_SZ
+	.set i, i+1
 .endr
 
 PDPT_511:
