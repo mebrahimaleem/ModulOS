@@ -19,6 +19,7 @@
 #define DRIVERS_INCLUDE_PCIE_INIT_H
 
 extern void pcie_init(void);
+
 extern void pcie_enumerate(void);
 
 #endif /* DRIVERS_INCLUDE_PCIE_INIT_H */

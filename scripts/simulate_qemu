@@ -10,8 +10,14 @@ qemu-system-x86_64 \
 	-m 16G \
 	-monitor stdio \
 	-drive if=none,id=disk0,file=build/modulos.img,format=raw \
-	-device ahci,id=ahci \
+	-device pcie-root-port,id=pcie.1,bus=pcie.0,chassis=1 \
+	-device pcie-root-port,id=pcie.2,bus=pcie.0,chassis=2 \
+	-device pcie-root-port,id=pcie.3,bus=pcie.2,chassis=3 \
+	-device ahci,id=ahci,bus=pcie.1 \
 	-device ide-hd,drive=disk0,bus=ahci.0,bootindex=1 \
+	-device usb-ehci,id=uhci.0,bus=pcie.3 \
+	-device usb-ehci,id=uhci.1,bus=pcie.3 \
+	-device qemu-xhci,id=xhci.0,bus=pcie.2 \
 	-smbios type=0,uefi=on \
 	-bios /usr/share/qemu/OVMF.fd \
 	-device VGA

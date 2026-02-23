@@ -24,6 +24,7 @@
 #define PAGE_PRESENT	0x1
 #define PAGE_RW				0x2
 #define PAT_MMIO_4K		0x98
+#define PAT_MMIO_2M		0x1018
 
 #define PAGE_BASE_MASK	0xFFFFFFFFFFFFF000	
 
@@ -42,7 +43,7 @@ enum page_size_t {
 
 extern void paging_init(void);
 
-extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size);
+extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size);
 extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
 extern uint64_t paging_ident(uint64_t paddr);
 

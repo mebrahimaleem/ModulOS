@@ -420,7 +420,7 @@ void acpi_parse_mcfg_conf_start(uint64_t* handle) {
 }
 
 void acpi_parse_mcfg_conf(struct acpi_mcfg_conf_t* conf, uint64_t* handle) {
-	if (*handle > (uint64_t)acpi_mcfg + acpi_mcfg->Length) {
+	if (*handle + sizeof(struct acpi_mcfg_conf_entry_t) > (uint64_t)acpi_mcfg + acpi_mcfg->Length) {
 		*handle = 0;
 		return;
 	}
