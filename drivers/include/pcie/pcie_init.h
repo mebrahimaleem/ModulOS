@@ -1,4 +1,4 @@
-/* pci_config.h - Peripheral Controller Interface configuration space access interface */
+/* pcie_init.h - Peripheral Controller Interface Express initialization interfce */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,15 +15,10 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_PIC_PIC_CONFIG
-#define DRIVERS_PIC_PIC_CONFIG
+#ifndef DRIVERS_INCLUDE_PCIE_INIT_H
+#define DRIVERS_INCLUDE_PCIE_INIT_H
 
-#include <stdint.h>
+extern void pcie_init(void);
+extern void pcie_enumerate(void);
 
-extern uint32_t pci_read_conf(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus);
-extern void pci_write_conf(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus, uint32_t data);
-
-extern uint64_t pci_read_conf_noalign(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus, uint8_t width);
-extern void pci_write_conf_noalign(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus, uint8_t width, uint64_t data);
-
-#endif /* DRIVERS_PIC_PIC_CONFIG */
+#endif /* DRIVERS_INCLUDE_PCIE_INIT_H */

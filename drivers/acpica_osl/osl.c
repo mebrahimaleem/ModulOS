@@ -24,7 +24,7 @@
 #include <acpica_osl/acpica_include.h>
 
 #include <serial/serial_print.h>
-#include <pci/pci_config.h>
+#include <pcie/pcie.h>
 
 #include <kernel/core/logging.h>
 #include <kernel/core/alloc.h>
@@ -282,23 +282,95 @@ ACPI_STATUS AcpiOsSignal(UINT32 func, void* info) {
 }
 
 ACPI_STATUS AcpiOsReadPciConfiguration(ACPI_PCI_ID* id, UINT32 reg, UINT64* val, UINT32 width) {
-	*val = pci_read_conf_noalign(
-			(uint8_t)reg,
-			(uint8_t)id->Function,
-			(uint8_t)id->Device,
-			(uint8_t)id->Bus,
-			(uint8_t)width);
+	uint32_t reg_cur;
+	uint32_t reg_end;
+	uint32_t read;
+	uint64_t constr = 0;
+	uint8_t shft = 0;
+	switch (width) {
+		case 8:
+			reg_end = reg + 1;
+			break;
+		case 16:
+			reg_end = reg + 2;
+			break;
+		case 32:
+			reg_end = reg + 4;
+			break;
+		case 64:
+			reg_end = reg + 8;
+			break;
+		default:
+			return AE_SUPPORT;
+	}
+
+	for (reg_cur = reg - (reg % 4); reg_cur < reg_end; reg_cur += 4) {
+		read = pcie_read(id->Segment, (uint8_t)id->Bus, (uint8_t)id->Device, (uint8_t)id->Function, (uint16_t)reg_cur);
+		if (reg_cur < reg) {
+			shft = (uint8_t)(8 * (reg - reg_cur));
+			constr |= read << shft;
+			shft = 32 - shft;
+		}
+		else {
+			constr |= (uint64_t)read >> shft;
+			shft += 32;
+		}
+	}
+
+	switch (width) {
+		case 8:
+			*val = constr & 0xFF;
+			break;
+		case 16:
+			*val = constr & 0xFFFF;
+			break;
+		case 32:
+			*val = constr & 0xFFFFFFFF;
+			break;
+		case 64:
+			*val = constr;
+			break;
+	}
+
 	return AE_OK;
 }
 
 ACPI_STATUS AcpiOsWritePciConfiguration(ACPI_PCI_ID* id, UINT32 reg, UINT64 val, UINT32 width) {
-	pci_write_conf_noalign(
-			(uint8_t)reg,
-			(uint8_t)id->Function,
-			(uint8_t)id->Device,
-			(uint8_t)id->Bus,
-			(uint8_t)width,
-			val);
+	uint32_t reg_cur;
+	uint32_t reg_end;
+	uint32_t write;
+	uint8_t shft = 0;
+	switch (width) {
+		case 8:
+			reg_end = reg + 1;
+			break;
+		case 16:
+			reg_end = reg + 2;
+			break;
+		case 32:
+			reg_end = reg + 4;
+			break;
+		case 64:
+			reg_end = reg + 8;
+			break;
+		default:
+			return AE_SUPPORT;
+	}
+
+	for (reg_cur = reg - (reg % 4); reg_cur < reg_end; reg_cur += 4) {
+		if (reg_cur < reg) {
+			shft = (uint8_t)(8 * (reg - reg_cur));
+			write = (uint32_t)(val << shft);
+			shft = 32 - shft;
+		}
+		else {
+			write = (uint32_t)(val >> shft);
+			val += 32;
+		}
+
+		pcie_write(id->Segment, (uint8_t)id->Bus, (uint8_t)id->Device, (uint8_t)id->Function, (uint16_t)reg_cur, write);
+	}
+
 	return AE_OK;
 }
 

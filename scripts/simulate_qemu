@@ -1,9 +1,33 @@
 #!/bin/bash
 
 mkdir -p build/test-runtime/
-qemu-system-x86_64 -s -smp 4 -serial vc -serial file:build/test-runtime/serial \
-	-d cpu_reset,int -m 16G -monitor stdio \
-	-drive format=raw,file=build/modulos.img,if=ide,media=disk \
-	-smbios type=0,uefi=on -bios /usr/share/qemu/OVMF.fd \
+qemu-system-x86_64 \
+	-machine q35 \
+	-s -smp 4 \
+	-serial vc \
+	-serial file:build/test-runtime/serial \
+	-d cpu_reset,int \
+	-m 16G \
+	-monitor stdio \
+	-drive if=none,id=disk0,file=build/modulos.img,format=raw \
+	-device ahci,id=ahci \
+	-device ide-hd,drive=disk0,bus=ahci.0,bootindex=1 \
+	-smbios type=0,uefi=on \
+	-bios /usr/share/qemu/OVMF.fd \
 	-device VGA
 
+
+
+
+
+#-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+
+
+#qemu-system-x86_64 -s -smp 4 -serial vc -serial file:build/test-runtime/serial \
+#	-d cpu_reset,int -m 16G -monitor stdio \
+#	-drive format=raw,file=build/modulos.img,if=ide,media=disk \
+#	-smbios type=0,uefi=on -bios /usr/share/qemu/OVMF.fd \
+#	-device VGA \
+#	-machine q35
+
+#-drive if=pflash,format=raw,file=scripts/OVMF_VARS.fd \

@@ -41,6 +41,9 @@
 #else /* HPET */
 #define FOUND_HPET	0x00
 #endif /* HPET */
+#define FOUND_MCFG	0x08
+
+#define FOUND_ALL		(FOUND_FADT | FOUND_MADT | FOUND_HPET | FOUND_MCFG)
 
 #define GAS_TYPE_SYS	0
 #define GAS_TYPE_IO		1
@@ -166,6 +169,28 @@ struct acpi_madt_t {
 	uint8_t InterruptControllerStructure[];
 } __attribute__((packed));
 
+struct acpi_mcfg_conf_entry_t {
+	uint64_t base;
+	uint16_t group;
+	uint8_t bus_start;
+	uint8_t bus_end;
+	uint32_t resv;
+} __attribute__((packed));
+
+struct acpi_mcfg_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint64_t Reserved;
+	struct acpi_mcfg_conf_entry_t conf[];
+} __attribute__((packed));
+
 #ifdef HPET
 struct acpi_hpet_t {
 	uint8_t Signature[4];
@@ -191,6 +216,7 @@ struct acpi_hpet_t {
 
 static struct acpi_fadt_t* acpi_fadt;
 static struct acpi_madt_t* acpi_madt;
+static struct acpi_mcfg_t* acpi_mcfg;
 #ifdef HPET
 static struct acpi_hpet_t* acpi_hpet[8];
 static uint8_t hpet_count;
@@ -300,10 +326,11 @@ fallback:
 #ifdef HPET
 				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
 #endif /* HPET */
+				CHECK_AND_COPY("MCFG", "MCFG", acpi_mcfg, FOUND_MCFG, (void)0);
 #undef CHECK_FAIL
 			}
 
-			if (found != (FOUND_FADT | FOUND_MADT | FOUND_HPET )) {
+			if (found != FOUND_ALL) {
 				logging_log_error("Could not find all ACPI tables");
 				panic(PANIC_ACPI);
 			}
@@ -352,10 +379,11 @@ fallback:
 #ifdef HPET
 				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
 #endif /* HPET */
+				CHECK_AND_COPY("MCFG", "MCFG", acpi_mcfg, FOUND_MCFG, (void)0);
 #undef CHECK_FAIL
 			}
 
-			if (found != (FOUND_FADT | FOUND_MADT | FOUND_HPET)) {
+			if (found != FOUND_ALL) {
 				logging_log_warning("Could not find all ACPI tables. Falling back to RSDPV1");
 				goto fallback;
 			}
@@ -385,6 +413,24 @@ void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* handle, uin
 
 uint16_t acpi_get_sci_int(void) {
 	return acpi_fadt->SCI_INT;
+}
+
+void acpi_parse_mcfg_conf_start(uint64_t* handle) {
+	*handle = (uint64_t)&acpi_mcfg->conf[0];
+}
+
+void acpi_parse_mcfg_conf(struct acpi_mcfg_conf_t* conf, uint64_t* handle) {
+	if (*handle > (uint64_t)acpi_mcfg + acpi_mcfg->Length) {
+		*handle = 0;
+		return;
+	}
+
+	const struct acpi_mcfg_conf_entry_t* entry = (struct acpi_mcfg_conf_entry_t*)*handle;
+	conf->base = entry->base;
+	conf->segment = entry->group;
+	conf->bus_start = entry->bus_start;
+	conf->bus_end = entry->bus_end;
+	*handle = (uint64_t)(entry + 1);
 }
 
 #ifdef HPET
