@@ -37,6 +37,8 @@ export BUILD_DRIVERS_SERIAL = 1
 
 export BUILD_DRIVERS_HPET = 1
 
+export BUILD_DRIVERS_AHCI = 1
+
 # End of options
 
 export SRC_TREE_ROOT = .

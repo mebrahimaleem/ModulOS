@@ -1,0 +1,34 @@
+/* ahci_init.h - Advanced Host Controller Interface initialization interface */
+/* Copyright (C) 2026  Ebrahim Aleem
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <https://www.gnu.org/licenses/>
+*/
+
+#ifndef DRIVERS_AHCI_AHCI_INIT_H
+#define DRIVERS_AHCI_AHCI_INIT_H
+
+#include <stdint.h>
+#include <pcie/generic_database.h>
+
+extern void ahci_generic(
+		uint16_t seg,
+		uint8_t bus,
+		uint8_t dev,
+		uint8_t func,
+		uint8_t class_code,
+		uint8_t subclass,
+		uint8_t prog_if,
+		uint8_t rev_id);
+
+#endif /* DRIVERS_AHCI_AHCI_INIT_H */

@@ -35,6 +35,11 @@
 static uint64_t next_pid;
 static uint8_t lock_proc;
 
+__attribute__((noreturn)) static void function_setup(process_function_t func, void* cntx) {
+	func(cntx);
+	process_kill_current();
+}
+
 void process_init(uint64_t init_rsp) {
 	next_pid = 1;
 	lock_init(&lock_proc);
@@ -96,6 +101,15 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 	pcb->sched_cntr = SCHED_READY;
 
 	pcb->pid = assign_pid();
+
+	return pcb;
+}
+
+struct pcb_t* process_from_func(process_function_t func, void* cntx) {
+	struct pcb_t* pcb = process_from_vaddr((uint64_t)function_setup);
+
+	pcb->rdi = (uint64_t)func;
+	pcb->rsi = (uint64_t)cntx;
 
 	return pcb;
 }

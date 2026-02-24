@@ -17,6 +17,7 @@
 
 #include <pcie/pcie_init.h>
 #include <pcie/pcie.h>
+#include <pcie/generic_database.h>
 
 #include <acpi/tables.h>
 
@@ -49,26 +50,38 @@ extern uint64_t*** ecam_dev_bases;
 
 static void enumerate_bus(uint16_t seg, uint8_t bus);
 
-static void configure_device(uint16_t seg, uint8_t bus, uint8_t dev, uint8_t func) {
+static void configure_function(uint16_t seg, uint8_t bus, uint8_t dev, uint8_t func) {
 	DISABLE_INT(seg, bus, dev, func);
+
+	const uint16_t vendor_id = VENDOR_ID(seg, bus, dev, func);
+	const uint16_t device_id = DEVICE_ID(seg, bus, dev, func);
+	const uint8_t class_code = CLASS_CODE(seg, bus, dev, func);
+	const uint8_t subclass = SUBCLASS(seg, bus, dev, func);
+	const uint8_t prog_if = PROG_IF(seg, bus, dev, func);
+	const uint8_t rev_id = REV_ID(seg, bus, dev, func);
+
 
 	switch (HEADER_TYPE(seg, bus, dev, func)) {
 		case 0:
-			logging_log_debug("Found device 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u",
-					VENDOR_ID(seg, bus, dev, 0), DEVICE_ID(seg, bus, dev, func), CLASS_CODE(seg, bus, dev, func), 
-					SUBCLASS(seg, bus, dev, func), PROG_IF(seg, bus, dev, func), REV_ID(seg, bus, dev, func), seg, bus, dev, func);
+			logging_log_debug("Found device function 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u.",
+					vendor_id, device_id, class_code, subclass, prog_if, rev_id, seg, bus, dev, func);
 			break;
 		case 1:
-			logging_log_debug("Found PCI bridge on %u.%u.%u.%u", seg, bus, dev, func);
+			logging_log_debug("Found PCI bridge function 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u",
+					vendor_id, device_id, class_code, subclass, prog_if, rev_id, seg, bus, dev, func);
 			enumerate_bus(seg, PCI_BRIDGE_SEC_NUM(seg, bus, dev, func));
 			break;
 		case 2:
-			logging_log_debug("Found CardBus bridge on %u.%u.%u.%u", seg, bus, dev, func);
+			logging_log_debug("Found CardBus bridge function 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u",
+					vendor_id, device_id, class_code, subclass, prog_if, rev_id, seg, bus, dev, func);
 			break;
 		default:
-			logging_log_error("Bad device on pcie %u.%u.%u.%u", seg, bus, dev, func);
+			logging_log_debug("Found unkown function 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u",
+					vendor_id, device_id, class_code, subclass, prog_if, rev_id, seg, bus, dev, func);
 			break;
 	}
+
+	pcie_generic_init(seg, bus, dev, func, class_code, subclass, prog_if, rev_id);
 }
 
 static void enumerate_bus(uint16_t seg, uint8_t bus) {
@@ -80,12 +93,12 @@ static void enumerate_bus(uint16_t seg, uint8_t bus) {
 			continue;
 		}
 
-		configure_device(seg, bus, dev, 0);
+		configure_function(seg, bus, dev, 0);
 
 		if (IS_MULTIFUNC(seg, bus, dev)) {
 			for (func = 1; func < 8; func ++) {
 				if (FUNCTION_EXISTS(seg, bus, dev, func)) {
-					configure_device(seg, bus, dev, func);
+					configure_function(seg, bus, dev, func);
 				}
 			}
 		}

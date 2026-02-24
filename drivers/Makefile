@@ -34,6 +34,10 @@ ifdef BUILD_DRIVERS_SERIAL
 $(call add_directory,serial,SERIAL)
 endif
 
+ifdef BUILD_DRIVERS_AHCI
+$(call add_directory,ahci,AHCI)
+endif
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 
