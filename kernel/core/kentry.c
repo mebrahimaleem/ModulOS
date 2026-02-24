@@ -77,15 +77,12 @@ void kentry(void) {
 
 	logging_log_debug("Early PCIE init");
 	pcie_init();
+	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
 
 	logging_log_debug("ACPICA init");
 	acpica_init();
 	logging_log_debug("ACPICA init done");
-
-	logging_log_debug("PCIE enumeration");
-	pcie_enumerate();
-	logging_log_debug("PCIE enumeration done");
 
 	logging_log_info("Boot Complete ModulOS");
 

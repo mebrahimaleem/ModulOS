@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#define PCI_CMD_REG	0x4
+
 extern uint32_t pcie_read(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off);
 extern void pcie_write(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off, uint32_t val);
 

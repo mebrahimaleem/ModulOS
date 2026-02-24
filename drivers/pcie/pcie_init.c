@@ -29,15 +29,69 @@
 
 #define DEV_BASE(ecam, bus, dev) (ecam + (((uint64_t)bus << 20) | ((uint64_t)dev << 15)))
 
-#define DEVICE_EXISTS(seg, bus, dev)	(VENDOR_ID(seg, bus, dev) != 0xFFFF)
+#define FUNCTION_EXISTS(seg, bus, dev, func)	(VENDOR_ID(seg, bus, dev, func) != 0xFFFF)
 
-#define VENDOR_ID(seg, bus, dev) 		(0xFFFF & pcie_read(seg, bus, dev, 0, 0x0))
-#define DEVICE_ID(seg, bus, dev) 		(0xFFFF & (pcie_read(seg, bus, dev, 0, 0x0) >> 16))
-#define HEADER_TYPE(seg, bus, dev)	(0x7F & (pcie_read(seg, bus, dev, 0, 0xC) >> 16))
+#define VENDOR_ID(seg, bus, dev, func) 		(0xFFFF & pcie_read(seg, bus, dev, func, 0x0))
+#define DEVICE_ID(seg, bus, dev, func) 		(0xFFFF & (pcie_read(seg, bus, dev, func, 0x0) >> 16))
+#define REV_ID(seg, bus, dev, func)				(0xFF & pcie_read(seg, bus, dev, func, 0x8))
+#define PROG_IF(seg, bus, dev, func)			(0xFF & (pcie_read(seg, bus, dev, func, 0x8) >> 8))
+#define SUBCLASS(seg, bus, dev, func)			(0xFF & (pcie_read(seg, bus, dev, func, 0x8) >> 16))
+#define CLASS_CODE(seg, bus, dev, func)		(0xFF & (pcie_read(seg, bus, dev, func, 0x8) >> 24))
+#define HEADER_TYPE(seg, bus, dev, func)	(0x7F & (pcie_read(seg, bus, dev, func, 0xC) >> 16))
+#define IS_MULTIFUNC(seg, bus, dev)				(0x80 & (pcie_read(seg, bus, dev, 0, 0xC) >> 16))
 
-#define PCI_BRIDGE_SEC_NUM(seg, bus, dev)	(0xFF & (pcie_read(seg, bus, dev, 0, 0x18) >> 8))
+
+#define PCI_BRIDGE_SEC_NUM(seg, bus, dev, func)	(0xFF & (pcie_read(seg, bus, dev, func, 0x18) >> 8))
+
+#define DISABLE_INT(seg, bus, dev, func)	pcie_write(seg, bus, dev, func, 0x4, pcie_read(seg, bus, dev, 0, 0x4) | 0x400);
 
 extern uint64_t*** ecam_dev_bases;
+
+static void enumerate_bus(uint16_t seg, uint8_t bus);
+
+static void configure_device(uint16_t seg, uint8_t bus, uint8_t dev, uint8_t func) {
+	DISABLE_INT(seg, bus, dev, func);
+
+	switch (HEADER_TYPE(seg, bus, dev, func)) {
+		case 0:
+			logging_log_debug("Found device 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u",
+					VENDOR_ID(seg, bus, dev, 0), DEVICE_ID(seg, bus, dev, func), CLASS_CODE(seg, bus, dev, func), 
+					SUBCLASS(seg, bus, dev, func), PROG_IF(seg, bus, dev, func), REV_ID(seg, bus, dev, func), seg, bus, dev, func);
+			break;
+		case 1:
+			logging_log_debug("Found PCI bridge on %u.%u.%u.%u", seg, bus, dev, func);
+			enumerate_bus(seg, PCI_BRIDGE_SEC_NUM(seg, bus, dev, func));
+			break;
+		case 2:
+			logging_log_debug("Found CardBus bridge on %u.%u.%u.%u", seg, bus, dev, func);
+			break;
+		default:
+			logging_log_error("Bad device on pcie %u.%u.%u.%u", seg, bus, dev, func);
+			break;
+	}
+}
+
+static void enumerate_bus(uint16_t seg, uint8_t bus) {
+	uint8_t dev;
+	uint8_t func;
+	logging_log_debug("Enumerating pcie bus %u.%u", seg, bus);
+	for (dev = 0; dev < 32; dev++) {
+		if (!FUNCTION_EXISTS(seg, bus, dev, 0)) {
+			continue;
+		}
+
+		configure_device(seg, bus, dev, 0);
+
+		if (IS_MULTIFUNC(seg, bus, dev)) {
+			for (func = 1; func < 8; func ++) {
+				if (FUNCTION_EXISTS(seg, bus, dev, func)) {
+					configure_device(seg, bus, dev, func);
+				}
+			}
+		}
+	}
+	logging_log_debug("Done enumerating pcie bus %u.%u", seg, bus);
+}
 
 void pcie_init(void) {
 	uint64_t mcfg_handle;
@@ -103,33 +157,6 @@ void pcie_init(void) {
 			acpi_parse_mcfg_conf(&conf, &mcfg_handle);
 		}
 	}
-}
-
-static void enumerate_bus(uint16_t seg, uint8_t bus) {
-	uint8_t dev;
-	logging_log_debug("Enumerating pcie bus %u.%u", seg, bus);
-	for (dev = 0; dev < 32; dev++) {
-		if (!DEVICE_EXISTS(seg, bus, dev)) {
-			continue;
-		}
-		switch (HEADER_TYPE(seg, bus, dev)) {
-			case 0:
-				logging_log_debug("Found device 0x%x:0x%x on %u.%u.%u",
-						VENDOR_ID(seg, bus, dev), DEVICE_ID(seg, bus, dev), seg, bus, dev);
-				break;
-			case 1:
-				logging_log_debug("Found PCI bridge on %u.%u.%u", seg, bus, dev);
-				enumerate_bus(seg, PCI_BRIDGE_SEC_NUM(seg, bus, dev));
-				break;
-			case 2:
-				logging_log_debug("Found CardBus bridge on %u.%u.%u", seg, bus, dev);
-				break;
-			default:
-				logging_log_error("Bad device on pcie %u.%u.%u", seg, bus, dev);
-				break;
-		}
-	}
-	logging_log_debug("Done enumerating pcie bus %u.%u", seg, bus);
 }
 
 void pcie_enumerate(void) {
