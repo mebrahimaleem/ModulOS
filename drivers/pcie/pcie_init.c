@@ -28,7 +28,7 @@
 
 #include <kernel/lib/kmemset.h>
 
-#define DEV_BASE(ecam, bus, dev) (ecam + (((uint64_t)bus << 20) | ((uint64_t)dev << 15)))
+#define FUN_BASE(ecam, bus, dev, fun) (ecam + (((uint64_t)bus << 20) | ((uint64_t)dev << 15) | ((uint64_t)fun << 12)))
 
 #define FUNCTION_EXISTS(seg, bus, dev, func)	(VENDOR_ID(seg, bus, dev, func) != 0xFFFF)
 
@@ -41,12 +41,13 @@
 #define HEADER_TYPE(seg, bus, dev, func)	(0x7F & (pcie_read(seg, bus, dev, func, 0xC) >> 16))
 #define IS_MULTIFUNC(seg, bus, dev)				(0x80 & (pcie_read(seg, bus, dev, 0, 0xC) >> 16))
 
+#define IS_MULTIFUNC_DIRECT(base)		(0x80 & (*(volatile uint32_t*)(base + 0x0C) >> 16))
 
 #define PCI_BRIDGE_SEC_NUM(seg, bus, dev, func)	(0xFF & (pcie_read(seg, bus, dev, func, 0x18) >> 8))
 
 #define DISABLE_INT(seg, bus, dev, func)	pcie_write(seg, bus, dev, func, 0x4, pcie_read(seg, bus, dev, 0, 0x4) | 0x400);
 
-extern uint64_t*** ecam_dev_bases;
+extern uint64_t**** ecam;
 
 static void enumerate_bus(uint16_t seg, uint8_t bus);
 
@@ -63,7 +64,7 @@ static void configure_function(uint16_t seg, uint8_t bus, uint8_t dev, uint8_t f
 
 	switch (HEADER_TYPE(seg, bus, dev, func)) {
 		case 0:
-			logging_log_debug("Found device function 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u.",
+			logging_log_debug("Found device function 0x%x:0x%x (%u/%u/%u/%u) on %u.%u.%u.%u",
 					vendor_id, device_id, class_code, subclass, prog_if, rev_id, seg, bus, dev, func);
 			break;
 		case 1:
@@ -113,8 +114,8 @@ void pcie_init(void) {
 	uint16_t j;
 	uint16_t max_bus;
 	uint16_t i;
-	uint64_t vaddr = 0;
-	uint8_t k;
+	uint8_t k, l;
+	uint64_t vaddr;
 
 	acpi_parse_mcfg_conf_start(&mcfg_handle);
 	acpi_parse_mcfg_conf(&conf, &mcfg_handle);
@@ -128,7 +129,7 @@ void pcie_init(void) {
 
 	max_seg++;
 
-	ecam_dev_bases = kmalloc(sizeof(uint64_t*) * max_seg );	
+	ecam = kmalloc(sizeof(uint64_t***) * max_seg );	
 
 	for (i = 0; i < max_seg; i++) {
 		max_bus = 0;
@@ -146,23 +147,37 @@ void pcie_init(void) {
 		}
 		
 		if (!j) {
-			ecam_dev_bases[i] = 0;
+			ecam[i] = 0;
 			continue;
 		}
 
-		ecam_dev_bases[i] = kmalloc(sizeof(uint64_t) * (max_bus + 1));
-		kmemset(ecam_dev_bases[i], 0, sizeof(uint64_t) * (max_bus + 1));
+		ecam[i] = kmalloc(sizeof(uint64_t**) * (max_bus + 1));
+		kmemset(ecam[i], 0, sizeof(uint64_t) * (max_bus + 1));
 
 		acpi_parse_mcfg_conf_start(&mcfg_handle);
 		acpi_parse_mcfg_conf(&conf, &mcfg_handle);
 		while (mcfg_handle) {
 			if (conf.segment == i) {
 				for (j = conf.bus_start; j <= conf.bus_end; j++) {
-					ecam_dev_bases[i][j] = kmalloc(32 * sizeof(uint64_t));
+					ecam[i][j] = kmalloc(32 * sizeof(uint64_t*));
 					for (k = 0; k < 32; k++) {
 						vaddr = mm_alloc_v(PAGE_SIZE_4K);
-						paging_map(vaddr, DEV_BASE(conf.base, j, k), PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
-						ecam_dev_bases[i][j][k] = vaddr;
+						paging_map(vaddr, FUN_BASE(conf.base, j, k, 0), PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+						
+						if (IS_MULTIFUNC_DIRECT(vaddr)) {
+							ecam[i][j][k] = kmalloc(8 * sizeof(uint64_t));
+							ecam[i][j][k][0] = vaddr;
+							for (l = 1; l < 8; l++) {
+								vaddr = mm_alloc_v(PAGE_SIZE_4K);
+								paging_map(vaddr, FUN_BASE(conf.base, j, k, l), PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+								ecam[i][j][k][l] = vaddr;
+							}
+						}
+						else {
+							ecam[i][j][k] = kmalloc(sizeof(uint64_t));
+							ecam[i][j][k][0] = vaddr;
+						}
+
 					}
 				}
 			}

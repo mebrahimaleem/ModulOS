@@ -19,6 +19,8 @@
 
 #include <ahci/ahci_init.h>
 
+#include <pcie/pcie.h>
+
 #include <kernel/core/logging.h>
 #include <kernel/core/scheduler.h>
 #include <kernel/core/process.h>
@@ -38,8 +40,10 @@ struct ahci_t {
 static void ahci_init(void* cntx) {
 	struct ahci_t* ahci = cntx;
 
-	logging_log_info("AHCI driver initialization for %u/%u/%u/%u at %u.%u.%u.%u.",
+	logging_log_info("AHCI driver initialization for %u/%u/%u/%u at %u.%u.%u.%u",
 			ahci->class_code, ahci->subclass, ahci->prog_if, ahci->rev_id, ahci->seg, ahci->bus, ahci->dev, ahci->func);
+
+	//uint32_t bar = pcie_read(ahci->seg, ahci->bus, ahci->dev, ahci->func, PCI_BAR5_REG);
 }
 
 void ahci_generic(

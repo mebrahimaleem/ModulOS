@@ -1,6 +1,8 @@
 #!/bin/bash
 
 mkdir -p build/test-runtime/
+truncate -s 4G build/test-runtime/disk1.img
+
 qemu-system-x86_64 \
 	-machine q35 \
 	-s -smp 4 \
@@ -10,30 +12,16 @@ qemu-system-x86_64 \
 	-m 16G \
 	-monitor stdio \
 	-drive if=none,id=disk0,file=build/modulos.img,format=raw \
+	-drive if=none,id=disk1,file=build/test-runtime/disk1.img,format=raw \
 	-device pcie-root-port,id=pcie.1,bus=pcie.0,chassis=1 \
 	-device pcie-root-port,id=pcie.2,bus=pcie.0,chassis=2 \
 	-device pcie-root-port,id=pcie.3,bus=pcie.2,chassis=3 \
 	-device ahci,id=ahci,bus=pcie.1 \
 	-device ide-hd,drive=disk0,bus=ahci.0,bootindex=1 \
+	-device ide-hd,drive=disk1,bus=ahci.1 \
 	-device usb-ehci,id=uhci.0,bus=pcie.3 \
 	-device usb-ehci,id=uhci.1,bus=pcie.3 \
 	-device qemu-xhci,id=xhci.0,bus=pcie.2 \
 	-smbios type=0,uefi=on \
 	-bios /usr/share/qemu/OVMF.fd \
 	-device VGA
-
-
-
-
-
-#-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-
-
-#qemu-system-x86_64 -s -smp 4 -serial vc -serial file:build/test-runtime/serial \
-#	-d cpu_reset,int -m 16G -monitor stdio \
-#	-drive format=raw,file=build/modulos.img,if=ide,media=disk \
-#	-smbios type=0,uefi=on -bios /usr/share/qemu/OVMF.fd \
-#	-device VGA \
-#	-machine q35
-
-#-drive if=pflash,format=raw,file=scripts/OVMF_VARS.fd \

@@ -19,14 +19,12 @@
 
 #include <pcie/pcie.h>
 
-#define FUN_OFF(fun) ((uint64_t)fun << 12)
-
-uint64_t*** ecam_dev_bases;
+uint64_t**** ecam;
 
 uint32_t pcie_read(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off) {
-	return *(volatile uint32_t*)((ecam_dev_bases[segment][bus][dev] | FUN_OFF(fun)) + off);
+	return *(volatile uint32_t*)(ecam[segment][bus][dev][fun] + off);
 }
 
 void pcie_write(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off, uint32_t val) {
-	*(volatile uint32_t*)((ecam_dev_bases[segment][bus][dev] | FUN_OFF(fun)) + off) = val;
+	*(volatile uint32_t*)(ecam[segment][bus][dev][fun] + off) = val;
 }

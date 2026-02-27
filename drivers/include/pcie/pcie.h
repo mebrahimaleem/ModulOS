@@ -20,7 +20,21 @@
 
 #include <stdint.h>
 
-#define PCI_CMD_REG	0x4
+#define PCI_ID_REG		0x00
+#define PCI_CMD_REG		0x04
+#define PCI_CLASS_REG	0x08
+#define PCI_ATTR_REG	0x0C
+#define PCI_BAR0_REG	0x10
+#define PCI_BAR1_REG	0x14
+#define PCI_BAR2_REG	0x18
+#define PCI_BAR3_REG	0x1C
+#define PCI_BAR4_REG	0x20
+#define PCI_BAR5_REG	0x24
+
+#define PCI_CMD_IOSE	0x001
+#define PCI_CMD_MSE		0x002
+#define PCI_CMD_BME		0x004
+#define PCI_CMD_ID		0x400
 
 extern uint32_t pcie_read(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off);
 extern void pcie_write(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off, uint32_t val);
