@@ -25,6 +25,7 @@
 #include <kernel/core/mm.h>
 #include <kernel/core/paging.h>
 #include <kernel/core/logging.h>
+#include <kernel/core/panic.h>
 
 #include <kernel/lib/kmemset.h>
 
@@ -162,6 +163,10 @@ void pcie_init(void) {
 					ecam[i][j] = kmalloc(32 * sizeof(uint64_t*));
 					for (k = 0; k < 32; k++) {
 						vaddr = mm_alloc_v(PAGE_SIZE_4K);
+						if (!vaddr) {
+							logging_log_error("Failed to allocate memory for PCIE configuration space");
+							panic(PANIC_NO_MEM);
+						}
 						paging_map(vaddr, FUN_BASE(conf.base, j, k, 0), PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 						
 						if (IS_MULTIFUNC_DIRECT(vaddr)) {
@@ -169,6 +174,10 @@ void pcie_init(void) {
 							ecam[i][j][k][0] = vaddr;
 							for (l = 1; l < 8; l++) {
 								vaddr = mm_alloc_v(PAGE_SIZE_4K);
+								if (!vaddr) {
+									logging_log_error("Failed to allocation memory for PCIE configuration space");
+									panic(PANIC_NO_MEM);
+								}
 								paging_map(vaddr, FUN_BASE(conf.base, j, k, l), PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 								ecam[i][j][k][l] = vaddr;
 							}

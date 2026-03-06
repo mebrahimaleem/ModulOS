@@ -239,7 +239,10 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS paddr, ACPI_SIZE len) {
 	}
 
 	for (uint64_t i = 0; i < len; i += PAGE_SIZE_4K) {
-		paging_map(vaddr + i, page_base + i, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+		if (!paging_map(vaddr + i, page_base + i, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
+			logging_log_error("Failed to map memory for ACPICA");
+			return 0;
+		}
 	}
 
 	return (void*)(vaddr + adj);

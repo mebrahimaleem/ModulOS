@@ -23,7 +23,6 @@
 
 #define CANON_HIGH			0xFFFF800000000000
 #define VIRTUAL_LIMIT		IDENT_BASE
-#define SIZE_2M					0x200000
 
 struct mem_segment_t {
 	uint64_t base;
@@ -35,24 +34,23 @@ struct mem_segment_t {
 	} type;
 };
 
+struct mm_tree_node_t;
+
 extern void mm_init(
 		void (*first_segment)(uint64_t* handle),
 		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg));
-extern uint64_t mm_early_alloc_2m(void);
 
-uint64_t mm_alloc_p(size_t size);
-uint64_t mm_alloc_v(size_t size);
+extern uint64_t mm_alloc_p(size_t size);
+extern uint64_t mm_alloc_v(size_t size);
 
-uint64_t mm_alloc_p2m(void);
-uint64_t mm_alloc_v2m(void);
+extern uint64_t mm_alloc_palign(size_t size, uint64_t align);
+extern uint64_t mm_alloc_valign(size_t size, uint64_t align);
 
-void mm_free_p(uint64_t addr, size_t size);
-void mm_free_v(uint64_t addr, size_t size);
+extern uint64_t mm_alloc_pmax(size_t size, uint64_t align, uint64_t max);
+extern uint64_t mm_alloc_vmax(size_t size, uint64_t align, uint64_t max);
 
-void mm_free_p2m(uint64_t addr);
-void mm_free_v2m(uint64_t addr);
-
-void mm_defrag(void);
+extern void mm_free_p(uint64_t base, size_t size);
+extern void mm_free_v(uint64_t base, size_t size);
 
 #endif /* KERNEL_CORE_MM_H */
 
