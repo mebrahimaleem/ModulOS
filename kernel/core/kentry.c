@@ -33,6 +33,10 @@
 
 #include <lib/kmemcpy.h>
 
+#ifdef MEM_TEST
+#include <mem_test/alloc_test.h>
+#endif /* MEM_TEST */
+
 #include <drivers/acpi/tables.h>
 #include <drivers/acpica_osl/init.h>
 #include <drivers/pic_8259/pic.h>
@@ -50,6 +54,13 @@ extern uint8_t* ap_init_locks;
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
+
+#ifdef MEM_TEST
+	logging_log_debug("Allocator test");
+	alloc_test_assert();
+	logging_log_debug("Allocator test pass");
+#endif /* MEM_TEST */
+
 	logging_log_debug("TSS and IDT init");
 	tss_init((void*)paging_ident((uint64_t)boot_context.gdt));
 	process_init(0);
@@ -104,7 +115,7 @@ void kapentry(uint64_t arb_id) {
 
 	logging_log_debug("AP TSS and IDT init");
 	tss_init(ap_gdts[proc_data_get()->arb_id]);
-	process_init_ap(init_stacks[arb_id]);
+	process_init_ap(init_stacks[arb_id] - INIT_STACK_SIZE);
 	idt_init_ap();
 	logging_log_debug("AP TSS and IDT init done");
 

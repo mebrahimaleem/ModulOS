@@ -225,11 +225,17 @@ static void map_header(const volatile void* table) {
 	const volatile struct acpi_gen_header_t* gen = (struct acpi_gen_header_t*)table;
 	uint64_t alloc_base = (uint64_t)gen & PAGE_BASE_MASK;
 
-	paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K);
+	if (!paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K)) {
+		logging_log_error("Failed to map ACPI header");
+		panic(PANIC_PAGING);
+	}
 
 	if ((uint64_t)gen != alloc_base) {
 		alloc_base += PAGE_SIZE_4K;
-		paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K);
+		if (!paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K)) {
+			logging_log_error("Failed to map ACPI header");
+			panic(PANIC_PAGING);
+		}
 	}
 }
 
@@ -243,7 +249,10 @@ static void map_table(const volatile void* table) {
 
 	while (alloc_base < (uint64_t)gen + gen->Length) {
 		alloc_base += PAGE_SIZE_4K;
-		paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K);
+		if (!paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K)) {
+			logging_log_error("Failed to map ACPI table");
+			panic(PANIC_PAGING);
+		}
 	}
 }
 

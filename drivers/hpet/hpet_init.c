@@ -77,11 +77,18 @@ void hpet_init(void) {
 		if (hpet_reg_bases[i]) {
 			logging_log_debug("Found HPET register base @ 0x%lx", hpet_reg_bases[i]);
 			const uint64_t temp = mm_alloc_v(PAGE_SIZE_4K);
-			paging_map(
+			if (!temp) {
+				logging_log_error("Failed to allocate memory for hpet");
+				panic(PANIC_NO_MEM);
+			}
+			if(!paging_map(
 					temp,
 					(uint64_t)hpet_reg_bases[i],
 					PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K,
-					PAGE_4K);
+					PAGE_4K)) {
+				logging_log_error("Failed to map memory for HPET");
+				panic(PANIC_PAGING);
+			}
 			hpet_reg_bases[i] = (void*)temp;
 
 			// disable all interrupts

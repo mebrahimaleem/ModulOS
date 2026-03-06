@@ -1,5 +1,5 @@
-/* proc_data.h - per procesor data interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* alloc_test.h - heap allocator runtime testing interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,24 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_PROC_DATA_H
-#define KERNEL_CORE_PROC_DATA_H
+#ifndef KERNEL_MEM_TEST_ALLOC_TEST_H
+#define KERNEL_MEM_TEST_ALLOC_TEST_H
 
-#include <stdint.h>
+extern void alloc_test_assert(void);
 
-#include <kernel/core/tss.h>
-#include <kernel/core/process.h>
-
-struct proc_data_t {
-	uint8_t arb_id;
-	volatile struct tss_t* tss;
-	struct pcb_t* current_process;
-};
-
-extern struct proc_data_t bsp_proc_data;
-extern struct proc_data_t** proc_data_ptr;
-
-extern void proc_data_set_id(uint8_t id);
-extern struct proc_data_t* proc_data_get(void);
-
-#endif /* KERNEL_CORE_PROC_DATA_H */
+#endif /* KERNEL_MEM_TEST_ALLOC_TEST_H */
