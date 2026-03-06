@@ -26,8 +26,8 @@
 #include <core/logging.h>
 #include <core/panic.h>
 
-#define HEADER_SIZE_MASK	0xFFFFFFFFFFFFFFF8
-#define HEADER_USED				0x1
+#define HEADER_SIZE_MASK	0xFFFFFFFFFFFFFFF8uLL
+#define HEADER_USED				0x1uLL
 
 struct free_node_t {
 	uint64_t base;
@@ -37,7 +37,10 @@ struct free_node_t {
 
 struct alloc_header_t {
 	uint64_t header;
+	uint64_t resv;
 } __attribute__((packed));
+
+_Static_assert(sizeof(struct alloc_header_t) == 16, "struct alloc_header_t must be 16 bytes wide");
 
 static struct free_node_t* free_list;
 static struct free_node_t* node_pool;
@@ -74,19 +77,13 @@ static struct free_node_t* alloc_node(void) {
 		}
 
 		lock_acquire(&alloc_lock);
-		ret[PAGE_SIZE_4K / sizeof(struct free_node_t)].next = node_pool;
+		ret[PAGE_SIZE_4K / sizeof(struct free_node_t) - 1].next = node_pool;
 		node_pool = &ret[1];
 		lock_release(&alloc_lock);
 	}
 
+	ret->next = 0;
 	return ret;
-}
-
-static void free_node(struct free_node_t* node) {
-	lock_acquire(&alloc_lock);
-	node->next = free_list;
-	free_list = node;
-	lock_release(&alloc_lock);
 }
 
 void* kmalloc(size_t size) {
@@ -125,11 +122,7 @@ void* kmalloc(size_t size) {
 
 	lock_release(&alloc_lock);
 
-	if (ret) {
-		((struct alloc_header_t*)ret)->header = (size - sizeof(struct alloc_header_t)) | HEADER_USED;
-		ret += sizeof(struct alloc_header_t);
-	}
-	else {
+	if (!ret) {
 		adj = size % PAGE_SIZE_4K;
 		if (adj) {
 			size += PAGE_SIZE_4K - adj;
@@ -142,10 +135,10 @@ void* kmalloc(size_t size) {
 		}
 
 		ret = paging_ident(ret);
-
-		((struct alloc_header_t*)ret)->header = (size - sizeof(struct alloc_header_t)) | HEADER_USED;
-		ret += sizeof(struct alloc_header_t);
 	}
+
+	((struct alloc_header_t*)ret)->header = (size) | HEADER_USED;
+	ret += sizeof(struct alloc_header_t);
 
 	return (void*)ret;
 }
@@ -161,11 +154,14 @@ void kfree(void* ptr) {
 		return;
 	}
 
-	header->header ^= HEADER_USED;
+	header->header &= ~HEADER_USED;
 
 	struct free_node_t* node = alloc_node();
 	node->size = header->header & HEADER_SIZE_MASK;
 	node->base = (uint64_t)header;
 
-	free_node(node);
+	lock_acquire(&alloc_lock);
+	node->next = free_list;
+	free_list = node;
+	lock_release(&alloc_lock);
 }

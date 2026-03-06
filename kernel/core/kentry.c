@@ -104,7 +104,7 @@ void kapentry(uint64_t arb_id) {
 
 	logging_log_debug("AP TSS and IDT init");
 	tss_init(ap_gdts[proc_data_get()->arb_id]);
-	process_init_ap(init_stacks[arb_id]);
+	process_init_ap(init_stacks[arb_id] - INIT_STACK_SIZE);
 	idt_init_ap();
 	logging_log_debug("AP TSS and IDT init done");
 
