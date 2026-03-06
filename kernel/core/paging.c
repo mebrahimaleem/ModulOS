@@ -99,7 +99,11 @@ uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_
 	}
 
 	for (; lvl > page_size; lvl--) {
-		*access = mm_alloc_p(0x1000) | PAGE_PRESENT | PAGE_RW;
+		*access = mm_alloc_p(0x1000);
+		if (!access) {
+			return 0;
+		}
+		*access |= PAGE_PRESENT | PAGE_RW;
 		access = (uint64_t*)paging_ident((*access & PAGE_ADDR_MASK));
 		kmemset(access, 0, 0x1000);
 
