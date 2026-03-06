@@ -37,6 +37,7 @@
 #include <kernel/core/proc_data.h>
 #include <kernel/core/mm.h>
 #include <kernel/core/gdt.h>
+#include <kernel/core/alloc.h>
 
 #include <kernel/lib/kmemcpy.h>
 
@@ -102,8 +103,11 @@ uint8_t* ap_init_locks;
 
 void apic_init(void) {
 	apic_base = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
-	paging_map(apic_base, apic_base,
-			PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	if (!paging_map(apic_base, apic_base,
+			PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
+		logging_log_error("Failed to map memory for LAPIC");
+		panic(PANIC_PAGING);
+	}
 
 	timer_vector = idt_get_vector();
 	error_vector = idt_get_vector();

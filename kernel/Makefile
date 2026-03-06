@@ -26,6 +26,10 @@ ifdef BUILD_KERNEL_GRAPHICSBASE
 $(call add_directory,graphicsbase,GRAPHICSBASE)
 endif
 
+ifdef BUILD_KERNEL_MEM_TEST
+$(call add_directory,mem_test,MEM_TEST)
+endif
+
 ifdef BUILD_DRIVERS_SERIAL
 DEFINES := $(DEFINES) -DSERIAL
 endif

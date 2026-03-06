@@ -27,6 +27,7 @@
 #include <kernel/core/alloc.h>
 #include <kernel/core/cpu_instr.h>
 #include <kernel/lib/kmemset.h>
+#include <kernel/core/panic.h>
 
 #define IOAPIC_OFF_IOREGSEL	0x00
 #define IOAPIC_OFF_IOWIN		0x10
@@ -58,7 +59,10 @@ void ioapic_init(void) {
 
 		logging_log_info("Initializing IO APIC 0x%lX", (uint64_t)ioapic->IOAPICID);
 		const uint64_t ioapic_base = ioapic->IOAPICAddress;
-		paging_map(ioapic_base, ioapic_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+		if (!paging_map(ioapic_base, ioapic_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
+			logging_log_error("Failed to map memory for IOAPIC");
+			panic(PANIC_PAGING);
+		}
 
 		*(volatile uint32_t*)(ioapic_base + IOAPIC_OFF_IOREGSEL) = IOAPIC_IOAPICVER;
 		const uint64_t num_redir = 1 + (MAX_REDIR_ENTRY_MSK &
@@ -74,7 +78,10 @@ void ioapic_init(void) {
 		for (uint64_t mapping_base = ioapic_base + PAGE_SIZE_4K;
 				mapping_base < ioapic_base + IOAPIC_REDIR_ST + num_redir * 2;
 				mapping_base += PAGE_SIZE_4K) {
-			paging_map(mapping_base, mapping_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+			if (!paging_map(mapping_base, mapping_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
+				logging_log_error("Failed to map memory for IOAPIC");
+				panic(PANIC_PAGING);
+			}
 		}
 	}
 

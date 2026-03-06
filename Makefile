@@ -30,11 +30,12 @@ export BUILD_BOOT_MULTIBOOT2 = 1
 # Optional core modules
 
 export BUILD_KERNEL_GRAPHICSBASE = 1
+export BUILD_KERNEL_MEM_TEST = 1
+
 
 # Optional driver modules
 
 export BUILD_DRIVERS_SERIAL = 1
-
 export BUILD_DRIVERS_HPET = 1
 
 # End of options
