@@ -27,6 +27,7 @@
 
 extern void time_init(void);
 
+//TODO: implement task sleep
 extern uint64_t time_busy_wait(uint64_t min_ns);
 
 extern uint64_t time_since_init_ns(void);

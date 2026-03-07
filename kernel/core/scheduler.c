@@ -34,6 +34,7 @@ void scheduler_schedule(struct pcb_t* pcb) {
 	lock_acquire(&lock_sched);
 	if (active_queue_tail) {
 		active_queue_tail->next = pcb;
+		active_queue_tail = active_queue_tail->next;
 	}
 	else {
 		active_queue = pcb;

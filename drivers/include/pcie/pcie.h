@@ -36,6 +36,8 @@
 #define PCI_CMD_BME		0x004
 #define PCI_CMD_ID		0x400
 
+#define PCI_BAR_BA_MAKS	0xFFFFE000
+
 extern uint32_t pcie_read(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off);
 extern void pcie_write(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off, uint32_t val);
 
