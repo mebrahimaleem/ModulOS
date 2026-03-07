@@ -20,6 +20,8 @@
 #export DEBUG = 1
 export DEBUG_LOGGING = 1
 
+export SUPPRESS_ACPICA_BUILD_OUTPUT = 1
+
 # Global options
 
 # Optional boot modules
