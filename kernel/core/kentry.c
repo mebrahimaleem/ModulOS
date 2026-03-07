@@ -126,11 +126,9 @@ void kapentry(uint64_t arb_id) {
 	logging_log_debug("AP TSS and IDT init done");
 
 	logging_log_debug("AP APIC init");
-	pic_disab();
 	apic_init_ap();
 	apic_timer_calib(apic_get_bsp_id());
 	apic_nmi_enab();
-	ioapic_init();
 	logging_log_debug("AP APIC init done");
 
 	logging_log_info("AP init complete");
