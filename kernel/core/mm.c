@@ -186,13 +186,13 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, u
 	}
 	else if (base < node->base) {
 		node->less = alloc_node();
-		node->base = base;
-		node->limit = size;
+		node->less->base = base;
+		node->less->limit = size;
 	}
 	else {
 		node->more = alloc_node();
-		node->base = base;
-		node->limit = size;
+		node->more->base = base;
+		node->more->limit = size;
 	}
 
 	//TODO: coallese
