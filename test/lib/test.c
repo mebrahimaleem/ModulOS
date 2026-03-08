@@ -72,3 +72,8 @@ TEST("hash_byte_sum") {
 	ASSERT_TRUE(hash_byte_sum((uint8_t*)"\0\1\2\3\0\0\1\2", 8) == 9, "fails basic sum");
 	ASSERT_TRUE(hash_byte_sum((uint8_t*)"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF", 8) == 248, "fails overflow");
 }
+
+TEST("crc32_ansi") {
+	ASSERT_TRUE(crc32_ansi("Hello, World!", 13) == 0xec4ac3d0, "fails expected checksum");
+	ASSERT_FALSE(crc32_ansi("Hello, World!", 12) == 0xec4ac3d0, "fails unexpected checksum");
+}

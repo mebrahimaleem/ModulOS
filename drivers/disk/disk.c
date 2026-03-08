@@ -20,6 +20,10 @@
 
 #include <disk/disk.h>
 
+#ifdef GPT
+#include <gpt/gpt.h>
+#endif /* GPT */
+
 #include <kernel/core/lock.h>
 #include <kernel/core/alloc.h>
 
@@ -58,6 +62,12 @@ struct disk_t* disk_add(void* cntx, disk_lba_read_t read, disk_lba_write_t write
 	disk_list = disk;
 	lock_release(&disk_lock);
 
+#ifdef GPT
+	if (gpt_find_partitions(disk)) {
+		return disk;
+	}
+#endif /* GPT */
+
 	return disk;
 }
 
@@ -85,4 +95,8 @@ enum disk_error_t disk_write(struct disk_t* disk, void* buffer, uint64_t lba, ui
 
 enum disk_error_t disk_flush(struct disk_t* disk) {
 	return disk->flush(disk->cntx);
+}
+
+uint64_t disk_get_id(struct disk_t* disk) {
+	return disk->id;
 }

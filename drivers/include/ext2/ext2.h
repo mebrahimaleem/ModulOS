@@ -1,5 +1,5 @@
-/* hash.h - hashing functions */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* ext2.c - Second Extended File System driver interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,38 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef DRIVERS_EXT2_EXT2_H
+#define DRIVERS_EXT2_EXT2_H
+
 #include <stdint.h>
-#include <stddef.h>
 
-#include <lib/hash.h>
+#include <drivers/disk/disk.h>
 
-uint8_t hash_byte_sum(const void* ptr, size_t c) {
-	const uint8_t* _ptr = ptr;
-	uint8_t sum = 0;
-	for (; c > 0; c--) {
-		sum += *(_ptr++);
-	}
+extern uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba);
 
-	return sum;
-}
-
-uint32_t crc32_ansi(const void* data, size_t length) {
-	uint32_t crc = 0xFFFFFFFF;
-	const uint8_t *p = (const uint8_t*)data;
-	uint8_t i;
-
-	while (length--) {
-		crc ^= *p++;
-
-		for (i = 0; i < 8; i++) {
-			if (crc & 1) {
-				crc = (crc >> 1) ^ 0xEDB88320;
-			}
-			else {
-				crc >>= 1;
-			}
-		}
-	}
-
-	return crc ^ 0xFFFFFFFF;
-}
+#endif /* DRIVERS_EXT2_EXT2_H */

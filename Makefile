@@ -42,6 +42,9 @@ export BUILD_DRIVERS_HPET = 1
 
 export BUILD_DRIVERS_AHCI = 1
 
+export BUILD_DRIVERS_GPT = 1
+export BUILD_DRIVERS_EXT2 = 1
+
 # End of options
 
 ifdef BUILD_DRIVERS_AHCI
