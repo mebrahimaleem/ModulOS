@@ -44,6 +44,10 @@ export BUILD_DRIVERS_AHCI = 1
 
 # End of options
 
+ifdef BUILD_DRIVERS_AHCI
+export BUILD_DRIVERS_SATA = 1
+endif
+
 export SRC_TREE_ROOT = .
 export OBJ_DIR = build
 

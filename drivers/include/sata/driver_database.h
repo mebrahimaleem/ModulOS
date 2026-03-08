@@ -1,4 +1,4 @@
-/* ahci_init.h - Advanced Host Controller Interface initialization interface */
+/* driver_database.h - SATA drivers database interface */
 /* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_AHCI_AHCI_INIT_H
-#define DRIVERS_AHCI_AHCI_INIT_H
+#ifndef DRIVERS_SATA_DRIVER_DATABASE_H
+#define DRIVERS_SATA_DRIVER_DATABASE_H
 
 #include <stdint.h>
-#include <pcie/generic_database.h>
 
-extern void ahci_generic(
+extern void sata_driver_database(
 		uint16_t seg,
 		uint8_t bus,
 		uint8_t dev,
@@ -31,4 +30,4 @@ extern void ahci_generic(
 		uint8_t prog_if,
 		uint8_t rev_id);
 
-#endif /* DRIVERS_AHCI_AHCI_INIT_H */
+#endif /* DRIVERS_SATA_DRIVER_DATABASE_H */

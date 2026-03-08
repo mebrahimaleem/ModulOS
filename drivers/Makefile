@@ -38,6 +38,10 @@ ifdef BUILD_DRIVERS_AHCI
 $(call add_directory,ahci,AHCI)
 endif
 
+ifdef BUILD_DRIVERS_SATA
+$(call add_directory,sata,SATA)
+endif
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 

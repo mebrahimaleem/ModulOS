@@ -20,12 +20,16 @@
 #include <pcie/generic_database.h>
 
 #ifdef AHCI
-#include <ahci/ahci_init.h>
+#include <ahci/ahci.h>
 #endif /* AHCI */
 
-#define CLASS_LIMIT	0x1
+#ifdef SATA
+#include <sata/driver_database.h>
+#endif /* SATA */
 
-#ifdef AHCI
+#define CLASS_LIMIT	0x13
+
+#ifdef SATA
 
 #ifndef U_MASS_STORAGE_CONTROLLER
 #define U_MASS_STORAGE_CONTROLLER
@@ -35,44 +39,13 @@
 #define U_SATA
 #endif /* U_SATA */
 
-#ifndef U_AHCI
-#define U_AHCI
-#endif /* U_AHCI */
-
-#endif /* AHCI */
-
-#ifdef U_SATA
-#define SATA_LIMIT 0x02
-static generic_driver_t sata_table[SATA_LIMIT + 1] = {
-#ifdef U_AHCI
-	[0x01] = ahci_generic
-#endif /* U_AHCI */
-};
-
-static void u_sata(
-		uint16_t seg,
-		uint8_t bus,
-		uint8_t dev,
-		uint8_t func,
-		uint8_t class_code,
-		uint8_t subclass,
-		uint8_t prog_if,
-		uint8_t rev_id) {
-	if (prog_if > SATA_LIMIT) {
-		return;
-	}
-
-	if (sata_table[prog_if]) {
-		sata_table[prog_if](seg, bus, dev, func, class_code, subclass, prog_if, rev_id);
-	}
-}
-#endif /* U_SATA */
+#endif /* SATA */
 
 #ifdef U_MASS_STORAGE_CONTROLLER
 #define MASS_STORAGE_CONTROLLER_LIMIT	0x06
 static generic_driver_t mass_storage_controller_table[MASS_STORAGE_CONTROLLER_LIMIT + 1] = {
 #ifdef U_SATA
-	[0x06] = u_sata
+	[0x06] = sata_driver_database
 #endif /* U_SATA  */
 };
 
