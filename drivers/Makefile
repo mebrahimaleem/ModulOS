@@ -24,16 +24,23 @@ $(call add_directory,apic,APIC)
 $(call add_directory,ioapic,IOAPIC)
 $(call add_directory,acpi,ACPI)
 $(call add_directory,acpica_osl,ACPICA_OSL)
-$(call add_directory,pci,PCI)
+$(call add_directory,pcie,PCIE)
+$(call add_directory,disk,DISK)
 
 ifdef BUILD_DRIVERS_HPET
 $(call add_directory,hpet,HPET)
 endif
-
-#TODO: switch to PCIe
-
+ 
 ifdef BUILD_DRIVERS_SERIAL
 $(call add_directory,serial,SERIAL)
+endif
+
+ifdef BUILD_DRIVERS_AHCI
+$(call add_directory,ahci,AHCI)
+endif
+
+ifdef BUILD_DRIVERS_SATA
+$(call add_directory,sata,SATA)
 endif
 
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags

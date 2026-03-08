@@ -24,6 +24,7 @@
 #include <kernel/core/logging.h>
 #include <kernel/core/paging.h>
 #include <kernel/core/alloc.h>
+#include <kernel/core/mm.h>
 
 #include <kernel/lib/kmemcmp.h>
 #include <kernel/lib/kmemcpy.h>
@@ -41,6 +42,9 @@
 #else /* HPET */
 #define FOUND_HPET	0x00
 #endif /* HPET */
+#define FOUND_MCFG	0x08
+
+#define FOUND_ALL		(FOUND_FADT | FOUND_MADT | FOUND_HPET | FOUND_MCFG)
 
 #define GAS_TYPE_SYS	0
 #define GAS_TYPE_IO		1
@@ -166,6 +170,28 @@ struct acpi_madt_t {
 	uint8_t InterruptControllerStructure[];
 } __attribute__((packed));
 
+struct acpi_mcfg_conf_entry_t {
+	uint64_t base;
+	uint16_t group;
+	uint8_t bus_start;
+	uint8_t bus_end;
+	uint32_t resv;
+} __attribute__((packed));
+
+struct acpi_mcfg_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint64_t Reserved;
+	struct acpi_mcfg_conf_entry_t conf[];
+} __attribute__((packed));
+
 #ifdef HPET
 struct acpi_hpet_t {
 	uint8_t Signature[4];
@@ -191,6 +217,7 @@ struct acpi_hpet_t {
 
 static struct acpi_fadt_t* acpi_fadt;
 static struct acpi_madt_t* acpi_madt;
+static struct acpi_mcfg_t* acpi_mcfg;
 #ifdef HPET
 static struct acpi_hpet_t* acpi_hpet[8];
 static uint8_t hpet_count;
@@ -207,11 +234,7 @@ static uint8_t hpet_count;
 #define CHECK_AND_COPY(sig, tbl, store, fnd, post) \
 	do { \
 		if (!kmemcmp((uint8_t*)gen->Signature, sig, 4)) { \
-			map_table(gen); \
-			if (verify_checksum(gen)) { \
-				CHECK_FAIL(sig); \
-			} \
-			logging_log_info("Found ACPI "  tbl " @ 0x%lX", (uint64_t)gen); \
+			logging_log_info("Copying ACPI "  tbl " @ 0x%lX", (uint64_t)gen); \
 			store = kmalloc(gen->Length); \
 			kmemcpy((void*)store, (void*)gen, gen->Length); \
 			found |= fnd; \
@@ -220,45 +243,68 @@ static uint8_t hpet_count;
 	} \
 	while (0)
 
-static void map_header(const volatile void* table) {
-	// ACPI memory will never collide, so identity map everything
-	const volatile struct acpi_gen_header_t* gen = (struct acpi_gen_header_t*)table;
-	uint64_t alloc_base = (uint64_t)gen & PAGE_BASE_MASK;
-
-	if (!paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K)) {
-		logging_log_error("Failed to map ACPI header");
-		panic(PANIC_PAGING);
-	}
-
-	if ((uint64_t)gen != alloc_base) {
-		alloc_base += PAGE_SIZE_4K;
-		if (!paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K)) {
-			logging_log_error("Failed to map ACPI header");
-			panic(PANIC_PAGING);
-		}
-	}
-}
-
-static void map_table(const volatile void* table) {
-	const volatile struct acpi_gen_header_t* gen = (struct acpi_gen_header_t*)table;
-	uint64_t alloc_base = (uint64_t)gen & PAGE_BASE_MASK;
-
-	if ((uint64_t)gen != alloc_base) {
-		alloc_base += PAGE_SIZE_4K;
-	}
-
-	while (alloc_base < (uint64_t)gen + gen->Length) {
-		alloc_base += PAGE_SIZE_4K;
-		if (!paging_map(alloc_base, alloc_base, PAGE_PRESENT | PAT_MMIO_4K, PAGE_4K)) {
-			logging_log_error("Failed to map ACPI table");
-			panic(PANIC_PAGING);
-		}
-	}
-}
-
-static inline uint8_t verify_checksum(const volatile void* table) {
+static inline uint8_t verify_checksum(const volatile struct acpi_gen_header_t* table) {
 	const volatile struct acpi_gen_header_t* gen = (struct acpi_gen_header_t*)table;
 	return hash_byte_sum((void*)gen, gen->Length);
+}
+
+static volatile void* map_table(const volatile void* table) {
+	uint64_t base = (uint64_t)table & PAGE_BASE_MASK, vaddr, len, off;
+	volatile struct acpi_gen_header_t* v_table;
+
+	vaddr = mm_alloc_v(PAGE_SIZE_4K * 2);
+	if (!vaddr) {
+		logging_log_error("Failed to allocate memory for ACPI table");
+		panic(PANIC_NO_MEM);
+	}
+
+	paging_map(vaddr, base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	paging_map(vaddr + PAGE_SIZE_4K, base + PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+
+	v_table = (volatile struct acpi_gen_header_t*)(vaddr + (uint64_t)table - base);
+	if (!vaddr) {
+		logging_log_error("Failed to allocate memory for ACPI table");
+		panic(PANIC_NO_MEM);
+	}
+
+	logging_log_debug("Found ACPI table %4.4s", &v_table->Signature[0]);
+	if (verify_checksum(v_table)) {
+		paging_unmap(vaddr + base, PAGE_4K);
+		paging_unmap(vaddr + PAGE_SIZE_4K, PAGE_4K);
+
+		mm_free_v(vaddr, PAGE_SIZE_4K * 2);
+
+		logging_log_warning("Bad Checksum for %4.4s", &v_table->Signature[0]);
+		return 0;
+	}
+
+	len = v_table->Length + (uint64_t)table - base;
+
+	paging_unmap(vaddr, PAGE_4K);
+	paging_unmap(vaddr + PAGE_SIZE_4K, PAGE_4K);
+
+	mm_free_v(vaddr, PAGE_SIZE_4K * 2);
+
+	vaddr = mm_alloc_v(len);
+	for (off = 0; off < len; off += PAGE_SIZE_4K) {
+		paging_map(vaddr + off, base + off, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	}
+
+	return (void*)(vaddr + (uint64_t)table - base);
+}
+
+static void unmap_table(const volatile void* table) {
+	volatile struct acpi_gen_header_t* v_table = (volatile struct acpi_gen_header_t*)table;
+	uint64_t base, len, off;
+
+	base = (uint64_t)table & PAGE_BASE_MASK;
+	len = v_table->Length + (uint64_t)table - base;
+
+	for (off = 0; off < len; off += PAGE_SIZE_4K) {
+		paging_unmap(base + off, PAGE_4K);
+	}
+
+	mm_free_v(base, len);
 }
 
 void acpi_copy_tables(void) {
@@ -283,16 +329,15 @@ void acpi_copy_tables(void) {
 		case RSDPV1:
 fallback:
 			found = 0;
-			const struct acpi_rsdt_t* rsdt = (const struct acpi_rsdt_t*)(uint64_t)boot_context.rsdp.RsdtAddress;
-			map_header(rsdt);
-			if (kmemcmp(rsdt->Signature, "RSDT", 4)) {
-				logging_log_error("Bad ACPI RSDT signature");
+			volatile struct acpi_rsdt_t* rsdt = (volatile struct acpi_rsdt_t*)(uint64_t)boot_context.rsdp.RsdtAddress;
+			rsdt = map_table(rsdt);
+			if (!rsdt) {
+				logging_log_error("Bad RSDT checksum");
 				panic(PANIC_ACPI);
 			}
-			map_table(rsdt);
 
-			if (verify_checksum(rsdt)) {
-				logging_log_error("Bad ACPI RSDT checksum");
+			if (kmemcmp((void*)rsdt->Signature, "RSDT", 4)) {
+				logging_log_error("Bad ACPI RSDT signature");
 				panic(PANIC_ACPI);
 			}
 
@@ -301,7 +346,11 @@ fallback:
 			for (const volatile uint32_t* entry = &rsdt->Entry[0];
 					(uint64_t)entry < (uint64_t)rsdt + rsdt->Length; entry++) {
 				gen = (const volatile struct acpi_gen_header_t*)(uint64_t)*entry;
-				map_header(gen);
+				gen = map_table(gen);
+
+				if (!gen) {
+					continue;
+				}
 
 #define CHECK_FAIL(sig) CHECK_FAIL_RSDPV1(sig)
 				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT, (void)0);
@@ -309,20 +358,25 @@ fallback:
 #ifdef HPET
 				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
 #endif /* HPET */
+				CHECK_AND_COPY("MCFG", "MCFG", acpi_mcfg, FOUND_MCFG, (void)0);
 #undef CHECK_FAIL
+
+				unmap_table(gen);
 			}
 
-			if (found != (FOUND_FADT | FOUND_MADT | FOUND_HPET )) {
+			if (found != FOUND_ALL) {
 				logging_log_error("Could not find all ACPI tables");
+				unmap_table(rsdt);
 				panic(PANIC_ACPI);
 			}
 
 			if (kmemcmp((uint8_t*)rsdt->OEMTableID, (uint8_t*)acpi_fadt->OEMTableID, 8)) {
-				logging_log_error("Bad ACPI FACP OEM Table ID. Falling back to RSDPV1");
-				goto fallback;
+				logging_log_error("Bad ACPI FACP OEM Table ID");
+				unmap_table(rsdt);
 				panic(PANIC_ACPI);
 			}
 
+			unmap_table(rsdt);
 			break;
 		default:
 			// backwards compat, so everything else is v2
@@ -335,16 +389,16 @@ fallback:
 			}
 
 			found = 0;
-			const struct acpi_xsdt_t* xsdt = (const struct acpi_xsdt_t*)boot_context.rsdp.XsdtAddress;
-			map_header(xsdt);
-			if (kmemcmp(xsdt->Signature, "XSDT", 4)) {
-				logging_log_warning("Bad ACPI XSDT signature. Falling back to RSDPV1");
+			volatile struct acpi_xsdt_t* xsdt = (volatile struct acpi_xsdt_t*)boot_context.rsdp.XsdtAddress;
+			xsdt = map_table(xsdt);
+
+			if (!xsdt) {
+				logging_log_warning("Bad ACPI XSDT checksum. Falling back to RSDPV1");
 				goto fallback;
 			}
-			map_table(xsdt);
 
-			if (verify_checksum(xsdt)) {
-				logging_log_warning("Bad ACPI XSDT checksum. Falling back to RSDPV1");
+			if (kmemcmp((void*)xsdt->Signature, "XSDT", 4)) {
+				logging_log_warning("Bad ACPI XSDT signature. Falling back to RSDPV1");
 				goto fallback;
 			}
 
@@ -353,7 +407,11 @@ fallback:
 			for (const volatile uint64_t* entry = &xsdt->Entry[0];
 					(uint64_t)entry < (uint64_t)xsdt + xsdt->Length; entry++) {
 				gen = (const volatile struct acpi_gen_header_t*)*entry;
-				map_header(gen);
+				gen = map_table(gen);
+
+				if (!gen) {
+					continue;
+				}
 
 #define CHECK_FAIL(sig) CHECK_FAIL_RSDPV2(sig)
 				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT, (void)0);
@@ -361,18 +419,25 @@ fallback:
 #ifdef HPET
 				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
 #endif /* HPET */
+				CHECK_AND_COPY("MCFG", "MCFG", acpi_mcfg, FOUND_MCFG, (void)0);
 #undef CHECK_FAIL
+
+				unmap_table(gen);
 			}
 
-			if (found != (FOUND_FADT | FOUND_MADT | FOUND_HPET)) {
+			if (found != FOUND_ALL) {
 				logging_log_warning("Could not find all ACPI tables. Falling back to RSDPV1");
+				unmap_table(xsdt);
 				goto fallback;
 			}
 
 			if (kmemcmp((uint8_t*)xsdt->OEMTableID, (uint8_t*)acpi_fadt->OEMTableID, 8)) {
 				logging_log_error("Bad ACPI FACP OEM Table ID. Falling back to RSDPV1");
+				unmap_table(xsdt);
 				goto fallback;
 			}
+
+			unmap_table(xsdt);
 			break;
 	}
 }
@@ -394,6 +459,24 @@ void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* handle, uin
 
 uint16_t acpi_get_sci_int(void) {
 	return acpi_fadt->SCI_INT;
+}
+
+void acpi_parse_mcfg_conf_start(uint64_t* handle) {
+	*handle = (uint64_t)&acpi_mcfg->conf[0];
+}
+
+void acpi_parse_mcfg_conf(struct acpi_mcfg_conf_t* conf, uint64_t* handle) {
+	if (*handle + sizeof(struct acpi_mcfg_conf_entry_t) > (uint64_t)acpi_mcfg + acpi_mcfg->Length) {
+		*handle = 0;
+		return;
+	}
+
+	const struct acpi_mcfg_conf_entry_t* entry = (struct acpi_mcfg_conf_entry_t*)*handle;
+	conf->base = entry->base;
+	conf->segment = entry->group;
+	conf->bus_start = entry->bus_start;
+	conf->bus_end = entry->bus_end;
+	*handle = (uint64_t)(entry + 1);
 }
 
 #ifdef HPET

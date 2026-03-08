@@ -82,7 +82,7 @@ void paging_init(void) {
 	lock_init(&paging_lock);
 }
 
-uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint8_t flg, enum page_size_t page_size) {
+uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size) {
 	uint64_t* access;
 	enum page_size_t lvl = page_walk(vaddr, &access);
 

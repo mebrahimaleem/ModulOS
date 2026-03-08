@@ -1,4 +1,4 @@
-/* pci_config.h - Peripheral Controller Interface configuration space access interface */
+/* pcie_init.c - Peripheral Controller Interface Express driver */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,15 +15,16 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_PIC_PIC_CONFIG
-#define DRIVERS_PIC_PIC_CONFIG
-
 #include <stdint.h>
 
-extern uint32_t pci_read_conf(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus);
-extern void pci_write_conf(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus, uint32_t data);
+#include <pcie/pcie.h>
 
-extern uint64_t pci_read_conf_noalign(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus, uint8_t width);
-extern void pci_write_conf_noalign(uint8_t reg, uint8_t fun, uint8_t dev, uint8_t bus, uint8_t width, uint64_t data);
+uint64_t**** ecam;
 
-#endif /* DRIVERS_PIC_PIC_CONFIG */
+uint32_t pcie_read(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off) {
+	return *(volatile uint32_t*)(ecam[segment][bus][dev][fun] + off);
+}
+
+void pcie_write(uint16_t segment, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t off, uint32_t val) {
+	*(volatile uint32_t*)(ecam[segment][bus][dev][fun] + off) = val;
+}

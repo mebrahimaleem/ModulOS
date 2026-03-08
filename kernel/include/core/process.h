@@ -86,6 +86,8 @@ struct preempt_frame_t {
 	uint64_t ss;
 } __attribute__((packed));
 
+typedef void (*process_function_t)(void* cntx);
+
 extern uint64_t process_get_pid(void);
 
 extern void process_init(uint64_t init_rsp);
@@ -93,6 +95,8 @@ extern void process_init(uint64_t init_rsp);
 extern void process_init_ap(uint64_t init_rsp);
 
 extern struct pcb_t* process_from_vaddr(uint64_t vaddr);
+
+extern struct pcb_t* process_from_func(process_function_t func, void* cntx);
 
 extern void process_resume(struct pcb_t* pcb) __attribute__((noreturn));
 

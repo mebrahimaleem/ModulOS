@@ -48,8 +48,8 @@ void tss_init(volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES]) {
 	tss->ist2_lo = ist2 & IST_LO_MASK;
 	tss->ist2_hi = (uint32_t)(ist2 >> IST_HI_SHFT);
 
-	logging_log_debug("New TSS @ 0x%lX - 0x%lX 0x%lX (ist1)",
-			(uint64_t)tss, ist1);
+	logging_log_debug("New TSS @ 0x%lX - 0x%lX 0x%lX (ist1) 0x%lX (ist2)",
+			(uint64_t)tss, ist1, ist2);
 
 	((struct gdt_sys_t*)&(*gdt)[GDT_TSS_INDEX])->base0 = 
 		(uint64_t)tss & GDT_BASE0_MASK;

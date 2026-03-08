@@ -1,4 +1,4 @@
-/* time.c - time management interface */
+/* driver_database.h - SATA drivers database interface */
 /* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,23 +15,19 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_TIME_H
-#define KERNEL_CORE_TIME_H
-
-#define TIME_CONV_NS_TO_FS	1000000
-#define TIME_CONV_MS_TO_NS	1000000
-#define TIME_CONV_US_TO_NS	1000
-#define TIME_CONV_MS_TO_FS	1000000000000
+#ifndef DRIVERS_SATA_DRIVER_DATABASE_H
+#define DRIVERS_SATA_DRIVER_DATABASE_H
 
 #include <stdint.h>
 
-extern void time_init(void);
+extern void sata_driver_database(
+		uint16_t seg,
+		uint8_t bus,
+		uint8_t dev,
+		uint8_t func,
+		uint8_t class_code,
+		uint8_t subclass,
+		uint8_t prog_if,
+		uint8_t rev_id);
 
-//TODO: implement task sleep
-extern uint64_t time_busy_wait(uint64_t min_ns);
-
-extern uint64_t time_since_init_ns(void);
-
-extern uint64_t time_since_init_fs(void);
-
-#endif /* KERNEL_CORE_TIME_H */
+#endif /* DRIVERS_SATA_DRIVER_DATABASE_H */

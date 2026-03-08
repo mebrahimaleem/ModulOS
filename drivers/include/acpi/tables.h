@@ -101,10 +101,20 @@ struct acpi_madt_ics_local_apic_nmi_t {
 	uint8_t LocalAPICLINTNum;
 } __attribute__((packed));
 
+struct acpi_mcfg_conf_t {
+	uint64_t base;
+	uint16_t segment;
+	uint8_t bus_start;
+	uint8_t bus_end;
+};
+
 extern void acpi_copy_tables(void);
 
 extern void acpi_parse_madt_ics_start(uint64_t* handle);
 extern void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* handle, uint8_t type);
+
+extern void acpi_parse_mcfg_conf_start(uint64_t* handle);
+extern void acpi_parse_mcfg_conf(struct acpi_mcfg_conf_t* conf, uint64_t* handle);
 
 extern uint16_t acpi_get_sci_int(void);
 

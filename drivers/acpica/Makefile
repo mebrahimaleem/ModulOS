@@ -46,7 +46,11 @@ $(OBJ_DIR)/../acpica.a: $(OBJ_DIR)/acpica.a
 	ln $< $@
 
 $(TARGETS): $(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)/
+ifdef SUPPRESS_ACPICA_BUILD_OUTPUT
+	$(CC) $(CFLAGS) -I $(SRC_TREE_ROOT)/include/drivers/acpica/ -Wno-error -o $@ $< 2> /dev/null
+else
 	$(CC) $(CFLAGS) -I $(SRC_TREE_ROOT)/include/drivers/acpica/ -Wno-error -o $@ $<
+endif
 
 $(OBJ_DIR)/acpica.a: $(TARGETS)
 	rm -f $@

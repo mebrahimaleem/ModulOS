@@ -20,6 +20,8 @@
 #export DEBUG = 1
 export DEBUG_LOGGING = 1
 
+export SUPPRESS_ACPICA_BUILD_OUTPUT = 1
+
 # Global options
 
 # Optional boot modules
@@ -38,7 +40,13 @@ export BUILD_KERNEL_MEM_TEST = 1
 export BUILD_DRIVERS_SERIAL = 1
 export BUILD_DRIVERS_HPET = 1
 
+export BUILD_DRIVERS_AHCI = 1
+
 # End of options
+
+ifdef BUILD_DRIVERS_AHCI
+export BUILD_DRIVERS_SATA = 1
+endif
 
 export SRC_TREE_ROOT = .
 export OBJ_DIR = build
