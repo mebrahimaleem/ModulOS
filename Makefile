@@ -127,7 +127,7 @@ $(OBJ_DIR)/stub.img: | $(OBJ_DIR)/
 	parted -s $@ mklabel gpt
 	parted -s $@ mkpart ESP fat32 4MiB 52MiB
 	parted -s $@ set 1 esp on
-	parted -s $@ mkpart rootfs ext4 52MiB 100%
+	parted -s $@ mkpart rootfs ext2 52MiB 100%
 
 $(OBJ_DIR)/stub-esp.dummy: $(OBJ_DIR)/stub.img $(OBJ_DIR)/modulos $(OBJ_DIR)/esp.img
 	mcopy -o -i $(OBJ_DIR)/esp.img $(OBJ_DIR)/modulos ::/
@@ -137,7 +137,7 @@ $(OBJ_DIR)/stub-esp.dummy: $(OBJ_DIR)/stub.img $(OBJ_DIR)/modulos $(OBJ_DIR)/esp
 # 54525952 is for 52MiB offset (512 * 1024 * 1024)
 # 1034240 is for 52MiB initial (4MiB align + 48MiB ESP) and 4MiB tail for gpt
 $(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img copy-doc
-	yes | mke2fs -L rootfs -E offset=54525952 -d $(OBJ_DIR)/rootfs/ -t ext4 \
+	yes | mke2fs -L rootfs -E offset=54525952 -d $(OBJ_DIR)/rootfs/ -t ext2 \
 		-b 4096 $< 1034240
 	touch $@
 
