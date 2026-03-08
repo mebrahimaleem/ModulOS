@@ -28,7 +28,12 @@
 
 #define SATA_FIS_H2D_C					0x80
 
-#define SATA_FIS_CMD_IDENT			0xEC
+#define SATA_FIS_CMD_DMA_READ_EXT			0x25
+#define SATA_FIS_CMD_DMA_WRITE_EXT		0x35
+#define SATA_FIS_CMD_FLUSH_CACHE_EXT	0xEA
+#define SATA_FIS_CMD_IDENT						0xEC
+
+#define SATA_FIS_CMD_W					0x40
 
 struct sata_fis_type_h2d_t {
 	uint8_t fis_type;

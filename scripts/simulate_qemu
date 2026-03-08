@@ -1,6 +1,7 @@
 #!/bin/bash
 
 mkdir -p build/test-runtime/
+#dd if=/dev/urandom of=build/test-runtime/disk1.img bs=4096 count=1 status=progress
 truncate -s 4G build/test-runtime/disk1.img
 
 qemu-system-x86_64 \

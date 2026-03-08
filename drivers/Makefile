@@ -25,6 +25,7 @@ $(call add_directory,ioapic,IOAPIC)
 $(call add_directory,acpi,ACPI)
 $(call add_directory,acpica_osl,ACPICA_OSL)
 $(call add_directory,pcie,PCIE)
+$(call add_directory,disk,DISK)
 
 ifdef BUILD_DRIVERS_HPET
 $(call add_directory,hpet,HPET)

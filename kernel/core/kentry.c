@@ -44,6 +44,7 @@
 #include <drivers/apic/ipi.h>
 #include <drivers/ioapic/ioapic_init.h>
 #include <drivers/pcie/pcie_init.h>
+#include <drivers/disk/disk.h>
 
 struct boot_context_t boot_context;
 
@@ -87,6 +88,7 @@ void kentry(void) {
 	logging_log_debug("APIC and IOAPIC init done");
 
 	logging_log_debug("Early PCIE init");
+	disk_init();
 	pcie_init();
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");

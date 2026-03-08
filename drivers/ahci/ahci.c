@@ -23,6 +23,8 @@
 
 #include <pcie/pcie.h>
 
+#include <disk/disk.h>
+
 #include <kernel/core/logging.h>
 #include <kernel/core/scheduler.h>
 #include <kernel/core/process.h>
@@ -34,6 +36,7 @@
 #include <kernel/core/lock.h>
 
 #include <kernel/lib/kmemset.h>
+#include <kernel/lib/kmemcpy.h>
 
 #define CAP_OFF						0x00
 #define GHC_OFF						0x04
@@ -42,6 +45,7 @@
 #define PXCLBU_OFF(port)	(0x100 + (0x80 * port) + 0x04)
 #define PXFB_OFF(port)		(0x100 + (0x80 * port) + 0x08)
 #define PXFBU_OFF(port)		(0x100 + (0x80 * port) + 0x0C)
+#define PXIS_OFF(port)		(0x100 + (0x80 * port) + 0x10)
 #define PXCMD_OFF(port)		(0x100 + (0x80 * port) + 0x18)
 #define PXTFD_OFF(port)		(0x100 + (0x80 * port) + 0x20)
 #define PXSSTS_OFF(port)	(0x100 + (0x80 * port) + 0x28)
@@ -55,6 +59,8 @@
 
 #define GHC_AE	0x80000000u
 #define GHC_IE	0x1u
+
+#define IS_TFES	0x40000000u
 
 #define CMD_ST	0x0001u
 #define CMD_FRE	0x0010u
@@ -77,6 +83,8 @@
 #define SLOT_NO_SLOT	0xFF
 
 #define PRDT_DBC_I	0x80000000u
+
+#define SECTOR_SIZE	512
 
 struct ahci_recv_fis_t {
 	struct sata_fis_dma_setup_t dsfis;
@@ -102,6 +110,13 @@ struct ahci_command_header_t {
 	uint32_t resv3;
 } __attribute__((packed));
 
+struct ahci_prdt_t {
+	uint32_t dba;
+	uint32_t dbau;
+	uint32_t resv;
+	uint32_t dbc_i;
+} __attribute__((packed));
+
 struct ahci_command_table_t {
 	union {
 		uint8_t _64[64];
@@ -109,12 +124,7 @@ struct ahci_command_table_t {
 	} cfis;
 	uint8_t acmd[16];
 	uint8_t resv[48];
-	struct {
-		uint32_t dba;
-		uint32_t dbau;
-		uint32_t resv;
-		uint32_t dbc_i;
-	} __attribute__((packed)) prdt[];
+	struct ahci_prdt_t prdt[];
 } __attribute__((packed));
 
 struct ahci_t {
@@ -130,10 +140,18 @@ struct ahci_t {
 	uint8_t lock;
 	uint64_t hba_reg;
 	uint32_t used_com;
+	struct ahci_command_table_t* com_tables_v[32];
+	uint32_t com_tables_p[32];
 	struct {
 		struct ahci_command_header_t* com_list;
 		struct ahci_recv_fis_t* recv_fis;
+		uint8_t lock;
 	}* ports[32];
+};
+
+struct ahci_disk_t {
+	struct ahci_t* ahci;
+	uint32_t port;
 };
 
 static inline void hba_write(struct ahci_t* ahci, uint64_t off, uint32_t val) {
@@ -146,6 +164,7 @@ static inline uint32_t hba_read(struct ahci_t* ahci, uint64_t off) {
 
 static inline void port_clear_errors(struct ahci_t* ahci, uint32_t port) {
 	hba_write(ahci, PXSERR_OFF(port), SERR_CLEAR);
+	hba_write(ahci, PXIS_OFF(port), ~0u);
 }
 
 static uint8_t find_slot(struct ahci_t* ahci, uint32_t port) {
@@ -163,18 +182,320 @@ static uint8_t find_slot(struct ahci_t* ahci, uint32_t port) {
 	return SLOT_NO_SLOT;
 }
 
+static enum disk_error_t ahci_read_lba(void* cntx, void* buffer, uint64_t lba, uint16_t count) {
+	struct ahci_disk_t* ahci_disk = cntx;
+	struct ahci_t* ahci = ahci_disk->ahci;
+	uint32_t port = ahci_disk->port;
+	uint8_t slot;
+	enum disk_error_t error;
+
+	uint64_t vaddr_buf, i;
+	uint32_t paddr_buf;
+
+	const uint64_t size = (uint64_t)count * SECTOR_SIZE;
+
+	if (size > PAGE_SIZE_2M * 2) {
+		return DISK_ERROR;
+	}
+
+	paddr_buf = (uint32_t)mm_alloc_pmax(size, 0, ~0u);
+	if (!paddr_buf) {
+		logging_log_error("Failed to allocate memory for AHCI read buffer");
+		return DISK_ERROR;
+	}
+
+	vaddr_buf = mm_alloc_v(size);
+	if (!vaddr_buf) {
+		mm_free_p(paddr_buf, size);
+
+		logging_log_error("Failed to allocate memory for AHCI read buffer");
+		return DISK_ERROR;
+	}
+
+	for (i = 0; i < size; i += PAGE_SIZE_4K) {
+		paging_map(vaddr_buf + i, paddr_buf + i, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	}
+
+	lock_acquire(&ahci->lock);
+	slot = find_slot(ahci, port);
+	ahci->used_com |= 1u << slot;
+	lock_release(&ahci->lock);
+
+	kmemset(&ahci->ports[port]->com_list[slot], 0, sizeof(struct ahci_command_header_t));
+	kmemset(ahci->com_tables_v[slot], 0, PAGE_SIZE_4K);
+
+	ahci->com_tables_v[slot]->cfis.h2d.fis_type = SATA_FIS_TYPE_H2D;
+	ahci->com_tables_v[slot]->cfis.h2d.flag = SATA_FIS_H2D_C;
+	ahci->com_tables_v[slot]->cfis.h2d.cmd = SATA_FIS_CMD_DMA_READ_EXT;
+	ahci->com_tables_v[slot]->cfis.h2d.lba0 = (lba >> 0) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba1 = (lba >> 8) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba3 = (lba >> 24) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba4 = (lba >> 32) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba5 = (lba >> 40) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.dev = 1u << 6;
+	ahci->com_tables_v[slot]->cfis.h2d.count_lo = (count) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.count_hi = (count >> 8) & 0xFF;
+	
+	ahci->com_tables_v[slot]->prdt[0].dba = paddr_buf;
+	ahci->com_tables_v[slot]->prdt[0].dbau = 0;
+	ahci->com_tables_v[slot]->prdt[0].dbc_i = (uint32_t)size - 1;
+
+	lock_acquire(&ahci->ports[port]->lock);
+
+	port_clear_errors(ahci, port);
+
+	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+
+	ahci->ports[port]->com_list[slot].flg = 5;
+	ahci->ports[port]->com_list[slot].prdtl = 1;
+	ahci->ports[port]->com_list[slot].ctba0 = ahci->com_tables_p[slot];
+	ahci->ports[port]->com_list[slot].ctba_u0 = 0;
+
+
+	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+	}
+
+	hba_write(ahci, PXCI_OFF(port), 1u << slot);
+	
+	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+
+		if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
+			logging_log_error("AHCI error while reading");
+			error = DISK_ERROR;
+			lock_release(&ahci->ports[port]->lock);
+
+			lock_acquire(&ahci->lock);
+			ahci->used_com &= ~(1u << slot);
+			lock_release(&ahci->lock);
+			goto cleanup;
+		}
+	}
+
+	if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
+		logging_log_error("AHCI error while reading");
+		error = DISK_ERROR;
+
+		lock_release(&ahci->ports[port]->lock);
+
+		lock_acquire(&ahci->lock);
+		ahci->used_com &= ~(1u << slot);
+		lock_release(&ahci->lock);
+		goto cleanup;
+	}
+
+	lock_release(&ahci->ports[port]->lock);
+
+	lock_acquire(&ahci->lock);
+	ahci->used_com &= ~(1u << slot);
+	lock_release(&ahci->lock);
+
+	kmemcpy(buffer, (void*)vaddr_buf, size);
+
+	error = DISK_OK;
+cleanup:
+	for (i = 0; i < size; i += PAGE_SIZE_4K) {
+		paging_unmap(vaddr_buf + i, PAGE_4K);
+	}
+
+	mm_free_v(vaddr_buf, size);
+	mm_free_p(paddr_buf, size);
+
+	return error;
+}
+
+static enum disk_error_t ahci_write_lba(void* cntx, void* buffer, uint64_t lba, uint16_t count) {
+	struct ahci_disk_t* ahci_disk = cntx;
+	struct ahci_t* ahci = ahci_disk->ahci;
+	uint32_t port = ahci_disk->port;
+	uint8_t slot;
+	enum disk_error_t error;
+
+	uint64_t vaddr_buf, i;
+	uint32_t paddr_buf;
+
+	const uint64_t size = (uint64_t)count * SECTOR_SIZE;
+
+	if (size > PAGE_SIZE_2M * 2) {
+		return DISK_ERROR;
+	}
+
+	paddr_buf = (uint32_t)mm_alloc_pmax(size, 0, ~0u);
+	if (!paddr_buf) {
+		logging_log_error("Failed to allocate memory for AHCI read buffer");
+		return DISK_ERROR;
+	}
+
+	vaddr_buf = mm_alloc_v(size);
+	if (!vaddr_buf) {
+		mm_free_p(paddr_buf, size);
+
+		logging_log_error("Failed to allocate memory for AHCI read buffer");
+		return DISK_ERROR;
+	}
+
+	for (i = 0; i < size; i += PAGE_SIZE_4K) {
+		paging_map(vaddr_buf + i, paddr_buf + i, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	}
+
+	kmemcpy((void*)vaddr_buf, buffer, size);
+
+	lock_acquire(&ahci->lock);
+	slot = find_slot(ahci, port);
+	ahci->used_com |= 1u << slot;
+	lock_release(&ahci->lock);
+
+	kmemset(&ahci->ports[port]->com_list[slot], 0, sizeof(struct ahci_command_header_t));
+	kmemset(ahci->com_tables_v[slot], 0, PAGE_SIZE_4K);
+
+	ahci->com_tables_v[slot]->cfis.h2d.fis_type = SATA_FIS_TYPE_H2D;
+	ahci->com_tables_v[slot]->cfis.h2d.flag = SATA_FIS_H2D_C;
+	ahci->com_tables_v[slot]->cfis.h2d.cmd = SATA_FIS_CMD_DMA_WRITE_EXT;
+	ahci->com_tables_v[slot]->cfis.h2d.lba0 = (lba >> 0) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba1 = (lba >> 8) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba3 = (lba >> 24) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba4 = (lba >> 32) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.lba5 = (lba >> 40) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.dev = 1u << 6;
+	ahci->com_tables_v[slot]->cfis.h2d.count_lo = (count) & 0xFF;
+	ahci->com_tables_v[slot]->cfis.h2d.count_hi = (count >> 8) & 0xFF;
+	
+	ahci->com_tables_v[slot]->prdt[0].dba = paddr_buf;
+	ahci->com_tables_v[slot]->prdt[0].dbau = 0;
+	ahci->com_tables_v[slot]->prdt[0].dbc_i = (uint32_t)size - 1;
+
+	lock_acquire(&ahci->ports[port]->lock);
+
+	port_clear_errors(ahci, port);
+
+	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+
+	ahci->ports[port]->com_list[slot].flg = 5 | SATA_FIS_CMD_W;
+	ahci->ports[port]->com_list[slot].prdtl = 1;
+	ahci->ports[port]->com_list[slot].ctba0 = ahci->com_tables_p[slot];
+	ahci->ports[port]->com_list[slot].ctba_u0 = 0;
+
+
+	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+	}
+
+	hba_write(ahci, PXCI_OFF(port), 1u << slot);
+	
+	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+
+		if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
+			logging_log_error("AHCI error while reading");
+			error = DISK_ERROR;
+			lock_release(&ahci->ports[port]->lock);
+
+			lock_acquire(&ahci->lock);
+			ahci->used_com &= ~(1u << slot);
+			lock_release(&ahci->lock);
+			goto cleanup;
+		}
+	}
+
+	if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
+		logging_log_error("AHCI error while reading");
+		error = DISK_ERROR;
+
+		lock_release(&ahci->ports[port]->lock);
+
+		lock_acquire(&ahci->lock);
+		ahci->used_com &= ~(1u << slot);
+		lock_release(&ahci->lock);
+		goto cleanup;
+	}
+
+	lock_release(&ahci->ports[port]->lock);
+
+	lock_acquire(&ahci->lock);
+	ahci->used_com &= ~(1u << slot);
+	lock_release(&ahci->lock);
+
+	error = DISK_OK;
+cleanup:
+	for (i = 0; i < size; i += PAGE_SIZE_4K) {
+		paging_unmap(vaddr_buf + i, PAGE_4K);
+	}
+
+	mm_free_v(vaddr_buf, size);
+	mm_free_p(paddr_buf, size);
+
+	return error;
+}
+
+static enum disk_error_t ahci_flush_cache(void* cntx) {
+	struct ahci_disk_t* ahci_disk = cntx;
+	struct ahci_t* ahci = ahci_disk->ahci;
+	uint32_t port = ahci_disk->port;
+	uint8_t slot;
+
+
+	lock_acquire(&ahci->lock);
+	slot = find_slot(ahci, port);
+	ahci->used_com |= 1u << slot;
+	lock_release(&ahci->lock);
+
+	kmemset(&ahci->ports[port]->com_list[slot], 0, sizeof(struct ahci_command_header_t));
+	kmemset(ahci->com_tables_v[slot], 0, PAGE_SIZE_4K);
+
+	ahci->com_tables_v[slot]->cfis.h2d.fis_type = SATA_FIS_TYPE_H2D;
+	ahci->com_tables_v[slot]->cfis.h2d.flag = SATA_FIS_H2D_C;
+	ahci->com_tables_v[slot]->cfis.h2d.cmd = SATA_FIS_CMD_FLUSH_CACHE_EXT;
+
+	lock_acquire(&ahci->ports[port]->lock);
+
+	port_clear_errors(ahci, port);
+
+	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+
+	ahci->ports[port]->com_list[slot].flg   = 5;
+	ahci->ports[port]->com_list[slot].prdtl = 0;
+	ahci->ports[port]->com_list[slot].ctba0 = ahci->com_tables_p[slot];
+	ahci->ports[port]->com_list[slot].ctba_u0 = 0;
+
+	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+	}
+
+	hba_write(ahci, PXCI_OFF(port), 1u << slot);
+
+	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
+		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+
+		if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
+			logging_log_error("AHCI flush cache error");
+			lock_release(&ahci->ports[port]->lock);
+
+			lock_acquire(&ahci->lock);
+			ahci->used_com &= ~(1u << slot);
+			lock_release(&ahci->lock);
+
+			return DISK_ERROR;
+		}
+	}
+
+	lock_release(&ahci->ports[port]->lock);
+	
+	lock_acquire(&ahci->lock);
+	ahci->used_com &= ~(1u << slot);
+	lock_release(&ahci->lock);
+	
+	return DISK_OK;
+}
+
 static void port_identify(struct ahci_t* ahci, uint32_t port) {
 	uint8_t slot;
-	uint32_t paddr_table, paddr_identity;
-	struct ahci_command_table_t* com_table;
-	uint16_t* identity;
+	uint32_t paddr_identity;
+	volatile uint16_t* identity;
 	uint8_t model[41];
-
-	paddr_table = (uint32_t)mm_alloc_pmax(PAGE_SIZE_4K, 0, ~0u);
-	if (!paddr_table) {
-		logging_log_error("Failed to allocate memory for AHCI command table");
-		return;
-	}
+	uint64_t lba48;
 
 	paddr_identity = (uint32_t)mm_alloc_pmax(PAGE_SIZE_4K, 0, ~0u);
 	if (!paddr_identity) {
@@ -182,40 +503,42 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 		return;
 	}
 
-	com_table = (struct ahci_command_table_t*)mm_alloc_v(PAGE_SIZE_4K);
-	if (!com_table) {
-		logging_log_error("Failed to allocate memory for AHCI command table");
-		return;
-	}
-
 	identity = (uint16_t*)mm_alloc_v(PAGE_SIZE_4K);
 	if (!identity) {
+		mm_free_p(paddr_identity, PAGE_SIZE_4K);
+
 		logging_log_error("Failed to allocate memory for AHCI identity buffer");
 		return;
 	}
 
-	paging_map((uint64_t)com_table, paddr_table, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 	paging_map((uint64_t)identity, paddr_identity, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
-
-	kmemset(com_table, 0, PAGE_SIZE_4K);
-	kmemset(identity, 0, PAGE_SIZE_4K);
-
-	com_table->prdt[0].dba = paddr_identity;
-	com_table->prdt[0].dbau = 0;
-	com_table->prdt[0].dbc_i = 512 - 1;
-
-	com_table->cfis.h2d.fis_type = SATA_FIS_TYPE_H2D;
-	com_table->cfis.h2d.flag = SATA_FIS_H2D_C;
-	com_table->cfis.h2d.cmd = SATA_FIS_CMD_IDENT;
 
 	lock_acquire(&ahci->lock);
 	slot = find_slot(ahci, port);
 	ahci->used_com |= 1u << slot;
 	lock_release(&ahci->lock);
 
+	kmemset(&ahci->ports[port]->com_list[slot], 0, sizeof(struct ahci_command_header_t));
+	kmemset(ahci->com_tables_v[slot], 0, PAGE_SIZE_4K);
+	kmemset((void*)identity, 0, PAGE_SIZE_4K);
+
+	ahci->com_tables_v[slot]->prdt[0].dba = paddr_identity;
+	ahci->com_tables_v[slot]->prdt[0].dbau = 0;
+	ahci->com_tables_v[slot]->prdt[0].dbc_i = 512 - 1;
+
+	ahci->com_tables_v[slot]->cfis.h2d.fis_type = SATA_FIS_TYPE_H2D;
+	ahci->com_tables_v[slot]->cfis.h2d.flag = SATA_FIS_H2D_C;
+	ahci->com_tables_v[slot]->cfis.h2d.cmd = SATA_FIS_CMD_IDENT;
+
+	lock_acquire(&ahci->ports[port]->lock);
+
+	port_clear_errors(ahci, port);
+
+	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+
 	ahci->ports[port]->com_list[slot].flg = 5;
 	ahci->ports[port]->com_list[slot].prdtl = 1;
-	ahci->ports[port]->com_list[slot].ctba0 = paddr_table;
+	ahci->ports[port]->com_list[slot].ctba0 = ahci->com_tables_p[slot];
 	ahci->ports[port]->com_list[slot].ctba_u0 = 0;
 
 	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
@@ -228,6 +551,8 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
 	}
 
+	lock_release(&ahci->ports[port]->lock);
+
 	lock_acquire(&ahci->lock);
 	ahci->used_com &= ~(1u << slot);
 	lock_release(&ahci->lock);
@@ -238,15 +563,14 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 	}
 	model[40] = 0;
 
-	logging_log_info("Found ATA drive %s", &model[0]);
+	lba48 = *(uint64_t*)&identity[100];
 
-	paging_unmap((uint64_t)com_table, PAGE_4K);
+	logging_log_info("Found ATA drive %s 0x%lx", &model[0], lba48);
+
 	paging_unmap((uint64_t)identity, PAGE_4K);
 
-	mm_free_v((uint64_t)com_table, PAGE_SIZE_4K);
 	mm_free_v((uint64_t)identity, PAGE_SIZE_4K);
 
-	mm_free_p(paddr_table, PAGE_SIZE_4K);
 	mm_free_p(paddr_identity, PAGE_SIZE_4K);
 }
 
@@ -292,6 +616,7 @@ static void ahci_init(void* cntx) {
 	uint32_t fis_pool_p = 0;
 	uint64_t cl_pool_v = 0;
 	uint64_t fis_pool_v = 0;
+	struct ahci_disk_t* ahci_disk;
 
 	logging_log_info("AHCI driver initialization for %u/%u/%u/%u at %u.%u.%u.%u",
 			ahci->class_code, ahci->subclass, ahci->prog_if, ahci->rev_id, ahci->seg, ahci->bus, ahci->dev, ahci->func);
@@ -323,6 +648,24 @@ static void ahci_init(void* cntx) {
 
 	logging_log_debug("AHCI HBA mapped to 0x%lx", ahci->hba_reg);
 
+	for (i = 0; i < 32; i++) {
+		ahci->com_tables_p[i] = (uint32_t)mm_alloc_pmax(PAGE_SIZE_4K, 0, ~0u);
+
+		if (!ahci->com_tables_p[i]) {
+			logging_log_error("Failed to allocate AHCI command table");
+			panic(PANIC_NO_MEM);
+		}
+
+		ahci->com_tables_v[i] = (struct ahci_command_table_t*)mm_alloc_v(PAGE_SIZE_4K);
+		if (!ahci->com_tables_v[i]) {
+			logging_log_error("Failed to allocate AHCI command table");
+			panic(PANIC_NO_MEM);
+		}
+
+		paging_map((uint64_t)ahci->com_tables_v[i], ahci->com_tables_p[i],
+				PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	}
+
 	/* minimal initialization sequence */
 	read = hba_read(ahci, GHC_OFF);
 	read &= ~GHC_IE;
@@ -334,6 +677,7 @@ static void ahci_init(void* cntx) {
 	for (i = 0; i < 32; i++) {
 		if (ports & (1u << i)) {
 			logging_log_debug("AHCI supports port %u", i);
+
 			read = hba_read(ahci, PXCMD_OFF(i));
 			if (read & (CMD_ST | CMD_FRE | CMD_FR | CMD_CR)) {
 				/* stop port execution */
@@ -378,6 +722,8 @@ static void ahci_init(void* cntx) {
 	for (i = 0; i < 32; i++) {
 		if (ports & (1u << i)) {
 			ahci->ports[i] = kmalloc(sizeof(*ahci->ports[i]));
+
+			lock_init(&ahci->ports[i]->lock);
 
 			if (j % (PAGE_SIZE_4K / CL_SIZE) == 0) {
 				cl_pool_p = (uint32_t)mm_alloc_pmax(PAGE_SIZE_4K, 0, ~0u);
@@ -455,6 +801,10 @@ static void ahci_init(void* cntx) {
 			hba_write(ahci, PXCMD_OFF(i), read);
 
 			port_identify(ahci, i);
+			ahci_disk = kmalloc(sizeof(struct ahci_disk_t));
+			ahci_disk->ahci = ahci;
+			ahci_disk->port = i;
+			disk_add(ahci_disk, ahci_read_lba, ahci_write_lba, ahci_flush_cache);
 		}
 		else {
 			ahci->ports[i] = 0;
