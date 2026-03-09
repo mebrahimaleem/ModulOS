@@ -115,13 +115,11 @@ struct pcb_t* process_from_func(process_function_t func, void* cntx) {
 }
 
 void process_kill_current(void) {
-	cpu_cli();
 	lock_acquire(&lock_proc);
 	struct pcb_t* pcb = proc_data_get()->current_process;
 	pcb->sched_cntr = SCHED_KILL;
 	logging_log_debug("Killed %ld", pcb->pid);
 	lock_release(&lock_proc);
-	cpu_sti();
 
 	cpu_wait_loop();
 }

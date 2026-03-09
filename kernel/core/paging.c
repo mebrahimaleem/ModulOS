@@ -24,8 +24,11 @@
 #include <core/panic.h>
 #include <core/logging.h>
 #include <core/lock.h>
+#include <core/cpu_instr.h>
 
 #include <lib/kmemset.h>
+
+#include <drivers/apic/ipi.h>
 
 #define PAGE_PS 			0x80
 
@@ -137,7 +140,9 @@ void paging_unmap(uint64_t vaddr, enum page_size_t page_size) {
 		return;
 	}
 
+
 	*access = 0;
+	apic_tlb_shootdown(vaddr);
 }
 
 uint64_t paging_ident(uint64_t paddr) {

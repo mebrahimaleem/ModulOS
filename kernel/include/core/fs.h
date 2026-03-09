@@ -1,5 +1,5 @@
-/* ipi.c - Inter Processor Interrupt interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* fs.c - kernel file system layer interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,24 +15,39 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_APIC_IPI_H
-#define DRIVERS_APIC_IPI_H
+#ifndef KERNEL_CORE_FS_H
+#define KERNEL_CORE_FS_H
 
 #include <stdint.h>
+#include <stddef.h>
 
-#define AP_ENTRY_PAGE	8
+enum fs_file_type_t {
+	FS_FILE,
+	FS_DIR,
+};
 
-extern void apic_init_shootdowns(uint8_t num_apic);
-extern void apic_ipi_init(void);
+enum fs_open_mode_t {
+	FS_OPEN_NOCREATE = 0,
+	FS_OPEN_CREATE = 1
+};
 
-extern void apic_wait_for_ipi(void);
-extern void apic_send_ipi_init_set(uint8_t apic_id);
-extern void apic_send_ipi_init_clear(uint8_t apic_id);
-extern void apic_send_ipi_sipi(uint8_t apic_id);
+enum fs_error_t {
+	FS_ERROR_OK,
+	FS_ERROR_FAIL
+};
 
-extern void apic_tlb_shootdown(uint64_t vaddr);
-extern void apic_tlb_shootdown_dispatch(void);
+struct fs_file_info_t {
+	enum fs_file_type_t type;
+	size_t size;
+};
 
-extern void apic_register_barrier(uint8_t apic_id);
+struct fs_file_t;
 
-#endif /* DRIVERS_APIC_IPI_H */
+
+typedef enum fs_error_t (*fs_stat_t)(void*, struct fs_file_info_t*);
+
+extern void fs_init(void);
+
+extern void fs_mount(void* root, fs_stat_t stat, const char* path);
+
+#endif /* KERNEL_CORE_FS_H */

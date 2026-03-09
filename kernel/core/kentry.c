@@ -30,6 +30,7 @@
 #include <core/scheduler.h>
 #include <core/process.h>
 #include <core/lock.h>
+#include <core/fs.h>
 
 #include <lib/kmemcpy.h>
 
@@ -80,15 +81,18 @@ void kentry(void) {
 	logging_log_debug("System clock initialized.");
 
 	logging_log_debug("APIC and IOAPIC init");
+	apic_ipi_init();
 	pic_disab();
 	apic_init();
 	apic_timer_calib(apic_get_bsp_id());
 	apic_nmi_enab();
 	ioapic_init();
+	cpu_sti();
 	logging_log_debug("APIC and IOAPIC init done");
 
 	logging_log_debug("Early PCIE init");
 	disk_init();
+	fs_init();
 	pcie_init();
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
@@ -131,6 +135,7 @@ void kapentry(uint64_t arb_id) {
 	apic_init_ap();
 	apic_timer_calib(apic_get_bsp_id());
 	apic_nmi_enab();
+	cpu_sti();
 	logging_log_debug("AP APIC init done");
 
 	logging_log_info("AP init complete");

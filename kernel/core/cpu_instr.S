@@ -41,6 +41,11 @@ cpu_pause:
 pause
 ret
 
+.globl cpu_invlpg
+cpu_invlpg:
+invlpg (%rdi)
+ret
+
 .globl cpu_wait_loop
 cpu_wait_loop:
 hlt

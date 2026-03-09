@@ -23,11 +23,21 @@
 
 #include <kernel/core/alloc.h>
 #include <kernel/core/logging.h>
+#include <kernel/core/fs.h>
+#include <kernel/core/lock.h>
+
+#include <kernel/lib/kmemcmp.h>
+#include <kernel/lib/kmemcpy.h>
 
 #define SUPERBLOCK_LBA			2
 #define SUPERBLOCK_SECTORS	2
 
 #define EXT2_SUPER_MAGIC	0xEF53
+
+#define ROOT_DIR_INODE			2
+
+#define EXT2_S_IFREG	0x8000
+#define EXT2_S_IFDIR	0x4000
 
 struct ext2_superblock_t {
 	uint32_t s_inodes_count;
@@ -126,10 +136,77 @@ _Static_assert(sizeof(struct ext2_superblock_t) == 1024, "Bad ext2 superblock si
 _Static_assert(sizeof(struct ext2_bg_desc_t) == 32, "Bad ext2 bg descriptor size");
 _Static_assert(sizeof(struct ext2_inode_t) == 128, "Bad exte2 inode size");
 
+struct ext2_t {
+	uint64_t start_lba;
+	uint64_t end_lba;
+	struct ext2_superblock_t* superblock;
+	struct ext2_bg_desc_t* bgdt;
+	struct disk_t* disk;
+	uint8_t lock;
+};
+
+struct ext2_inode_handle_t {
+	struct ext2_t* ext2;
+	uint64_t inode_index;
+};
+
+static uint8_t label_rootfs[16] = {'r', 'o', 'o', 't', 'f', 's', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct ext2_inode_t* inode) {
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const struct ext2_bg_desc_t* bgdt = inode_handle->ext2->bgdt;
+
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t block_group = (inode_handle->inode_index - 1) / superblock->s_inodes_per_group;
+	const uint64_t lcl_inode_idx = (inode_handle->inode_index - 1) % superblock->s_inodes_per_group;
+	const uint64_t lcl_inode_off = lcl_inode_idx * superblock->s_inode_size;
+	const uint64_t lcl_inode_blk = lcl_inode_off / block_size;
+	const uint64_t inode_off = lcl_inode_off % block_size;
+
+	const uint64_t inode_table_block = bgdt[block_group].bg_inode_table + lcl_inode_blk;
+	void* buffer = kmalloc(block_size);
+
+	if (disk_read(
+				inode_handle->ext2->disk,
+				buffer,
+				inode_handle->ext2->start_lba + inode_table_block * block_size / SECTOR_SIZE,
+				(uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
+		logging_log_error("Failed to read inode %lu", inode_handle->inode_index);
+		kfree(buffer);
+		return 1;
+	}
+
+	*inode = *(struct ext2_inode_t*)((uint64_t)buffer + inode_off);
+	kfree(buffer);
+	return 0;
+}
+
+static enum fs_error_t ext2_stat(void* handle, struct fs_file_info_t* info) {
+	struct ext2_inode_t inode;
+	if (get_inode(handle, &inode)) {
+		return FS_ERROR_FAIL;
+	}
+
+	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	
+	if (inode.i_mode & EXT2_S_IFREG) {
+		info->type = FS_FILE;
+	}
+	else if (inode.i_mode & EXT2_S_IFDIR) {
+		info->type = FS_DIR;
+	}
+	else {
+		return FS_ERROR_FAIL;
+	}
+
+	return FS_ERROR_OK;
+}
+
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
-
-	(void)end_lba;
+	struct ext2_inode_handle_t* root_handle;
+	struct ext2_bg_desc_t* bgdt;
+	uint64_t bgdt_size, adj, bgdt_start_lba;
 
 	if (disk_read(disk, superblock, start_lba + SUPERBLOCK_LBA, SUPERBLOCK_SECTORS) != DISK_OK) {
 		logging_log_error("Failed to read disk %lu @ %u/%u", disk_get_id(disk), SUPERBLOCK_LBA, SUPERBLOCK_SECTORS);
@@ -142,8 +219,43 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 		return 0;
 	}
 
+	bgdt_start_lba = start_lba + (1u << (1 + superblock->s_log_block_size));
+
+	bgdt_size = (1 + superblock->s_blocks_count / superblock->s_blocks_per_group) * sizeof(struct ext2_bg_desc_t);
+	adj = bgdt_size % SECTOR_SIZE;
+	if (adj) {
+		bgdt_size += SECTOR_SIZE - adj;
+	}
+
+	bgdt = kmalloc(bgdt_size);
+	if (disk_read(disk, bgdt, bgdt_start_lba, (uint16_t)(bgdt_size / SECTOR_SIZE)) != DISK_OK) {
+		logging_log_error("Failed to read disk %lu @ %u/%u", disk_get_id(disk), SUPERBLOCK_LBA, SUPERBLOCK_SECTORS);
+		kfree(superblock);
+		kfree(bgdt);
+		return 0;
+	}
+
 	logging_log_info("Found ext2 filesystem %16.16s", superblock->s_volume_name);
 
-	kfree(superblock);
+	root_handle = kmalloc(sizeof(struct ext2_inode_handle_t));
+	root_handle->ext2 = kmalloc(sizeof(struct ext2_t));
+	root_handle->ext2->start_lba = start_lba;
+	root_handle->ext2->end_lba = end_lba;
+	root_handle->ext2->superblock = superblock;
+	root_handle->ext2->bgdt = bgdt;
+	root_handle->ext2->disk = disk;
+	lock_init(&root_handle->ext2->lock);
+	root_handle->inode_index = ROOT_DIR_INODE;
+
+	logging_log_debug("ext2 blocks: 0x%x x 0x%x (0x%lX)",
+			1024u << superblock->s_log_block_size, superblock->s_blocks_count,
+			(uint64_t)(1024u << superblock->s_log_block_size) * (uint64_t)superblock->s_blocks_count);
+
+	if (!kmemcmp(label_rootfs, superblock->s_volume_name, sizeof(superblock->s_volume_name))) {
+		fs_mount(root_handle, ext2_stat, "/");
+	}
+
+	//TODO: mount other volumes
+
 	return 1;
 }

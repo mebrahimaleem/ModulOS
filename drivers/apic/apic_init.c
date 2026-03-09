@@ -116,6 +116,8 @@ void apic_init(void) {
 	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, IST_SCHED, IDT_GATE_INT, 0);
 	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 
+	apic_init_shootdowns(num_apic);
+
 	apic_init_ap();
 
 	// init stacks
@@ -241,6 +243,8 @@ void apic_init_ap(void) {
 
 	apic_write_lve(APIC_REG_ERE, error_vector,
 			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, 0);
+
+	apic_register_barrier(apic_id);
 
 	// enable apic
 	apic_write_reg(APIC_REG_ESR, 0);

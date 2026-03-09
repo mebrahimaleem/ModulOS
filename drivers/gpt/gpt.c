@@ -92,7 +92,7 @@ uint8_t gpt_find_partitions(struct disk_t* disk) {
 	}
 
 	partition_array_size = gpt->partition_array_entry_count * gpt->partition_array_entry_size;
-	partition_array_base = kmalloc((partition_array_size / SECTOR_SIZE) + 1);
+	partition_array_base = kmalloc(SECTOR_SIZE * ((partition_array_size / SECTOR_SIZE) + 1));
 
 	if (disk_read(disk, partition_array_base, gpt->partition_array_lba,
 				(uint16_t)(partition_array_size / SECTOR_SIZE) + 1) != DISK_OK) {
