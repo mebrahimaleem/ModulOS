@@ -25,6 +25,7 @@
 #include <kernel/core/logging.h>
 #include <kernel/core/fs.h>
 #include <kernel/core/lock.h>
+#include <kernel/core/panic.h>
 
 #include <kernel/lib/kmemcmp.h>
 #include <kernel/lib/kmemcpy.h>
@@ -34,10 +35,12 @@
 
 #define EXT2_SUPER_MAGIC	0xEF53
 
-#define ROOT_DIR_INODE			2
+#define EXT2_ROOT_INO			2
 
 #define EXT2_S_IFREG	0x8000
 #define EXT2_S_IFDIR	0x4000
+
+#define DIRLS_SET			0x8000000000000000
 
 struct ext2_superblock_t {
 	uint32_t s_inodes_count;
@@ -132,6 +135,14 @@ struct ext2_inode_t {
 	uint8_t i_osd2[12];
 } __attribute__((packed));
 
+struct ext2_ll_dir_entry_t {
+	uint32_t inode;
+	uint16_t rec_len;
+	uint8_t name_len;
+	uint8_t file_type;
+	uint8_t name[];
+} __attribute__((packed));
+
 _Static_assert(sizeof(struct ext2_superblock_t) == 1024, "Bad ext2 superblock size");
 _Static_assert(sizeof(struct ext2_bg_desc_t) == 32, "Bad ext2 bg descriptor size");
 _Static_assert(sizeof(struct ext2_inode_t) == 128, "Bad exte2 inode size");
@@ -142,12 +153,17 @@ struct ext2_t {
 	struct ext2_superblock_t* superblock;
 	struct ext2_bg_desc_t* bgdt;
 	struct disk_t* disk;
-	uint8_t lock;
 };
 
 struct ext2_inode_handle_t {
 	struct ext2_t* ext2;
 	uint64_t inode_index;
+};
+
+struct ext2_dir_track_t {
+	struct ext2_inode_handle_t* handle;
+	struct ext2_inode_t dir;
+	uint64_t off;
 };
 
 static uint8_t label_rootfs[16] = {'r', 'o', 'o', 't', 'f', 's', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -181,25 +197,89 @@ static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct 
 	return 0;
 }
 
-static enum fs_error_t ext2_stat(void* handle, struct fs_file_info_t* info) {
+static enum fs_status_t ext2_stat(struct fs_file_handle_t* file, struct fs_info_t* info) {
 	struct ext2_inode_t inode;
-	if (get_inode(handle, &inode)) {
-		return FS_ERROR_FAIL;
+	
+	if (get_inode((struct ext2_inode_handle_t*)file, &inode)) {
+		return FS_STATUS_ERROR;
 	}
 
-	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
-	
+	info->size = (uint32_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+
 	if (inode.i_mode & EXT2_S_IFREG) {
-		info->type = FS_FILE;
+		info->type = FS_TYPE_FILE;
 	}
 	else if (inode.i_mode & EXT2_S_IFDIR) {
-		info->type = FS_DIR;
+		info->type = FS_TYPE_DIR;
 	}
 	else {
-		return FS_ERROR_FAIL;
+		return FS_STATUS_ERROR;
 	}
 
-	return FS_ERROR_OK;
+	return FS_STATUS_OK;
+}
+
+static struct fs_dirls_handle_t* ext2_dirst(struct fs_file_handle_t* handle) {
+	struct ext2_inode_t inode;
+	
+	if (get_inode((struct ext2_inode_handle_t*)handle, &inode)) {
+		return 0;
+	}
+
+	struct ext2_dir_track_t* dir_track = kmalloc(sizeof(struct ext2_dir_track_t));	
+	dir_track->handle = (struct ext2_inode_handle_t*)handle;
+	dir_track->dir = inode;
+	dir_track->off = 0;
+	//TODO: support reading from other blocks as well
+	return (struct fs_dirls_handle_t*)dir_track;
+}
+
+static enum fs_status_t ext2_dirls(struct fs_dirls_handle_t** handle, struct fs_ls_info_t* file) {
+	struct ext2_dir_track_t* dt = (struct ext2_dir_track_t*)*handle;
+
+	const struct ext2_superblock_t* superblock = dt->handle->ext2->superblock;
+
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+
+	if (dt->off >= block_size) {
+		return FS_STATUS_EOF;
+	}
+
+	const uint64_t lba = dt->handle->ext2->start_lba + dt->dir.i_block[0] * block_size / SECTOR_SIZE;
+
+	void* buffer = kmalloc(block_size);
+
+	if (disk_read(dt->handle->ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
+		logging_log_error("Failed to read");
+	}
+
+	struct ext2_ll_dir_entry_t* entry =
+		(struct ext2_ll_dir_entry_t*)((uint64_t)buffer + dt->off);
+
+	if (entry->inode != 0) {
+		if (entry->name[0] == '.' && (entry->name_len == 1 || (entry->name_len == 2 && entry->name[1] == '.'))) {
+			file->valid = 0;
+		}
+
+		else {
+			kmemcpy(file->name, entry->name, entry->name_len);
+			file->name_len = entry->name_len;
+			struct ext2_inode_handle_t* hndl = kmalloc(sizeof(struct ext2_inode_handle_t));
+			hndl->ext2 = dt->handle->ext2;
+			hndl->inode_index = entry->inode;
+			file->handle = (struct fs_file_handle_t*)hndl;
+			file->valid = 1;
+		}
+	}
+
+	dt->off += entry->rec_len;
+
+	kfree(buffer);
+	return FS_STATUS_OK;
+}
+
+static void ext2_diren(struct fs_dirls_handle_t* handle) {
+	kfree(handle);
 }
 
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
@@ -244,16 +324,41 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 	root_handle->ext2->superblock = superblock;
 	root_handle->ext2->bgdt = bgdt;
 	root_handle->ext2->disk = disk;
-	lock_init(&root_handle->ext2->lock);
-	root_handle->inode_index = ROOT_DIR_INODE;
+	root_handle->inode_index = EXT2_ROOT_INO;
 
 	logging_log_debug("ext2 blocks: 0x%x x 0x%x (0x%lX)",
 			1024u << superblock->s_log_block_size, superblock->s_blocks_count,
 			(uint64_t)(1024u << superblock->s_log_block_size) * (uint64_t)superblock->s_blocks_count);
 
 	if (!kmemcmp(label_rootfs, superblock->s_volume_name, sizeof(superblock->s_volume_name))) {
-		fs_mount(root_handle, ext2_stat, "/");
+		if (fs_mount((struct fs_file_handle_t*)root_handle, "/",
+					ext2_stat,
+					ext2_dirst,
+					ext2_dirls,
+					ext2_diren
+					) != FS_STATUS_OK) {
+			logging_log_error("Failed to mount rootfs");
+			panic(PANIC_STATE);
+		}
+
+		struct fs_file_t* root_file = fs_open("/.");
+		if (!root_file) {
+			logging_log_error("Failed to open root directory");
+			panic(PANIC_STATE);
+		}
+
+		struct fs_info_t root_file_info;
+		if (fs_stat(root_file, &root_file_info) != FS_STATUS_OK) {
+			logging_log_error("Failed to stat root directory");
+			panic(PANIC_STATE);
+		}
+
+		logging_log_debug("Root directory (0x%lx) (%u)", root_file_info.size, root_file_info.type);
+
+		fs_close(root_file);
 	}
+
+	fs_log_vfs_tree();
 
 	//TODO: mount other volumes
 

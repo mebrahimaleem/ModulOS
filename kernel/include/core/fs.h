@@ -22,32 +22,58 @@
 #include <stddef.h>
 
 enum fs_file_type_t {
-	FS_FILE,
-	FS_DIR,
+	FS_TYPE_FILE,
+	FS_TYPE_DIR
 };
 
-enum fs_open_mode_t {
-	FS_OPEN_NOCREATE = 0,
-	FS_OPEN_CREATE = 1
+enum fs_status_t {
+	FS_STATUS_OK,
+	FS_STATUS_ERROR,
+	FS_STATUS_EOF,
+	FS_STATUS_FILE_NOT_FOUND,
+	FS_STATUS_BUSY
 };
 
-enum fs_error_t {
-	FS_ERROR_OK,
-	FS_ERROR_FAIL
-};
-
-struct fs_file_info_t {
+struct fs_info_t {
 	enum fs_file_type_t type;
 	size_t size;
 };
 
+struct fs_ls_info_t {
+	struct fs_file_handle_t* handle;
+	char name[256];
+	uint8_t name_len;
+	uint8_t valid;
+};
+
 struct fs_file_t;
-
-
-typedef enum fs_error_t (*fs_stat_t)(void*, struct fs_file_info_t*);
+struct fs_file_handle_t;
+struct fs_dirls_handle_t;
 
 extern void fs_init(void);
 
-extern void fs_mount(void* root, fs_stat_t stat, const char* path);
+typedef enum fs_status_t (*fs_stat_t)(struct fs_file_handle_t* handle, struct fs_info_t* info);
+
+typedef struct fs_dirls_handle_t* (*fs_dirst_t)(struct fs_file_handle_t* handle);
+typedef enum fs_status_t (*fs_dirls_t)(struct fs_dirls_handle_t** handle, struct fs_ls_info_t* file);
+typedef void (*fs_diren_t)(struct fs_dirls_handle_t* handle);
+
+extern void fs_init(void);
+
+extern enum fs_status_t fs_mount(
+		struct fs_file_handle_t* root,
+		const char* path,
+		fs_stat_t stat,
+		fs_dirst_t dirst,
+		fs_dirls_t dirls,
+		fs_diren_t diren);
+
+extern struct fs_file_t* fs_open(const char* path);
+extern void fs_close(struct fs_file_t* file);
+extern enum fs_status_t fs_stat(struct fs_file_t* file, struct fs_info_t* info);
+
+#ifdef DEBUG
+extern void fs_log_vfs_tree(void);
+#endif /* DEBUG */
 
 #endif /* KERNEL_CORE_FS_H */

@@ -17,7 +17,7 @@
 
 # Debug options
 
-#export DEBUG = 1
+export DEBUG = 1
 export DEBUG_LOGGING = 1
 
 export SUPPRESS_ACPICA_BUILD_OUTPUT = 1
@@ -74,7 +74,7 @@ TEST_TARGETS := \
 TEST_CANIDATES := $(patsubst $(OBJ_DIR)/test_%.a,test-%,$(TEST_TARGETS))
 TEST_EXEC := $(basename $(TEST_TARGETS))
 
-COPY_DOC_TO := $(OBJ_DIR)/rootfs/doc/ModulOS/
+COPY_DOC_TO := $(OBJ_DIR)/rootfs/usr/share/doc/ModulOS/
 
 SRC := $(shell find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \))
 
