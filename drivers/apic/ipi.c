@@ -148,6 +148,8 @@ void apic_tlb_shootdown_dispatch(void) {
 	cpu_invlpg(tlb_shootdown_addr);
 
 	tlb_shootdown_barrier[proc_data_get()->arb_id] = 0;
+
+	apic_write_reg(APIC_REG_EOI, APIC_EOI);
 }
 
 void apic_register_barrier(uint8_t apic_id) {
