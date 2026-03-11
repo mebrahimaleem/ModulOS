@@ -80,19 +80,24 @@ static void free_node(struct mm_tree_node_t* node) {
 }
 
 static struct mm_tree_node_t* find_base_node(uint64_t base, struct mm_tree_node_t* root, struct mm_tree_node_t* parent) {
-	if (!root) {
-		return parent;
-	}
+	while (1) {
+		if (!root) {
+			return parent;
+		}
 
-	if (WITHIN_NODE(base, root->base, root->limit)) {
-		return root;
-	}
+		if (WITHIN_NODE(base, root->base, root->limit)) {
+			return root;
+		}
 
-	if (base < root->base) {
-		return find_base_node(base, root->less, root);
-	}
+		parent = root;
 
-	return find_base_node(base, root->more, root);
+		if (base < root->base) {
+			root = root->less;
+		}
+		else {
+			root = root->more;
+		}
+	}
 }
 
 static void attach_node(struct mm_tree_node_t* root, struct mm_tree_node_t* node) {

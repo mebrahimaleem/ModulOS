@@ -58,6 +58,12 @@ typedef struct fs_dirls_handle_t* (*fs_dirst_t)(struct fs_file_handle_t* handle)
 typedef enum fs_status_t (*fs_dirls_t)(struct fs_dirls_handle_t** handle, struct fs_ls_info_t* file);
 typedef void (*fs_diren_t)(struct fs_dirls_handle_t* handle);
 
+typedef struct fs_file_handle_t* (*fs_create_t)(
+		struct fs_file_handle_t* handle,
+		enum fs_file_type_t type,
+		const char* name,
+		uint8_t name_len);
+
 extern void fs_init(void);
 
 extern enum fs_status_t fs_mount(
@@ -66,11 +72,14 @@ extern enum fs_status_t fs_mount(
 		fs_stat_t stat,
 		fs_dirst_t dirst,
 		fs_dirls_t dirls,
-		fs_diren_t diren);
+		fs_diren_t diren,
+		fs_create_t create);
 
 extern struct fs_file_t* fs_open(const char* path);
 extern void fs_close(struct fs_file_t* file);
 extern enum fs_status_t fs_stat(struct fs_file_t* file, struct fs_info_t* info);
+extern enum fs_status_t fs_list(struct fs_file_t* file, char* buffer);
+extern enum fs_status_t fs_create(struct fs_file_t* file, enum fs_file_type_t type, const char* name);
 
 #ifdef DEBUG
 extern void fs_log_vfs_tree(void);

@@ -33,6 +33,16 @@
 #define SUPERBLOCK_LBA			2
 #define SUPERBLOCK_SECTORS	2
 
+#define DIRECT_BLOCKS			12
+#define INDIR_1						12
+#define INDIR_2						13
+#define INDIR_3						14
+
+#define BLOCK_OK		0
+#define BLOCK_RETRY	1
+#define BLOCK_LAST	2
+#define BLOCK_ERROR	3
+
 #define EXT2_SUPER_MAGIC	0xEF53
 
 #define EXT2_ROOT_INO			2
@@ -164,9 +174,26 @@ struct ext2_dir_track_t {
 	struct ext2_inode_handle_t* handle;
 	struct ext2_inode_t dir;
 	uint64_t off;
+	uint64_t block;
 };
 
 static uint8_t label_rootfs[16] = {'r', 'o', 'o', 't', 'f', 's', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static void* read_block(uint64_t block, struct ext2_t* ext2) {
+	const uint64_t block_size = 1024u << ext2->superblock->s_log_block_size;
+
+	void* buffer = kmalloc(block_size);
+
+	const uint64_t lba = ext2->start_lba + block * block_size / SECTOR_SIZE;
+
+	if (disk_read(ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
+		logging_log_error("Failed to read");
+		kfree(buffer);
+		return 0;
+	}
+
+	return buffer;
+}
 
 static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct ext2_inode_t* inode) {
 	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
@@ -180,21 +207,169 @@ static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct 
 	const uint64_t inode_off = lcl_inode_off % block_size;
 
 	const uint64_t inode_table_block = bgdt[block_group].bg_inode_table + lcl_inode_blk;
-	void* buffer = kmalloc(block_size);
+	void* buffer = read_block(inode_table_block, inode_handle->ext2);
 
-	if (disk_read(
-				inode_handle->ext2->disk,
-				buffer,
-				inode_handle->ext2->start_lba + inode_table_block * block_size / SECTOR_SIZE,
-				(uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
+	if (!buffer) {
 		logging_log_error("Failed to read inode %lu", inode_handle->inode_index);
 		kfree(buffer);
-		return 1;
 	}
 
 	*inode = *(struct ext2_inode_t*)((uint64_t)buffer + inode_off);
 	kfree(buffer);
 	return 0;
+}
+
+static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index) {
+	uint64_t block = dt->block;
+	struct ext2_inode_t* inode = &dt->dir;
+	struct ext2_t* ext2 = dt->handle->ext2;
+
+
+	if (block < DIRECT_BLOCKS) {
+		*index = inode->i_block[block];
+
+		if (!*index) {
+			dt->block += 1;
+			return BLOCK_RETRY;
+		}
+
+		return BLOCK_OK;
+	}
+
+	block -= DIRECT_BLOCKS;
+
+	const uint64_t block_size = 1024u << ext2->superblock->s_log_block_size;
+	const uint64_t indir1 = block_size / sizeof(uint32_t);
+
+	uint32_t* buffer;
+
+	if (block < indir1) {
+		*index = inode->i_block[INDIR_1];
+
+		if (!*index) {
+			dt->block += indir1;
+			return BLOCK_RETRY;
+		}
+
+		buffer = read_block(*index, ext2);
+
+		if (!buffer) {
+			return BLOCK_ERROR;
+		}
+
+		*index = buffer[block];
+		kfree(buffer);
+
+		if (!*index) {
+			dt->block += 1;
+			return BLOCK_RETRY;
+		}
+
+		return BLOCK_OK;
+	}
+
+	block -= indir1;
+
+	const uint64_t indir2 = indir1 * indir1;
+
+
+	if (block < indir2) {
+		*index = inode->i_block[INDIR_2];
+
+		if (!*index) {
+			dt->block += indir2;
+			return BLOCK_RETRY;
+		}
+
+		buffer = read_block(*index, ext2);
+
+		if (!buffer) {
+			return BLOCK_ERROR;
+		}
+
+		*index = buffer[block / indir1];
+		kfree(buffer);
+
+		if (!*index) {
+			dt->block += indir1;
+			return BLOCK_RETRY;
+		}
+
+		buffer = read_block(*index, ext2);
+
+		if (!buffer) {
+			return BLOCK_ERROR;
+		}
+
+		*index = buffer[block % indir1];
+		kfree(buffer);
+
+		if (!*index) {
+			dt->block += 1;
+			return BLOCK_RETRY;
+		}
+
+		return BLOCK_OK;
+	}
+
+	block -= indir2;
+
+	const uint64_t indir3 = indir2 * indir1;
+
+	if (block < indir3) {
+		*index = inode->i_block[INDIR_3];
+
+		if (!*index) {
+			dt->block += indir3;
+			return BLOCK_RETRY;
+		}
+
+		buffer = read_block(*index, ext2);
+
+		if (!buffer) {
+			return BLOCK_ERROR;
+		}
+
+		*index = buffer[block / indir2];
+		kfree(buffer);
+
+		if (!*index) {
+			dt->block += indir2;
+			return BLOCK_RETRY;
+		}
+
+		buffer = read_block(*index, ext2);
+
+		if (!buffer) {
+			return BLOCK_ERROR;
+		}
+
+		*index = buffer[(block % indir2) / indir1];
+		kfree(buffer);
+
+		if (!*index) {
+			dt->block += indir1;
+			return BLOCK_RETRY;
+		}
+
+		buffer = read_block(*index, ext2);
+
+		if (!buffer) {
+			return BLOCK_ERROR;
+		}
+
+		*index = buffer[block % indir1];
+		kfree(buffer);
+
+		if (!*index) {
+			dt->block += 1;
+			return BLOCK_RETRY;
+		}
+
+		return BLOCK_OK;
+	}
+
+	return BLOCK_LAST;
 }
 
 static enum fs_status_t ext2_stat(struct fs_file_handle_t* file, struct fs_info_t* info) {
@@ -230,7 +405,7 @@ static struct fs_dirls_handle_t* ext2_dirst(struct fs_file_handle_t* handle) {
 	dir_track->handle = (struct ext2_inode_handle_t*)handle;
 	dir_track->dir = inode;
 	dir_track->off = 0;
-	//TODO: support reading from other blocks as well
+	dir_track->block = 0;
 	return (struct fs_dirls_handle_t*)dir_track;
 }
 
@@ -242,15 +417,34 @@ static enum fs_status_t ext2_dirls(struct fs_dirls_handle_t** handle, struct fs_
 	const uint64_t block_size = 1024u << superblock->s_log_block_size;
 
 	if (dt->off >= block_size) {
+		dt->block++;
+		dt->off = 0;
+	}
+
+	uint64_t block_index;
+	uint8_t res = get_block_index_dir(dt, &block_index);
+
+	if (res == BLOCK_RETRY) {
+		file->valid = 0;
+		dt->off = 0;
+		return FS_STATUS_OK;
+	}
+
+	if (res == BLOCK_LAST) {
+		file->valid = 0;
 		return FS_STATUS_EOF;
 	}
 
-	const uint64_t lba = dt->handle->ext2->start_lba + dt->dir.i_block[0] * block_size / SECTOR_SIZE;
+	if (res == BLOCK_ERROR) {
+		file->valid = 0;
+		return FS_STATUS_ERROR;
+	}
 
-	void* buffer = kmalloc(block_size);
+	void* buffer = read_block(block_index, dt->handle->ext2);
 
-	if (disk_read(dt->handle->ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
+	if (!buffer) {
 		logging_log_error("Failed to read");
+		return FS_STATUS_ERROR;
 	}
 
 	struct ext2_ll_dir_entry_t* entry =
@@ -280,6 +474,14 @@ static enum fs_status_t ext2_dirls(struct fs_dirls_handle_t** handle, struct fs_
 
 static void ext2_diren(struct fs_dirls_handle_t* handle) {
 	kfree(handle);
+}
+
+static struct fs_file_handle_t* ext2_create(
+		struct fs_file_handle_t* handle,
+		enum fs_file_type_t type,
+		const char* name,
+		uint8_t name_len) {
+	return 0;
 }
 
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
@@ -335,7 +537,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_stat,
 					ext2_dirst,
 					ext2_dirls,
-					ext2_diren
+					ext2_diren,
+					ext2_create
 					) != FS_STATUS_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);

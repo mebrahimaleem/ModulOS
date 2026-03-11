@@ -35,6 +35,7 @@ struct fs_mount_t {
 	fs_dirst_t dirst;
 	fs_dirls_t dirls;
 	fs_diren_t diren;
+	fs_create_t create;
 };
 
 struct fs_node_t {
@@ -59,6 +60,10 @@ struct fs_node_t {
 struct fs_file_t {
 	struct fs_node_t* node;
 	struct fs_info_t info;
+	union {
+		uint64_t off;
+		struct fs_node_t* dir;
+	} seek;
 };
 
 enum node_res_t {
@@ -102,12 +107,27 @@ static void vfs_diren(struct fs_dirls_handle_t* handle) {
 	(void)handle;
 }
 
+static struct fs_file_handle_t* vfs_create(
+		struct fs_file_handle_t* handle,
+		enum fs_file_type_t type,
+		const char* name,
+		uint8_t name_len) {
+	(void)handle;
+	(void)type;
+	(void)name;
+	(void)name_len;
+
+	logging_log_error("Attempted to create virtual file %s (%u)", name, type);
+	return 0;
+}
+
 static struct fs_mount_t vfs_mount = {
 	.parent = &vfs_mount,
 	.stat = vfs_stat,
 	.dirst = vfs_dirst,
 	.dirls = vfs_dirls,
-	.diren = vfs_diren
+	.diren = vfs_diren,
+	.create = vfs_create,
 };
 
 static uint8_t vfs_lock;
@@ -129,6 +149,36 @@ void fs_init(void) {
 	vfs_root.info.type = FS_TYPE_DIR;
 }
 
+static inline struct fs_node_t* init_node(
+		struct fs_node_t* node,
+		struct fs_file_handle_t* handle,
+		const char* name,
+		uint8_t name_len) {
+	enum fs_status_t status;
+	struct fs_info_t info;
+
+	if ((status = node->mount->stat(handle, &info)) != FS_STATUS_OK) {
+		return 0;
+	}
+
+	struct fs_node_t* sub = kmalloc(sizeof(struct fs_node_t));
+
+	sub->accesses = 0;
+	sub->co = 0;
+	sub->handle = handle;
+	sub->mount = node->mount;
+	sub->name_len = name_len;
+	sub->name = kmalloc(name_len + 1);
+	kmemcpy(sub->name, name, name_len);
+	sub->name[name_len] = 0;
+	sub->parent = node;
+	sub->status = 0;
+	sub->sub = 0;
+	sub->info = info;
+
+	return sub;
+}
+
 static inline enum fs_status_t assert_consistent(struct fs_node_t* node, uint8_t clear) {
 	if (node->status & VFS_STATUS_CONSISTENT) {
 		return FS_STATUS_OK;
@@ -137,13 +187,9 @@ static inline enum fs_status_t assert_consistent(struct fs_node_t* node, uint8_t
 	if (node->sub && clear) {
 		logging_log_error("Detected corrupt vfs state. Inconsistent non-leaf node");
 		panic(PANIC_STATE);
-	}
-	struct fs_info_t info;
-	enum fs_status_t status;
-	
+	}	
 
 	struct fs_ls_info_t file;
-	struct fs_node_t* temp;
 	struct fs_dirls_handle_t* handle = node->mount->dirst(node->handle);
 
 	if (!handle) {
@@ -154,27 +200,15 @@ static inline enum fs_status_t assert_consistent(struct fs_node_t* node, uint8_t
 		if (!file.valid) {
 			continue;
 		}
-
-		if ((status = node->mount->stat(file.handle, &info)) != FS_STATUS_OK) {
+		
+		struct fs_node_t* temp = init_node(node, file.handle, file.name, file.name_len);
+		if (!temp) {
 			node->mount->diren(handle);
-			return status;
+			return FS_STATUS_ERROR;
 		}
 
-		temp = node->sub;
-		node->sub = kmalloc(sizeof(struct fs_node_t));
-
-		node->sub->accesses = 0;
-		node->sub->co = temp;
-		node->sub->handle = file.handle;
-		node->sub->mount = node->mount;
-		node->sub->name_len  = file.name_len;
-		node->sub->name = kmalloc(file.name_len + 1);
-		kmemcpy(node->sub->name, file.name, file.name_len);
-		node->sub->name[file.name_len] = 0;
-		node->sub->parent = node;
-		node->sub->status = 0;
-		node->sub->sub = 0;
-		node->sub->info = info;
+		temp->co = node->sub;
+		node->sub = temp;
 	}
 
 	node->mount->diren(handle);
@@ -269,38 +303,14 @@ static void cleanup_path(struct fs_node_t* root, const char* path) {
 	(void)path;
 }
 
-struct fs_file_t* fs_open(const char* path) {
-	struct fs_node_t* node = resolve_path(&vfs_root, simplify_path(path));
-
-	if (!node) {
-		return 0;
-	}
-
-	struct fs_file_t* file = kmalloc(sizeof(struct fs_file_t));
-	file->node = node;
-	return file;
-}
-
-void fs_close(struct fs_file_t* file) {
-	lock_acquire(&vfs_lock);
-	cleanup_path(&vfs_root, simplify_path(file->node->name));
-	lock_release(&vfs_lock);
-
-	kfree(file);
-}
-
-enum fs_status_t fs_stat(struct fs_file_t* file, struct fs_info_t* info) {
-	*info = file->node->info;
-	return FS_STATUS_OK;
-}
-
 extern enum fs_status_t fs_mount(
 		struct fs_file_handle_t* root,
 		const char* path,
 		fs_stat_t stat,
 		fs_dirst_t dirst,
 		fs_dirls_t dirls,
-		fs_diren_t diren) {
+		fs_diren_t diren,
+		fs_create_t create) {
 
 	lock_acquire(&vfs_lock);
 
@@ -318,6 +328,7 @@ extern enum fs_status_t fs_mount(
 	mount->dirst = dirst;
 	mount->dirls = dirls;
 	mount->diren = diren;
+	mount->create = create;
 
 	node->mount = mount;
 	node->handle = root;
@@ -338,6 +349,76 @@ extern enum fs_status_t fs_mount(
 		*node = revert;
 		return status;
 	}	
+
+	lock_release(&vfs_lock);
+	return FS_STATUS_OK;
+}
+
+struct fs_file_t* fs_open(const char* path) {
+	lock_acquire(&vfs_lock);
+	struct fs_node_t* node = resolve_path(&vfs_root, simplify_path(path));
+	lock_release(&vfs_lock);
+
+	if (!node) {
+		return 0;
+	}
+
+	struct fs_file_t* file = kmalloc(sizeof(struct fs_file_t));
+	file->node = node;
+	file->seek.off = 0;
+	return file;
+}
+
+void fs_close(struct fs_file_t* file) {
+	lock_acquire(&vfs_lock);
+	cleanup_path(&vfs_root, simplify_path(file->node->name));
+	lock_release(&vfs_lock);
+
+	kfree(file);
+}
+
+enum fs_status_t fs_stat(struct fs_file_t* file, struct fs_info_t* info) {
+	*info = file->node->info;
+	return FS_STATUS_OK;
+}
+
+enum fs_status_t fs_list(struct fs_file_t* file, char* buffer) {
+
+	if (!file->seek.dir) {
+		lock_acquire(&vfs_lock);
+		file->seek.dir = file->node->sub;
+		lock_release(&vfs_lock);
+	}
+
+	if (!file->seek.dir) {
+		return FS_STATUS_EOF;
+	}
+
+	kmemcpy(buffer, file->seek.dir->name, file->seek.dir->name_len);
+	buffer[file->seek.dir->name_len] = 0;
+
+	lock_acquire(&vfs_lock);
+	file->seek.dir = file->seek.dir->co;
+	lock_release(&vfs_lock);
+
+	return FS_STATUS_OK;
+}
+
+enum fs_status_t fs_create(struct fs_file_t* file, enum fs_file_type_t type, const char* name) {
+	uint8_t name_len;
+	for (name_len = 0; name[name_len]; name_len++); //TODO: use strlen
+
+	lock_acquire(&vfs_lock);
+	struct fs_file_handle_t* handle = file->node->mount->create(file->node->handle, type, name, name_len);
+
+	if (!handle) {
+		lock_release(&vfs_lock);
+		return FS_STATUS_ERROR;
+	}
+
+	struct fs_node_t* node = init_node(file->node, handle, name, name_len);
+	node->co = file->node->sub;
+	file->node->sub = node;
 
 	lock_release(&vfs_lock);
 	return FS_STATUS_OK;
