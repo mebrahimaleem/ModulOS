@@ -20,92 +20,38 @@
 
 #include <stdint.h>
 #include <stddef.h>
-/*
-struct fs_dir_handle_t;
 
-enum fs_status_t {
-	FS_STATUS_OK,
-	FS_STATUS_ERROR
+struct mount_cntx_t;
+
+struct file_handle_t;
+struct dir_handle_t;
+
+enum file_status_t {
+	FILE_OK,
+	FILE_ERROR,
+	FILE_DNE,
+	FILE_BUSY,
+	FILE_NO_SUPPORT
 };
 
-struct fs_stat_buf_t {
+struct file_info_t {
+	enum {
+		FILE_TYPE_REG,
+		FILE_TYPE_DIR
+	} type;
+	uint64_t size;
 };
 
-typedef enum fs_status_t (*fs_stat_t)(const char* path, struct fs_stat_buf_t* stat_buf);
-typedef struct fs_dir_handle_t* (*fs_opendir_t)(const char* path);
-typedef void (*fs_closedir_t)(struct fs_dir_handle_t* handle);
-typedef enum fs_status_t (*fs_readdir_t)(struct fs_dir_handle_t* handle, const char** name);
+typedef enum file_status_t (*fs_stat_t)(struct mount_cntx_t* cntx, const char*, struct file_info_t*);
 
-extern void fs_init(void);
+enum file_status_t fs_stat(const char* name, struct file_info_t* info);
 
-extern void fs_mount(
-		const char* path,
-		fs_stat_t stat,
-		fs_opendir_t opendir,
-		fs_closedir_t closedir,
-		fs_readdir_t readdir);
-*/
+void fs_init(void);
 
-/* old interface */
-
-enum fs_file_type_t {
-	FS_TYPE_FILE,
-	FS_TYPE_DIR
-};
-
-enum fs_status_t {
-	FS_STATUS_OK,
-	FS_STATUS_ERROR,
-	FS_STATUS_EOF,
-	FS_STATUS_FILE_NOT_FOUND,
-	FS_STATUS_BUSY
-};
-
-struct fs_info_t {
-	enum fs_file_type_t type;
-	size_t size;
-};
-
-struct fs_ls_info_t {
-	struct fs_file_handle_t* handle;
-	char name[256];
-	uint8_t name_len;
-	uint8_t valid;
-};
-
-struct fs_file_t;
-struct fs_file_handle_t;
-struct fs_dirls_handle_t;
-
-extern void fs_init(void);
-
-
-typedef struct fs_file_open_handle_t* (*fs_open_t)(struct fs_file_handle_t* handle);
-typedef void (*fs_close_t)(struct fs_file_open_handle_t* handle);
-
-typedef enum fs_status_t (*fs_stat_t)(struct fs_file_open_handle_t* handle, struct fs_info_t* info);
-typedef enum fs_status_t (*fs_read_dir_t)(struct fs_file_open_handle_t* handle, struct fs_file_handle_t** file, char* name);
-
-typedef struct fs_file_handle_t* (*fs_create_t)(
-		struct fs_file_handle_t* handle,
-		enum fs_file_type_t type,
-		const char* name,
-		uint8_t name_len);
-
-extern void fs_init(void);
-
-extern enum fs_status_t fs_mount(
-		struct fs_file_handle_t* root,
-		const char* path,
-		fs_open_t open,
-		fs_close_t close,
-		fs_stat_t stat,
-		fs_read_dir_t read_dir);
-
-extern struct fs_file_t* fs_open(const char* path);
-extern void fs_close(struct fs_file_t* file);
-
-extern enum fs_status_t fs_stat(struct fs_file_t* file, struct fs_info_t* info);
-extern enum fs_status_t fs_read_dir(struct fs_file_t* file, char* buffer);
+enum file_status_t fs_mount(
+		const char* mountpoint,
+		struct mount_cntx_t* cntx,
+		fs_stat_t stat
+		);
 
 #endif /* KERNEL_CORE_FS_H */

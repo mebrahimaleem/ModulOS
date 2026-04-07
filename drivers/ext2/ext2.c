@@ -186,6 +186,10 @@ static void* read_block(uint64_t block, struct ext2_t* ext2) {
 
 	const uint64_t lba = ext2->start_lba + block * block_size / SECTOR_SIZE;
 
+	if (lba > ext2->end_lba) {
+		logging_log_error("Attempt to read beyond ext2 end lba (0x%x > 0x%x)", lba, ext2->end_lba);
+	}
+
 	if (disk_read(ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
 		logging_log_error("Failed to read");
 		kfree(buffer);
@@ -372,115 +376,35 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 	return BLOCK_LAST;
 }
 
-static enum fs_status_t ext2_stat(struct fs_file_handle_t* file, struct fs_info_t* info) {
+static enum file_status_t ext2_stat(struct mount_cntx_t* cntx, const char* path, struct file_info_t* info) {
+	struct ext2_inode_handle_t inode_handle;
 	struct ext2_inode_t inode;
-	
-	if (get_inode((struct ext2_inode_handle_t*)file, &inode)) {
-		return FS_STATUS_ERROR;
-	}
 
-	info->size = (uint32_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	inode_handle.ext2 = (struct ext2_t*)cntx;
+	inode_handle.inode_index = 2;
+	(void)path;
+
+	if (get_inode(&inode_handle, &inode)) {
+		return FILE_ERROR;
+	}
 
 	if (inode.i_mode & EXT2_S_IFREG) {
-		info->type = FS_TYPE_FILE;
+		info->type = FILE_TYPE_REG;
 	}
 	else if (inode.i_mode & EXT2_S_IFDIR) {
-		info->type = FS_TYPE_DIR;
+		info->type = FILE_TYPE_DIR;
 	}
 	else {
-		return FS_STATUS_ERROR;
+		return FILE_NO_SUPPORT;
 	}
 
-	return FS_STATUS_OK;
-}
+	info->size = inode.i_size;
 
-static struct fs_dirls_handle_t* ext2_dirst(struct fs_file_handle_t* handle) {
-	struct ext2_inode_t inode;
-	
-	if (get_inode((struct ext2_inode_handle_t*)handle, &inode)) {
-		return 0;
-	}
-
-	struct ext2_dir_track_t* dir_track = kmalloc(sizeof(struct ext2_dir_track_t));	
-	dir_track->handle = (struct ext2_inode_handle_t*)handle;
-	dir_track->dir = inode;
-	dir_track->off = 0;
-	dir_track->block = 0;
-	return (struct fs_dirls_handle_t*)dir_track;
-}
-
-static enum fs_status_t ext2_dirls(struct fs_dirls_handle_t** handle, struct fs_ls_info_t* file) {
-	struct ext2_dir_track_t* dt = (struct ext2_dir_track_t*)*handle;
-
-	const struct ext2_superblock_t* superblock = dt->handle->ext2->superblock;
-
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
-
-	if (dt->off >= block_size) {
-		dt->block++;
-		dt->off = 0;
-	}
-
-	uint64_t block_index;
-	uint8_t res = get_block_index_dir(dt, &block_index);
-
-	if (res == BLOCK_RETRY) {
-		file->valid = 0;
-		dt->off = 0;
-		return FS_STATUS_OK;
-	}
-
-	if (res == BLOCK_LAST) {
-		file->valid = 0;
-		return FS_STATUS_EOF;
-	}
-
-	if (res == BLOCK_ERROR) {
-		file->valid = 0;
-		return FS_STATUS_ERROR;
-	}
-
-	void* buffer = read_block(block_index, dt->handle->ext2);
-
-	if (!buffer) {
-		logging_log_error("Failed to read");
-		return FS_STATUS_ERROR;
-	}
-
-	struct ext2_ll_dir_entry_t* entry =
-		(struct ext2_ll_dir_entry_t*)((uint64_t)buffer + dt->off);
-
-	logging_log_info("directory entry %x, %x, %x", entry->inode, entry->name_len, entry->rec_len);
-
-	if (entry->inode != 0) {
-		if (entry->name[0] == '.' && (entry->name_len == 1 || (entry->name_len == 2 && entry->name[1] == '.'))) {
-			file->valid = 0;
-		}
-
-		else {
-			kmemcpy(file->name, entry->name, entry->name_len);
-			file->name_len = entry->name_len;
-			struct ext2_inode_handle_t* hndl = kmalloc(sizeof(struct ext2_inode_handle_t));
-			hndl->ext2 = dt->handle->ext2;
-			hndl->inode_index = entry->inode;
-			file->handle = (struct fs_file_handle_t*)hndl;
-			file->valid = 1;
-		}
-	}
-
-	dt->off += entry->rec_len;
-
-	kfree(buffer);
-	return FS_STATUS_OK;
-}
-
-static void ext2_diren(struct fs_dirls_handle_t* handle) {
-	kfree(handle);
+	return FILE_OK;
 }
 
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
-	struct ext2_inode_handle_t* root_handle;
 	struct ext2_bg_desc_t* bgdt;
 	uint64_t bgdt_size, adj, bgdt_start_lba;
 
@@ -513,45 +437,34 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 
 	logging_log_info("Found ext2 filesystem %16.16s", superblock->s_volume_name);
 
-	root_handle = kmalloc(sizeof(struct ext2_inode_handle_t));
-	root_handle->ext2 = kmalloc(sizeof(struct ext2_t));
-	root_handle->ext2->start_lba = start_lba;
-	root_handle->ext2->end_lba = end_lba;
-	root_handle->ext2->superblock = superblock;
-	root_handle->ext2->bgdt = bgdt;
-	root_handle->ext2->disk = disk;
-	root_handle->inode_index = EXT2_ROOT_INO;
+	struct ext2_t* ext2 = kmalloc(sizeof(struct ext2_t));
+	ext2->start_lba = start_lba;
+	ext2->end_lba = end_lba;
+	ext2->superblock = superblock;
+	ext2->bgdt = bgdt;
+	ext2->disk = disk;
 
 	logging_log_debug("ext2 blocks: 0x%x x 0x%x (0x%lX)",
 			1024u << superblock->s_log_block_size, superblock->s_blocks_count,
 			(uint64_t)(1024u << superblock->s_log_block_size) * (uint64_t)superblock->s_blocks_count);
 
 	if (!kmemcmp(label_rootfs, superblock->s_volume_name, sizeof(superblock->s_volume_name))) {
-		if (fs_mount((struct fs_file_handle_t*)root_handle, "/",
-					ext2_open,
-					ext2_close,
-					ext2_stat,
-					ext2_read_dir,
-					) != FS_STATUS_OK) {
+		if (fs_mount(
+					"/",
+					(struct mount_cntx_t*)ext2,
+					ext2_stat
+					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);
 		}
 
-		struct fs_file_t* root_file = fs_open("/.");
-		if (!root_file) {
-			logging_log_error("Failed to open root directory");
-			panic(PANIC_STATE);
+		struct file_info_t stat_buf;
+		enum file_status_t sts;
+		if ((sts = fs_stat("/.", &stat_buf)) != FILE_OK) {
+			logging_log_error("Failed to stat root directory %u", sts);
 		}
 
-		struct fs_info_t root_file_info;
-		if (fs_stat(root_file, &root_file_info) != FS_STATUS_OK) {
-			logging_log_error("Failed to stat root directory");
-			panic(PANIC_STATE);
-		}
-
-		logging_log_debug("Root directory (0x%lx) (%u)", root_file_info.size, root_file_info.type);
-
-		fs_close(root_file);
+		logging_log_debug("Root directory %u (%u)", stat_buf.size, stat_buf.type);
 	}
 
 	//TODO: mount other volumes
