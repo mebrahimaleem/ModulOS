@@ -38,4 +38,6 @@ extern void cpu_halt_loop(void) __attribute__((noreturn));
 
 extern void cpu_trap(void);
 
+extern uint64_t read_cr2(void);
+
 #endif /* KERNEL_CORE_CPU_INSTR_H */

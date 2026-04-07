@@ -44,6 +44,13 @@ extern uint64_t kernel_pml4[512];
 
 static uint8_t paging_lock;
 
+struct addr_list_t {
+	struct addr_list_t* next;
+	uint64_t addr;
+};
+
+static struct addr_list_t* stack_guard_list;
+
 static enum page_size_t page_walk(uint64_t vaddr, uint64_t** access) {
 	uint64_t entry;
 	*access = (uint64_t*)paging_ident((uint64_t)&kernel_pml4[0]);
@@ -83,6 +90,8 @@ static enum page_size_t page_walk(uint64_t vaddr, uint64_t** access) {
 
 void paging_init(void) {
 	lock_init(&paging_lock);
+
+	stack_guard_list = 0;
 }
 
 uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size) {
@@ -150,9 +159,45 @@ uint64_t paging_ident(uint64_t paddr) {
 }
 
 void paging_install_guard(uint64_t vaddr) {
-	//TODO, and install ISR
+	struct addr_list_t* guard = kmalloc(sizeof(struct addr_list_t));
+	guard->addr = vaddr & PAGE_ADDR_MASK;
+
+	lock_acquire(&paging_lock);
+	guard->next = stack_guard_list;
+	stack_guard_list = guard;
+	lock_release(&paging_lock);
 }
 
 void paging_remove_guard(uint64_t vaddr) {
-	//TODO
+	struct addr_list_t* i, ** prev = &stack_guard_list;
+
+	lock_acquire(&paging_lock);
+	for (i = stack_guard_list; i; i = i->next) {
+		if (i->addr == vaddr) {
+			*prev = i->next;
+			kfree(i);
+			break;
+		}
+
+		prev = &i->next;
+	}
+
+	lock_release(&paging_lock);
+}
+
+uint8_t paging_check_guard(uint64_t vaddr) {
+	struct addr_list_t* i;
+	uint64_t addr = vaddr & PAGE_ADDR_MASK;
+	uint8_t ret = 0;
+
+	lock_acquire(&paging_lock);
+	for (i = stack_guard_list; i; i = i->next) {
+		if (i->addr == addr) {
+			ret = 1;
+			break;
+		}
+	}
+	lock_release(&paging_lock);
+
+	return ret;
 }

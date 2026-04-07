@@ -151,22 +151,22 @@ void apic_init(void) {
 
 		paging_map(
 				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 1,
-				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 1,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 0,
 				PAGE_PRESENT | PAGE_RW,
 				PAGE_4K);
 		paging_map(
 				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 2,
-				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 2,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 1,
 				PAGE_PRESENT | PAGE_RW,
 				PAGE_4K);
 		paging_map(
 				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 3,
-				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 3,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 2,
 				PAGE_PRESENT | PAGE_RW,
 				PAGE_4K);
 		paging_map(
 				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 4,
-				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 4,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 3,
 				PAGE_PRESENT | PAGE_RW,
 				PAGE_4K);
 		paging_install_guard(init_stacks_vaddr[num_apic]);

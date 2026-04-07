@@ -49,5 +49,6 @@ extern uint64_t paging_ident(uint64_t paddr);
 
 extern void paging_install_guard(uint64_t vaddr);
 extern void paging_remove_guard(uint64_t vaddr);
+extern uint8_t paging_check_guard(uint64_t vaddr);
 
 #endif /* KERNEL_CORE_PAGING_H */

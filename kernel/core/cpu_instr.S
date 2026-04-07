@@ -61,3 +61,8 @@ jmp cpu_halt_loop
 cpu_trap:
 // setting a breakpoint here will catch traps
 ret
+
+.globl read_cr2
+read_cr2:
+movq %cr2, %rax
+ret

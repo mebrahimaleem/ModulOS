@@ -209,10 +209,10 @@ void multiboot2_init(struct mb2_info_t* info) {
 	init_stack_paddr = mm_alloc_p(PAGE_SIZE_4K * 4);
 	init_stack_vaddr = mm_alloc_v(PAGE_SIZE_4K * 5);
 
-	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 1, init_stack_paddr + PAGE_SIZE_4K * 1, PAGE_PRESENT | PAGE_RW, PAGE_4K);
-	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 2, init_stack_paddr + PAGE_SIZE_4K * 2, PAGE_PRESENT | PAGE_RW, PAGE_4K);
-	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 3, init_stack_paddr + PAGE_SIZE_4K * 3, PAGE_PRESENT | PAGE_RW, PAGE_4K);
-	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 4, init_stack_paddr + PAGE_SIZE_4K * 4, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 1, init_stack_paddr + PAGE_SIZE_4K * 0, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 2, init_stack_paddr + PAGE_SIZE_4K * 1, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 3, init_stack_paddr + PAGE_SIZE_4K * 2, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 4, init_stack_paddr + PAGE_SIZE_4K * 3, PAGE_PRESENT | PAGE_RW, PAGE_4K);
 	paging_install_guard(init_stack_vaddr);
 
 	boot_context.gdt = &gdt;

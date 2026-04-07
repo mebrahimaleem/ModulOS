@@ -22,6 +22,7 @@
 
 #define IST_ABORT	1
 #define IST_SCHED	2
+#define IST_PF		3
 
 struct tss_t {
 	uint32_t resv0;

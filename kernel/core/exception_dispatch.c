@@ -20,6 +20,10 @@
 #include <core/exception_dispatch.h>
 #include <core/logging.h>
 #include <core/panic.h>
+#include <core/paging.h>
+#include <core/cpu_instr.h>
+
+#define VECTOR_PF	0xE
 
 void exception_dispatch(struct exception_context_t* context) {
 	//TODO: remove reduntant rsp push
@@ -35,6 +39,16 @@ void exception_dispatch(struct exception_context_t* context) {
 			context->r8, context->r9, context->r10, context->r11,
 			context->r12, context->r13, context->r14, context->r15,
 			context->rflags, context->cs, context->ss, context->rip);
+
+	switch (context->vector) {
+		case VECTOR_PF:
+			if (paging_check_guard(read_cr2())) {
+				logging_log_error("Stack Overflow");
+			}
+			break;
+		default:
+			break;
+	}	
 
 	panic(PANIC_STATE);
 }

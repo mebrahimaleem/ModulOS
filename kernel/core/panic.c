@@ -40,5 +40,6 @@ void panic(enum panic_code_t code) {
 #ifdef DEBUG
 	cpu_trap();
 #endif /* DEBUG */
-	process_kill_current();
+
+	cpu_halt_loop();
 }
