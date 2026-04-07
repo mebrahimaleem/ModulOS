@@ -24,6 +24,7 @@
 #include <core/lock.h>
 #include <core/logging.h>
 #include <core/panic.h>
+#include <core/cpu_instr.h>
 
 #include <lib/mergesort.h>
 
@@ -184,9 +185,15 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, u
 	if (WITHIN_NODE(base, node->base, node->limit)) {
 		if (root == p_tree) {
 			logging_log_warning("Double free @ 0x%lx on p_tree", base);
+#ifdef DEBUG
+			cpu_trap();
+#endif /* DEBUG */
 		}
 		else {
 			logging_log_warning("Double free @ 0x%lx on v_tree", base);
+#ifdef DEBUG
+			cpu_trap();
+#endif /* DEBUG */
 		}
 	}
 	else if (base < node->base) {

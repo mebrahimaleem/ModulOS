@@ -37,5 +37,8 @@ void panic(enum panic_code_t code) {
 	logging_log_error("Panic 0x%lX %s", (uint64_t)code, 
 			panic_names[code] ? panic_names[code] : panic_names[PANIC_UNK]);
 
+#ifdef DEBUG
+	cpu_trap();
+#endif /* DEBUG */
 	process_kill_current();
 }

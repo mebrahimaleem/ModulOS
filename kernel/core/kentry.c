@@ -55,6 +55,12 @@ extern uint8_t ap_bootstrap_end;
 extern volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
 extern uint8_t* ap_init_locks;
 
+extern uint64_t init_stack_vaddr;
+extern uint64_t init_stack_paddr;
+
+extern uint64_t* init_stacks_paddr;
+extern uint64_t* init_stacks_vaddr;
+
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
 
@@ -66,7 +72,7 @@ void kentry(void) {
 
 	logging_log_debug("TSS and IDT init");
 	tss_init((void*)paging_ident((uint64_t)boot_context.gdt));
-	process_init(0);
+	process_init(init_stack_vaddr, init_stack_paddr);
 	idt_init();
 	scheduler_init();
 	logging_log_debug("TSS and IDT init done");
@@ -127,7 +133,7 @@ void kapentry(uint64_t arb_id) {
 
 	logging_log_debug("AP TSS and IDT init");
 	tss_init(ap_gdts[proc_data_get()->arb_id]);
-	process_init_ap(init_stacks[arb_id] - INIT_STACK_SIZE);
+	process_init_ap(init_stacks_vaddr[arb_id], init_stacks_paddr[arb_id]);
 	idt_init_ap();
 	logging_log_debug("AP TSS and IDT init done");
 

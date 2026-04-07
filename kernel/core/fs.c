@@ -25,17 +25,154 @@
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemcpy.h>
+#include <lib/kstrcmp.h>
+#include <lib/kstrcpy.h>
+#include <lib/kstrlen.h>
+/*
+struct vfs_mount_t {
+	fs_stat_t stat;
+	fs_opendir_t opendir;
+	fs_closedir_t closedir;
+};
 
-#define VFS_STATUS_CONSISTENT	0x1
-#define VFS_STATUS_MOUNTED		0x2
+struct vfs_node_t {
+	struct vfs_node_t* co;
+	struct vfs_node_t* sub;
+
+	const char* name;
+	struct vfs_mount_t* mount;
+};
+
+static struct vfs_node_t vfs_root;
+static struct vfs_mount_t vfs_mount;
+static uint8_t vfs_lock;
+
+static inline const char* simplify_path(const char* path) {
+	while (
+			*path == '/' ||
+			(*path == '.' && (*(path+1) == '/' || !*(path+1)))) {
+		path++;
+	}
+
+	return path;
+}
+
+static inline const char* path_next(const char* path, uint8_t* len) {
+	*len = 0;
+
+	while (*path && *path != '/') {
+		path++;
+		(*len)++;
+	}
+
+	return simplify_path(path);
+}
+
+static struct vfs_node_t* resolve_sub_path(struct vfs_node_t* root, const char* path) {
+	struct vfs_node_t* walk, * node;
+	const char* next = path;
+	uint8_t len;
+
+	path = path_next(path, &len);
+
+	for (walk = root->sub; walk; walk = walk->co) {
+		if (len == kstrlen(walk->name) && kmemcmp(walk->name, next, len) == 0) {
+			if (*next) {
+				return resolve_sub_path(walk, path);
+			}
+
+			return walk;
+		}
+	}
+
+	struct fs_file_open_handle_t* file = root->mount->opendir(root->handle);
+
+	if (!file) {
+		return 0;
+	}
+
+	char* buffer = kmalloc(256);
+	struct fs_file_handle_t* handle;
+	while (root->mount->read_dir(file, &handle, buffer) == FS_STATUS_OK) {
+		if (kstrcmp(buffer, next) == 0) {
+			walk = init_node(root, handle, buffer);
+			if (!walk) {
+				kfree(buffer);
+				return 0;
+			}
+
+			walk->co = root->sub;
+			root->sub = walk;
+
+			root->mount->close(file);
+
+			if (*next) {
+				node = resolve_sub_path(walk, path);
+				if (node) {
+					walk->accesses++;
+					return node;
+				}
+				return 0;
+			}
+
+			walk->accesses++;
+			return walk;
+		}
+	}
+
+
+	root->mount->close(file);
+	kfree(buffer);
+	return 0;
+}
+
+static struct fs_node_t* resolve_absolute_path(const char* path) {
+	path = simplify_path(path);
+
+	if (kstrcmp(path, "") == 0) {
+		return &vfs_root;
+	}
+
+	return resolve_sub_path(&vfs_root, path);
+}
+
+void fs_init(void) {
+	vfs_root.co = 0;
+	vfs_root.sub = 0;
+	vfs_root.name = "";
+	vfs_root.mount = 0;
+
+	lock_init(&vfs_lock);
+}
+
+void fs_mount(
+		const char* path,
+		fs_stat_t stat,
+		fs_opendir_t opendir,
+		fs_closedir_t closedir) {
+}
+
+
+
+*/
+
+
+
+
+
+
+
+
+/* old implementation */
+
+#define VFS_STATUS_MOUNTED		0x1
 
 struct fs_mount_t {
 	struct fs_mount_t* parent;
+	fs_open_t open;
+	fs_close_t close;
 	fs_stat_t stat;
-	fs_dirst_t dirst;
-	fs_dirls_t dirls;
-	fs_diren_t diren;
-	fs_create_t create;
+	fs_read_dir_t read_dir;
 };
 
 struct fs_node_t {
@@ -49,176 +186,117 @@ struct fs_node_t {
 
 	uint64_t accesses;
 
-	char* name;
+	const char* name;
 
 	struct fs_info_t info;
 
-	uint8_t name_len;
 	uint8_t status;
 };
 
-struct fs_file_t {
-	struct fs_node_t* node;
-	struct fs_info_t info;
-	union {
-		uint64_t off;
-		struct fs_node_t* dir;
-	} seek;
+struct vfs_file_open_handle_t {
+	struct fs_node_t* walk;
 };
 
-enum node_res_t {
-	NODE_RES_TRUE,
-	NODE_RES_FALSE,
-	NODE_RES_LAST,
-	NODE_RES_PARENT,
-};
+static struct fs_file_open_handle_t* vfs_open(struct fs_file_handle_t* handle) {
+	struct fs_node_t* node = (struct fs_node_t*)handle;
+	struct vfs_file_open_handle_t* open;
 
-static enum fs_status_t vfs_stat(struct fs_file_handle_t* handle, struct fs_info_t* info) {
+	open = kmalloc(sizeof(struct vfs_file_open_handle_t));
+	open->walk = node->sub;
+	return (struct fs_file_open_handle_t*)open;
+}
+
+static void vfs_close(struct fs_file_open_handle_t* handle) {
+	kfree(handle);
+}
+
+static enum fs_status_t vfs_stat(struct fs_file_open_handle_t* handle, struct fs_info_t* info) {
 	(void)handle;
-
 	info->size = 0;
 	info->type = FS_TYPE_DIR;
 
 	return FS_STATUS_OK;
 }
 
-static struct fs_dirls_handle_t* vfs_dirst(struct fs_file_handle_t* handle) {
-	struct fs_node_t* node = (struct fs_node_t*)handle;
-	return (struct fs_dirls_handle_t*)node->sub;
-}
-
-static enum fs_status_t vfs_dirls(struct fs_dirls_handle_t** handle, struct fs_ls_info_t* file) {
-	if (!handle) {
+static enum fs_status_t vfs_read_dir(struct fs_file_open_handle_t* handle, struct fs_file_handle_t** file, char* name) {
+	struct vfs_file_open_handle_t* open = (struct vfs_file_open_handle_t*)handle;
+	if (!open->walk) {
 		return FS_STATUS_EOF;
 	}
 
-	struct fs_node_t* walk = (struct fs_node_t*)*handle;
+	*file = open->walk->handle;
+	kstrcpy(name, open->walk->name);
 
-	file->handle = (struct fs_file_handle_t*)walk;
-	kmemcpy(file->name, walk->name, walk->name_len);
-	file->name_len = walk->name_len;
-
-	*handle = (struct fs_dirls_handle_t*)walk->co;
-
+	open->walk = open->walk->co;
 	return FS_STATUS_OK;
-}
-
-static void vfs_diren(struct fs_dirls_handle_t* handle) {
-	(void)handle;
-}
-
-static struct fs_file_handle_t* vfs_create(
-		struct fs_file_handle_t* handle,
-		enum fs_file_type_t type,
-		const char* name,
-		uint8_t name_len) {
-	(void)handle;
-	(void)type;
-	(void)name;
-	(void)name_len;
-
-	logging_log_error("Attempted to create virtual file %s (%u)", name, type);
-	return 0;
 }
 
 static struct fs_mount_t vfs_mount = {
 	.parent = &vfs_mount,
+	.open = vfs_open,
+	.close = vfs_close,
 	.stat = vfs_stat,
-	.dirst = vfs_dirst,
-	.dirls = vfs_dirls,
-	.diren = vfs_diren,
-	.create = vfs_create,
+	.read_dir = vfs_read_dir
 };
 
-static uint8_t vfs_lock;
 static struct fs_node_t vfs_root;
+
+static uint8_t vfs_lock;
 
 void fs_init(void) {
 	lock_init(&vfs_lock);
 
-	vfs_root.sub = 0;
+	vfs_root.handle = (struct fs_file_handle_t*)&vfs_root;
 	vfs_root.co = 0;
+	vfs_root.sub = 0;
 	vfs_root.parent = &vfs_root;
 	vfs_root.mount = &vfs_mount;
-	vfs_root.name = (char*)"";
-	vfs_root.status = VFS_STATUS_CONSISTENT;
-	vfs_root.name_len = 0;
-	vfs_root.handle = (struct fs_file_handle_t*)&vfs_root;
+	vfs_root.name = "";
+	vfs_root.status = 0;
 	vfs_root.accesses = 1;
 	vfs_root.info.size = 0;
 	vfs_root.info.type = FS_TYPE_DIR;
 }
 
 static inline struct fs_node_t* init_node(
-		struct fs_node_t* node,
+		struct fs_node_t* parent,
 		struct fs_file_handle_t* handle,
-		const char* name,
-		uint8_t name_len) {
+		const char* name) {
+
+	struct fs_node_t* node;
 	enum fs_status_t status;
 	struct fs_info_t info;
 
-	if ((status = node->mount->stat(handle, &info)) != FS_STATUS_OK) {
+	struct fs_file_open_handle_t* open = parent->mount->open(handle);
+
+	if (!open) {
 		return 0;
 	}
 
-	struct fs_node_t* sub = kmalloc(sizeof(struct fs_node_t));
+	status = parent->mount->stat(open, &info);
+	parent->mount->close(open);
 
-	sub->accesses = 0;
-	sub->co = 0;
-	sub->handle = handle;
-	sub->mount = node->mount;
-	sub->name_len = name_len;
-	sub->name = kmalloc(name_len + 1);
-	kmemcpy(sub->name, name, name_len);
-	sub->name[name_len] = 0;
-	sub->parent = node;
-	sub->status = 0;
-	sub->sub = 0;
-	sub->info = info;
+	if (status != FS_STATUS_OK) {
+		return 0;
+	}
 
-	return sub;
+
+	node = kmalloc(sizeof(struct fs_node_t));
+
+	node->handle = handle;
+	node->co = 0;
+	node->sub = 0;
+	node->parent = parent;
+	node->mount = parent->mount;
+	node->name = name;
+	node->status = 0;
+	node->accesses = 0;
+	node->info = info;
+
+	return node;
 }
 
-static inline enum fs_status_t assert_consistent(struct fs_node_t* node, uint8_t clear) {
-	if (node->status & VFS_STATUS_CONSISTENT) {
-		return FS_STATUS_OK;
-	}
-
-	if (node->sub && clear) {
-		logging_log_error("Detected corrupt vfs state. Inconsistent non-leaf node");
-		panic(PANIC_STATE);
-	}	
-
-	struct fs_ls_info_t file;
-	struct fs_dirls_handle_t* handle = node->mount->dirst(node->handle);
-
-	if (!handle) {
-		return FS_STATUS_ERROR;
-	}
-
-	while (node->mount->dirls(&handle, &file) == FS_STATUS_OK) {
-		if (!file.valid) {
-			continue;
-		}
-		
-		struct fs_node_t* temp = init_node(node, file.handle, file.name, file.name_len);
-		if (!temp) {
-			node->mount->diren(handle);
-			return FS_STATUS_ERROR;
-		}
-
-		temp->co = node->sub;
-		node->sub = temp;
-	}
-
-	node->mount->diren(handle);
-
-	node->status |= VFS_STATUS_CONSISTENT;
-
-	return FS_STATUS_OK;
-}
-
-static inline const char* simplify_path(const char* path) {
+static const inline char* simplify_path(const char* path) {
 	while (
 			*path == '/' ||
 			(*path == '.' && (*(path+1) == '/' || !*(path+1)))) {
@@ -228,73 +306,89 @@ static inline const char* simplify_path(const char* path) {
 	return path;
 }
 
-static inline const char* check_path(struct fs_node_t* node, const char* path, enum node_res_t* res) {
-	uint8_t i = 0;
-	const char* start;
+static inline const char* path_next(const char* path, uint8_t* len) {
+	*len = 0;
 
-	for (start = path; *path && *path != '/'; path++) {
-		i++;
-	}
-	
-	path = simplify_path(path);
-
-	*res = NODE_RES_FALSE;
-
-	if (i == node->name_len && !kmemcmp(node->name, start, i)) {
-		if (!*path) {
-			*res = NODE_RES_LAST;
-		}
-		else {
-			*res = NODE_RES_TRUE;
-		}
+	while (*path && *path != '/') {
+		path++;
+		(*len)++;
 	}
 
-	if (i == 2 && !kmemcmp("..", start, i)) {
-		*res = NODE_RES_PARENT;
-	}
-
-	return path;
+	return simplify_path(path);
 }
 
-static struct fs_node_t* resolve_path(struct fs_node_t* root, const char* path) {
-	enum node_res_t res;
-	struct fs_node_t* node, * walk;
+static struct fs_node_t* resolve_sub_path(struct fs_node_t* root, const char* path) {
+	struct fs_node_t* walk, * node;
+	const char* next = path;
+	uint8_t len;
 
-	path = check_path(root, path, &res);
+	path = path_next(path, &len);
 
-	switch (res) {
-		case NODE_RES_LAST:
-			root->accesses++;
-			return root;
-
-		case NODE_RES_PARENT:
-			node = resolve_path(root->parent, path);
-			if (node) {
-				root->parent->accesses--;
-			}
-			return node;
-
-		case NODE_RES_TRUE:
-			if (root->info.type != FS_TYPE_DIR) {
-				return 0;
-			}
-
-			if (assert_consistent(root, 1) != FS_STATUS_OK) {
-				return 0;
-			}
-
-			for (walk = root->sub; walk; walk = walk->co) {
-				node = resolve_path(walk, path);
+	for (walk = root->sub; walk; walk = walk->co) {
+		if (len == kstrlen(walk->name) && kmemcmp(walk->name, next, len) == 0) {
+			if (*next) {
+				node = resolve_sub_path(walk, path);
 				if (node) {
-					root->accesses++;
+					walk->accesses++;
 					return node;
 				}
+				return 0;
 			}
-		__attribute__((fallthrough));
-		case NODE_RES_FALSE:
-		default:
-			return 0;
+
+			walk->accesses++;
+			return walk;
+		}
 	}
+
+	struct fs_file_open_handle_t* file = root->mount->open(root->handle);
+
+	if (!file) {
+		return 0;
+	}
+
+	char* buffer = kmalloc(256);
+	struct fs_file_handle_t* handle;
+	while (root->mount->read_dir(file, &handle, buffer) == FS_STATUS_OK) {
+		if (kstrcmp(buffer, next) == 0) {
+			walk = init_node(root, handle, buffer);
+			if (!walk) {
+				kfree(buffer);
+				return 0;
+			}
+
+			walk->co = root->sub;
+			root->sub = walk;
+
+			root->mount->close(file);
+
+			if (*next) {
+				node = resolve_sub_path(walk, path);
+				if (node) {
+					walk->accesses++;
+					return node;
+				}
+				return 0;
+			}
+
+			walk->accesses++;
+			return walk;
+		}
+	}
+
+
+	root->mount->close(file);
+	kfree(buffer);
+	return 0;
+}
+
+static struct fs_node_t* resolve_absolute_path(const char* path) {
+	path = simplify_path(path);
+
+	if (kstrcmp(path, "") == 0) {
+		return &vfs_root;
+	}
+
+	return resolve_sub_path(&vfs_root, path);
 }
 
 static void cleanup_path(struct fs_node_t* root, const char* path) {
@@ -306,17 +400,17 @@ static void cleanup_path(struct fs_node_t* root, const char* path) {
 extern enum fs_status_t fs_mount(
 		struct fs_file_handle_t* root,
 		const char* path,
+		fs_open_t open,
+		fs_close_t close,
 		fs_stat_t stat,
-		fs_dirst_t dirst,
-		fs_dirls_t dirls,
-		fs_diren_t diren,
-		fs_create_t create) {
+		fs_read_dir_t read_dir) {
 
 	lock_acquire(&vfs_lock);
 
-	struct fs_node_t* node = resolve_path(&vfs_root, path);
+	struct fs_node_t* node = resolve_absolute_path(path);
 
 	if (node->status & VFS_STATUS_MOUNTED) {
+		lock_release(&vfs_lock);
 		return FS_STATUS_BUSY;
 	}
 
@@ -324,11 +418,11 @@ extern enum fs_status_t fs_mount(
 	revert = *node;
 	struct fs_mount_t* mount = kmalloc(sizeof(struct fs_mount_t));
 	mount->parent = node->mount;
+
+	mount->open = open;
+	mount->close = close;
 	mount->stat = stat;
-	mount->dirst = dirst;
-	mount->dirls = dirls;
-	mount->diren = diren;
-	mount->create = create;
+	mount->read_dir = read_dir;
 
 	node->mount = mount;
 	node->handle = root;
@@ -339,122 +433,49 @@ extern enum fs_status_t fs_mount(
 	if (status != FS_STATUS_OK) {
 		kfree(mount);
 		*node = revert;
+		lock_release(&vfs_lock);
 		return status;
 	}
 
 	node->info = info;
 	
-	if ((status = assert_consistent(node, 0)) != FS_STATUS_OK) {
-		kfree(mount);
-		*node = revert;
-		return status;
-	}	
-
 	lock_release(&vfs_lock);
 	return FS_STATUS_OK;
 }
 
 struct fs_file_t* fs_open(const char* path) {
 	lock_acquire(&vfs_lock);
-	struct fs_node_t* node = resolve_path(&vfs_root, simplify_path(path));
+	struct fs_node_t* node = resolve_absolute_path(path);
 	lock_release(&vfs_lock);
 
 	if (!node) {
 		return 0;
 	}
 
-	struct fs_file_t* file = kmalloc(sizeof(struct fs_file_t));
-	file->node = node;
-	file->seek.off = 0;
-	return file;
+	return (struct fs_file_t*)node;
 }
 
 void fs_close(struct fs_file_t* file) {
-	lock_acquire(&vfs_lock);
-	cleanup_path(&vfs_root, simplify_path(file->node->name));
-	lock_release(&vfs_lock);
+	struct fs_node_t* node = (struct fs_node_t*)file;
 
-	kfree(file);
+	lock_acquire(&vfs_lock);
+	cleanup_path(&vfs_root, simplify_path(node->name));
+	lock_release(&vfs_lock);
 }
 
 enum fs_status_t fs_stat(struct fs_file_t* file, struct fs_info_t* info) {
-	*info = file->node->info;
-	return FS_STATUS_OK;
-}
-
-enum fs_status_t fs_list(struct fs_file_t* file, char* buffer) {
-
-	if (!file->seek.dir) {
-		lock_acquire(&vfs_lock);
-		file->seek.dir = file->node->sub;
-		lock_release(&vfs_lock);
-	}
-
-	if (!file->seek.dir) {
-		return FS_STATUS_EOF;
-	}
-
-	kmemcpy(buffer, file->seek.dir->name, file->seek.dir->name_len);
-	buffer[file->seek.dir->name_len] = 0;
-
-	lock_acquire(&vfs_lock);
-	file->seek.dir = file->seek.dir->co;
-	lock_release(&vfs_lock);
+	struct fs_node_t* node = (struct fs_node_t*)file;
+	*info = node->info;
 
 	return FS_STATUS_OK;
 }
 
-enum fs_status_t fs_create(struct fs_file_t* file, enum fs_file_type_t type, const char* name) {
-	uint8_t name_len;
-	for (name_len = 0; name[name_len]; name_len++); //TODO: use strlen
+enum fs_status_t fs_read_dir(struct fs_file_t* file, char* buffer) {
+	struct fs_node_t* node = (struct fs_node_t*)file;
 
 	lock_acquire(&vfs_lock);
-	struct fs_file_handle_t* handle = file->node->mount->create(file->node->handle, type, name, name_len);
-
-	if (!handle) {
-		lock_release(&vfs_lock);
-		return FS_STATUS_ERROR;
-	}
-
-	struct fs_node_t* node = init_node(file->node, handle, name, name_len);
-	node->co = file->node->sub;
-	file->node->sub = node;
-
+	enum fs_status_t sts = node->mount->read_dir(node->handle, buffer, "");
 	lock_release(&vfs_lock);
-	return FS_STATUS_OK;
+
+	return sts;
 }
-
-#ifdef DEBUG
-
-static void fs_log_tree(struct fs_node_t* node, char* prefix, size_t prefix_len) {
-	logging_log_debug("vfs tree: %s%256s (%u/0x%lx)", prefix, node->name, node->info.type, node->info.size);
-
-	if (node->info.type != FS_TYPE_DIR) {
-		return;
-	}
-
-	if (assert_consistent(node, 1) != FS_STATUS_OK) {
-		logging_log_error("Failed to log vfs tree");
-		return;
-	}
-
-	char* new_prefix = kmalloc(prefix_len + 2);
-	kmemcpy(new_prefix+2, prefix, prefix_len);
-	new_prefix[0] = new_prefix[1] = ' ';
-
-	for (struct fs_node_t* walk = node->sub; walk; walk = walk->co) {
-		fs_log_tree(walk, new_prefix, prefix_len + 2);
-	}
-
-	kfree(new_prefix);
-}
-
-void fs_log_vfs_tree(void) {
-	lock_acquire(&vfs_lock);
-
-	fs_log_tree(&vfs_root, (char*)"", 1);	
-
-	lock_release(&vfs_lock);
-}
-
-#endif /* DEBUG */

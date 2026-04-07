@@ -47,5 +47,7 @@ extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum pa
 extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
 extern uint64_t paging_ident(uint64_t paddr);
 
+extern void paging_install_guard(uint64_t vaddr);
+extern void paging_remove_guard(uint64_t vaddr);
 
 #endif /* KERNEL_CORE_PAGING_H */

@@ -148,3 +148,11 @@ void paging_unmap(uint64_t vaddr, enum page_size_t page_size) {
 uint64_t paging_ident(uint64_t paddr) {
 	return paddr + IDENT_BASE;
 }
+
+void paging_install_guard(uint64_t vaddr) {
+	//TODO, and install ISR
+}
+
+void paging_remove_guard(uint64_t vaddr) {
+	//TODO
+}

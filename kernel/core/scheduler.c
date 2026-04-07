@@ -58,8 +58,7 @@ void scheduler_run(void) {
 			process_resume(current_pcb);
 			break;
 		case SCHED_KILL:
-			kfree((void*)current_pcb->init_rsp);
-			kfree((void*)current_pcb->init_k_rsp);
+			process_discard(current_pcb);
 			break;
 		default:
 			scheduler_schedule(current_pcb);

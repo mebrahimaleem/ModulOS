@@ -450,6 +450,8 @@ static enum fs_status_t ext2_dirls(struct fs_dirls_handle_t** handle, struct fs_
 	struct ext2_ll_dir_entry_t* entry =
 		(struct ext2_ll_dir_entry_t*)((uint64_t)buffer + dt->off);
 
+	logging_log_info("directory entry %x, %x, %x", entry->inode, entry->name_len, entry->rec_len);
+
 	if (entry->inode != 0) {
 		if (entry->name[0] == '.' && (entry->name_len == 1 || (entry->name_len == 2 && entry->name[1] == '.'))) {
 			file->valid = 0;
@@ -474,14 +476,6 @@ static enum fs_status_t ext2_dirls(struct fs_dirls_handle_t** handle, struct fs_
 
 static void ext2_diren(struct fs_dirls_handle_t* handle) {
 	kfree(handle);
-}
-
-static struct fs_file_handle_t* ext2_create(
-		struct fs_file_handle_t* handle,
-		enum fs_file_type_t type,
-		const char* name,
-		uint8_t name_len) {
-	return 0;
 }
 
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
@@ -534,11 +528,10 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 
 	if (!kmemcmp(label_rootfs, superblock->s_volume_name, sizeof(superblock->s_volume_name))) {
 		if (fs_mount((struct fs_file_handle_t*)root_handle, "/",
+					ext2_open,
+					ext2_close,
 					ext2_stat,
-					ext2_dirst,
-					ext2_dirls,
-					ext2_diren,
-					ext2_create
+					ext2_read_dir,
 					) != FS_STATUS_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);
@@ -560,8 +553,6 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 
 		fs_close(root_file);
 	}
-
-	fs_log_vfs_tree();
 
 	//TODO: mount other volumes
 

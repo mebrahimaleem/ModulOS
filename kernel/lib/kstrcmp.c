@@ -1,5 +1,5 @@
-/* cpu_instr.h - cpu instruction interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* kstrcmp.c - kernel string compare implementation */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,27 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_CPU_INSTR_H
-#define KERNEL_CORE_CPU_INSTR_H
+#include <lib/kstrcmp.h>
 
-#include <stdint.h>
+int kstrcmp(const char* s1, const char* s2) {
+	while (*s1 && *s2 && *s1 == *s2) {
+		s1++;
+		s2++;
+	}
 
-extern void cpu_lidt(uint64_t idt_ptr);
-
-extern void cpu_ltr_28(void);
-
-extern void cpu_cli(void);
-
-extern void cpu_sti(void);
-
-extern void cpu_pause(void);
-
-extern void cpu_invlpg(uint64_t addr);
-
-extern void cpu_wait_loop(void) __attribute__((noreturn));
-
-extern void cpu_halt_loop(void) __attribute__((noreturn));
-
-extern void cpu_trap(void);
-
-#endif /* KERNEL_CORE_CPU_INSTR_H */
+	return (int)(*s1 - *s2);
+}

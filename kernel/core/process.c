@@ -26,11 +26,15 @@
 #include <core/cpu_instr.h>
 #include <core/gdt.h>
 #include <core/scheduler.h>
+#include <core/paging.h>
+#include <core/mm.h>
 
 #include <drivers/apic/apic_regs.h>
 
 #define INIT_RFLG				0x200
 #define INIT_STACK_SIZE 0x4000
+
+// change manual paging map when adjusting stack size
 
 static uint64_t next_pid;
 static uint8_t lock_proc;
@@ -40,10 +44,10 @@ __attribute__((noreturn)) static void function_setup(process_function_t func, vo
 	process_kill_current();
 }
 
-void process_init(uint64_t init_rsp) {
+void process_init(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	next_pid = 1;
 	lock_init(&lock_proc);
-	process_init_ap(init_rsp);
+	process_init_ap(init_rsp_vaddr, init_rsp_paddr);
 }
 
 static uint64_t assign_pid(void) {
@@ -57,17 +61,45 @@ uint64_t process_get_pid(void) {
 	return proc_data_get()->current_process->pid;
 }
 
-void process_init_ap(uint64_t init_rsp) {
+void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	struct pcb_t* pcb = kmalloc(sizeof(struct pcb_t));
-	pcb->init_rsp = init_rsp;
-	pcb->init_k_rsp = 0;
+	pcb->init_rsp_vaddr = init_rsp_vaddr;
+	pcb->init_rsp_paddr = init_rsp_paddr;
+	pcb->init_k_rsp_vaddr =
+		pcb->init_k_rsp_paddr = 0;
 	pcb->sched_cntr = SCHED_SKIP;
 	proc_data_get()->current_process = pcb;
 	proc_data_get()->current_process->pid = assign_pid();
 }
 
 struct pcb_t* process_from_vaddr(uint64_t vaddr) {
-	struct pcb_t* pcb = kmalloc(sizeof(struct pcb_t));
+	struct pcb_t* pcb;
+	uint64_t stack_vaddr;
+	uint64_t stack_paddr;
+
+	stack_vaddr = mm_alloc_v(INIT_STACK_SIZE + PAGE_SIZE_4K); // extra guard page
+	if (!stack_vaddr) {
+		logging_log_error("Failed to allocate stack");
+		panic(PANIC_NO_MEM);
+	}
+
+	stack_paddr = mm_alloc_p(INIT_STACK_SIZE);
+	if (!stack_paddr) {
+		mm_free_v(stack_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
+		logging_log_error("Failed to allocate stack");
+		panic(PANIC_NO_MEM);
+	}
+
+	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
+	// add for increased stack size
+	paging_map(stack_vaddr + 1 * PAGE_SIZE_4K, stack_paddr + 0 * PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(stack_vaddr + 2 * PAGE_SIZE_4K, stack_paddr + 1 * PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(stack_vaddr + 3 * PAGE_SIZE_4K, stack_paddr + 2 * PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(stack_vaddr + 4 * PAGE_SIZE_4K, stack_paddr + 3 * PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	// leave last page unmapped as guard
+	paging_install_guard(stack_vaddr);
+
+	pcb = kmalloc(sizeof(struct pcb_t));
 
 	pcb->rax =
 		pcb->rbx =
@@ -85,10 +117,12 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 		pcb->r14 =
 		pcb->r15 = 0;
 
-	pcb->rsp =
-		pcb->init_rsp = (uint64_t)kmalloc(INIT_STACK_SIZE);
-	pcb->init_k_rsp = 0;
-	pcb->rsp += INIT_STACK_SIZE;
+	pcb->rsp = stack_vaddr + PAGE_SIZE_4K * 5;
+	pcb->init_rsp_vaddr = stack_vaddr;
+	pcb->init_rsp_paddr = stack_paddr;
+
+	pcb->init_k_rsp_vaddr =
+		pcb->init_k_rsp_paddr = 0;
 	pcb->k_rsp_lo = 0;
 	pcb->k_rsp_hi = 0;
 
@@ -125,7 +159,16 @@ void process_kill_current(void) {
 }
 
 void process_discard(struct pcb_t* pcb) {
-	kfree((void*)pcb->init_rsp);
+	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
+	paging_unmap(pcb->init_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
+	paging_unmap(pcb->init_rsp_vaddr + 2 * PAGE_SIZE_4K, PAGE_4K);
+	paging_unmap(pcb->init_rsp_vaddr + 3 * PAGE_SIZE_4K, PAGE_4K);
+	paging_unmap(pcb->init_rsp_vaddr + 4 * PAGE_SIZE_4K, PAGE_4K);
+	paging_remove_guard(pcb->init_rsp_vaddr);
+
+	mm_free_v(pcb->init_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
+	mm_free_p(pcb->init_rsp_paddr, INIT_STACK_SIZE);
+
 	kfree(pcb);
 }
 

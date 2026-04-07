@@ -56,3 +56,8 @@ cpu_halt_loop:
 cli
 hlt
 jmp cpu_halt_loop
+
+.globl cpu_trap
+cpu_trap:
+// setting a breakpoint here will catch traps
+ret

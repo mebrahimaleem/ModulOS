@@ -96,7 +96,8 @@ extern uint8_t gdt;
 extern uint8_t gdt_end;
 extern uint8_t kernel_pml4;
 
-uint64_t* init_stacks;
+uint64_t* init_stacks_paddr;
+uint64_t* init_stacks_vaddr;
 volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
 volatile struct gdt_ptr_64_t** ap_gdt_ptr_64;
 uint8_t* ap_init_locks;
@@ -121,7 +122,8 @@ void apic_init(void) {
 	apic_init_ap();
 
 	// init stacks
-	init_stacks = kmalloc(sizeof(uint64_t*) * num_apic);
+	init_stacks_vaddr = kmalloc(sizeof(uint64_t) * num_apic);
+	init_stacks_paddr = kmalloc(sizeof(uint64_t) * num_apic);
 	proc_data_ptr = kmalloc(sizeof(struct proc_data_t*) * num_apic);
 	proc_data_ptr[0] = &bsp_proc_data;
 
@@ -132,7 +134,42 @@ void apic_init(void) {
 
 	for (--num_apic; num_apic; num_apic--) {
 		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
-		init_stacks[num_apic] = (uint64_t)kmalloc(INIT_STACK_SIZE) + INIT_STACK_SIZE;
+		init_stacks_vaddr[num_apic] = mm_alloc_v(PAGE_SIZE_4K * 5);
+
+		if (!init_stacks_vaddr[num_apic]) {
+			logging_log_error("Failed to allocate stack");
+			panic(PANIC_NO_MEM);
+		}
+
+		init_stacks_paddr[num_apic] = mm_alloc_p(PAGE_SIZE_4K * 4);
+
+		if (!init_stacks_paddr[num_apic]) {
+			logging_log_error("Failed to allocate stack");
+			mm_free_v(init_stacks_vaddr[num_apic], PAGE_SIZE_4K * 5);
+			panic(PANIC_NO_MEM);
+		}
+
+		paging_map(
+				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 1,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 1,
+				PAGE_PRESENT | PAGE_RW,
+				PAGE_4K);
+		paging_map(
+				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 2,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 2,
+				PAGE_PRESENT | PAGE_RW,
+				PAGE_4K);
+		paging_map(
+				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 3,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 3,
+				PAGE_PRESENT | PAGE_RW,
+				PAGE_4K);
+		paging_map(
+				init_stacks_vaddr[num_apic] + PAGE_SIZE_4K * 4,
+				init_stacks_paddr[num_apic] + PAGE_SIZE_4K * 4,
+				PAGE_PRESENT | PAGE_RW,
+				PAGE_4K);
+		paging_install_guard(init_stacks_vaddr[num_apic]);
 
 		ap_gdts[num_apic] = kmalloc(sizeof(struct gdt_t[GDT_NUM_ENTRIES]));
 		ap_gdt_ptr_64[num_apic] = kmalloc(sizeof(struct gdt_ptr_64_t));
@@ -315,7 +352,7 @@ void apic_start_ap(void) {
 		(uint16_t)((uint64_t)&gdt_end - (uint64_t)&gdt - 1); // gdt64 ptr
 	*(volatile uint64_t*)paging_ident(AP_ARB_BASE + 0xa) = (uint64_t)&gdt;
 	*(volatile uint32_t*)paging_ident(AP_ARB_BASE + 0x12) = (uint32_t)(uint64_t)&kernel_pml4;
-	*(volatile uint64_t*)paging_ident(AP_ARB_BASE + 0x16) = (uint64_t)init_stacks;
+	*(volatile uint64_t*)paging_ident(AP_ARB_BASE + 0x16) = (uint64_t)init_stacks_vaddr;
 
 	uint64_t handle;
 	struct acpi_madt_ics_local_apic_t* local_apic;

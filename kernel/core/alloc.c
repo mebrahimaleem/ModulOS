@@ -25,6 +25,7 @@
 #include <core/proc_data.h>
 #include <core/logging.h>
 #include <core/panic.h>
+#include <core/cpu_instr.h>
 
 #define HEADER_SIZE_MASK	0xFFFFFFFFFFFFFFF8uLL
 #define HEADER_USED				0x1uLL
@@ -151,6 +152,9 @@ void kfree(void* ptr) {
 	struct alloc_header_t* header = (struct alloc_header_t*)((uint64_t)ptr - sizeof(struct alloc_header_t));
 	if (!(header->header & HEADER_USED)) {
 		logging_log_warning("Double free @ 0x%lx", ptr);
+#ifdef DEBUG
+		cpu_trap();
+#endif /* DEBUG */
 		return;
 	}
 
