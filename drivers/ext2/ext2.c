@@ -597,6 +597,25 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	return read;
 }
 
+static uint64_t ext2_get_seek(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+
+	return inode_handle->seek_block * block_size + inode_handle->seek;
+}
+
+static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+
+	inode_handle->seek_block = seek / block_size;
+	inode_handle->seek = seek % block_size;
+
+	return FILE_OK;
+}
+
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
 	struct ext2_bg_desc_t* bgdt;
@@ -649,7 +668,9 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_open,
 					ext2_close,
 					ext2_stat,
-					ext2_read
+					ext2_read,
+					ext2_get_seek,
+					ext2_seek
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);
