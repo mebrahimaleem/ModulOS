@@ -29,6 +29,7 @@
 
 #include <kernel/lib/kmemcmp.h>
 #include <kernel/lib/kmemcpy.h>
+#include <kernel/lib/kmemset.h>
 
 #define SUPERBLOCK_LBA			2
 #define SUPERBLOCK_SECTORS	2
@@ -170,11 +171,13 @@ struct ext2_t {
 struct ext2_inode_handle_t {
 	struct ext2_t* ext2;
 	uint64_t inode_index;
+	uint64_t seek;
+	uint64_t seek_block;
 };
 
-struct ext2_dir_track_t {
+struct ext2_block_track_t {
 	struct ext2_inode_handle_t* handle;
-	struct ext2_inode_t* dir;
+	struct ext2_inode_t* inode;
 	uint64_t off;
 	uint64_t block;
 };
@@ -226,17 +229,17 @@ static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct 
 	return 0;
 }
 
-static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index) {
-	uint64_t block = dt->block;
-	struct ext2_inode_t* inode = dt->dir;
-	struct ext2_t* ext2 = dt->handle->ext2;
+static uint8_t get_block_index(struct ext2_block_track_t* bt, uint64_t* index) {
+	uint64_t block = bt->block;
+	struct ext2_inode_t* inode = bt->inode;
+	struct ext2_t* ext2 = bt->handle->ext2;
 
 
 	if (block < DIRECT_BLOCKS) {
 		*index = inode->i_block[block];
 
 		if (!*index) {
-			dt->block += 1;
+			bt->block += 1;
 			return BLOCK_RETRY;
 		}
 
@@ -254,7 +257,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		*index = inode->i_block[INDIR_1];
 
 		if (!*index) {
-			dt->block += indir1;
+			bt->block += indir1;
 			return BLOCK_RETRY;
 		}
 
@@ -268,7 +271,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		kfree(buffer);
 
 		if (!*index) {
-			dt->block += 1;
+			bt->block += 1;
 			return BLOCK_RETRY;
 		}
 
@@ -284,7 +287,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		*index = inode->i_block[INDIR_2];
 
 		if (!*index) {
-			dt->block += indir2;
+			bt->block += indir2;
 			return BLOCK_RETRY;
 		}
 
@@ -298,7 +301,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		kfree(buffer);
 
 		if (!*index) {
-			dt->block += indir1;
+			bt->block += indir1;
 			return BLOCK_RETRY;
 		}
 
@@ -312,7 +315,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		kfree(buffer);
 
 		if (!*index) {
-			dt->block += 1;
+			bt->block += 1;
 			return BLOCK_RETRY;
 		}
 
@@ -327,7 +330,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		*index = inode->i_block[INDIR_3];
 
 		if (!*index) {
-			dt->block += indir3;
+			bt->block += indir3;
 			return BLOCK_RETRY;
 		}
 
@@ -341,7 +344,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		kfree(buffer);
 
 		if (!*index) {
-			dt->block += indir2;
+			bt->block += indir2;
 			return BLOCK_RETRY;
 		}
 
@@ -355,7 +358,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		kfree(buffer);
 
 		if (!*index) {
-			dt->block += indir1;
+			bt->block += indir1;
 			return BLOCK_RETRY;
 		}
 
@@ -369,7 +372,7 @@ static uint8_t get_block_index_dir(struct ext2_dir_track_t* dt, uint64_t* index)
 		kfree(buffer);
 
 		if (!*index) {
-			dt->block += 1;
+			bt->block += 1;
 			return BLOCK_RETRY;
 		}
 
@@ -393,7 +396,7 @@ static inline size_t path_entry_len(char* path) {
 static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
 	struct ext2_inode_t inode;
 	size_t path_len;
-	struct ext2_dir_track_t track;
+	struct ext2_block_track_t track;
 	uint64_t block_index;
 	uint8_t cntrl = 0;
 
@@ -406,9 +409,12 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
 
 	track.handle->ext2 = (struct ext2_t*)cntx;
 	track.handle->inode_index = EXT2_ROOT_INO;
+	track.handle->seek = 0;
+	track.handle->seek_block = 0;
 
 	const struct ext2_superblock_t* superblock = track.handle->ext2->superblock;
 	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
 	void* buffer;
 
 	while (*path && cntrl != 2) {
@@ -418,18 +424,23 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
 			return 0;
 		}
 
-		track.dir = &inode;
+		track.inode = &inode;
 		track.block = 0;
 		track.off = 0;
 
 		cntrl = 1;
 		while (cntrl == 1) {
+			if (track.block * block_size > size) {
+				cntrl = 2;
+				break;
+			}
+
 			if (track.off >= block_size) {
 				track.block++;
 				track.off = 0;
 			}
 
-			switch (get_block_index_dir(&track, &block_index)) {
+			switch (get_block_index(&track, &block_index)) {
 				case BLOCK_OK:
 					buffer = read_block(block_index, track.handle->ext2);
 					if (!buffer) {
@@ -457,11 +468,13 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
 								cntrl = 0;
 							}
 
+							kfree(buffer);
 							break;
 						}
 					}
 
 					track.off += entry->rec_len;
+					kfree(buffer);
 					__attribute__((fallthrough));
 				case BLOCK_RETRY:
 					continue;
@@ -506,9 +519,82 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 		return FILE_NO_SUPPORT;
 	}
 
-	info->size = inode.i_size;
+	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
 
 	return FILE_OK;
+}
+
+static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count) {
+	struct ext2_inode_t inode;
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	struct ext2_block_track_t track;
+	uint8_t* block_buffer = 0;
+
+	if (!inode_handle || get_inode(inode_handle, &inode)) {
+		return 0;
+	}
+
+	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+
+	size_t read = 0;
+	uint64_t index;
+	uint64_t write_seek = 0;
+	size_t write_len;
+
+	while (count) {
+		track.block = inode_handle->seek_block;
+		track.inode = &inode;
+		track.handle = inode_handle;
+
+		if (track.block * block_size > size) {
+			break;
+		}
+
+		write_len = block_size; // default full block
+
+		if (count < block_size) {
+			// read partial, only requested
+			write_len = count;
+		}
+
+		if (write_len + inode_handle->seek > block_size) {
+			// read partial, not past block
+			write_len = block_size - inode_handle->seek;
+		}
+
+		switch (get_block_index(&track, &index)) {
+			case BLOCK_OK:
+				block_buffer = read_block(index, inode_handle->ext2);
+
+				if (!block_buffer) {
+					return read;
+				}
+
+				kmemcpy((uint8_t*)buffer + write_seek, block_buffer + inode_handle->seek, write_len);
+
+				kfree(block_buffer);
+				break;
+			case BLOCK_RETRY:
+				kmemset((uint8_t*)buffer + write_seek, 0, write_len);
+				break;
+			default:
+				return read;
+		}
+
+		write_seek += write_len;
+		inode_handle->seek += write_len;
+		count -= write_len;
+		read += write_len;
+
+		if (inode_handle->seek == block_size) {
+			inode_handle->seek = 0;
+			inode_handle->seek_block++;
+		}
+	}
+
+	return read;
 }
 
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
@@ -562,7 +648,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					(struct mount_cntx_t*)ext2,
 					ext2_open,
 					ext2_close,
-					ext2_stat
+					ext2_stat,
+					ext2_read
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);
@@ -582,7 +669,27 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 
 		logging_log_debug("Root directory %u (%u)", stat_buf.size, stat_buf.type);
 
+		struct fs_handle_t* gpl_handle = fs_open("/usr/share/doc/ModulOS/LICENSES/GPLV3");
+		if (!gpl_handle) {
+			logging_log_error("Failed to open GPL license");
+		}
+
+		if ((sts = fs_stat(gpl_handle, &stat_buf)) != FILE_OK) {
+			logging_log_error("Failed to stat GPL license %u", (uint32_t)sts);
+		}
+
+		char* GPL = kmalloc(stat_buf.size + 1);
+
+		if (stat_buf.size != fs_read(gpl_handle, GPL, stat_buf.size)) {
+			logging_log_error("Failed to read GPL license");
+		}
+
+		GPL[stat_buf.size] = 0;
+
+		logging_log_debug("Read License\n%s", GPL);
+
 		fs_close(root_handle);
+		fs_close(gpl_handle);
 	}
 
 	//TODO: mount other volumes

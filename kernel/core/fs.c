@@ -37,6 +37,7 @@ struct vfs_mount_t {
 	fs_open_t open;
 	fs_close_t close;
 	fs_stat_t stat;
+	fs_read_t read;
 };
 
 struct fs_handle_t {
@@ -84,7 +85,8 @@ enum file_status_t fs_mount(
 		struct mount_cntx_t* cntx,
 		fs_open_t open,
 		fs_close_t close,
-		fs_stat_t stat
+		fs_stat_t stat,
+		fs_read_t read
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -99,6 +101,7 @@ enum file_status_t fs_mount(
 		vfs_root.mount->open = open;
 		vfs_root.mount->close = close;
 		vfs_root.mount->stat = stat;
+		vfs_root.mount->read = read;
 
 		return FILE_OK;
 	}
@@ -218,5 +221,15 @@ enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info)
 
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
 	lock_release(&fs_lock);
+	return ret;
+}
+
+size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
+	size_t ret;
+
+	lock_acquire(&fs_lock);
+	ret = handle->mount->read(handle->handle, buffer, count);
+	lock_release(&fs_lock);
+
 	return ret;
 }

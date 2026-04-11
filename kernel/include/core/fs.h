@@ -1,4 +1,4 @@
-/* fs.c - kernel file system layer interface */
+/* fs.h - kernel file system layer interface */
 /* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -48,6 +48,7 @@ typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, char*);
 typedef void (*fs_close_t)(struct file_handle_t*);
 
 typedef enum file_status_t (*fs_stat_t)(struct file_handle_t*, struct file_info_t*);
+typedef size_t (*fs_read_t)(struct file_handle_t*, void*, size_t);
 
 void fs_init(void);
 
@@ -56,12 +57,14 @@ enum file_status_t fs_mount(
 		struct mount_cntx_t* cntx,
 		fs_open_t open,
 		fs_close_t close,
-		fs_stat_t stat
+		fs_stat_t stat,
+		fs_read_t read
 		);
 
-struct fs_handle_t* fs_open(const char* path);
-void fs_close(struct fs_handle_t* handle);
+extern struct fs_handle_t* fs_open(const char* path);
+extern void fs_close(struct fs_handle_t* handle);
 
-enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
+extern enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
+extern size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count);
 
 #endif /* KERNEL_CORE_FS_H */
