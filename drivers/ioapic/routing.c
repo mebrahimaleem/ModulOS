@@ -138,7 +138,7 @@ void ioapic_routing_init(uint64_t num_gsi) {
 
 	logging_log_info("Found SCI on GSI 0x%lX", sci_gsi);
 	const uint8_t sci_v = idt_get_vector();
-	idt_install(sci_v, (uint64_t)sci_isr, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(sci_v, (uint64_t)sci_isr, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	ioapic_conf_gsi(sci_gsi, sci_v, IOAPIC_REDIR_TRG_LVL | IOAPIC_REDIR_POL_LO, bsp_apic_id);
 }
 

@@ -231,6 +231,10 @@ ktransfer:
 	pushq $0
 	pushq $0
 	call multiboot2_init
+	movq init_stack_vaddr, %rsp
+	addq $0x5000, %rsp
+	pushq $0
+	pushq $0
 	jmp kentry
 
 	.section .data.boot
@@ -330,3 +334,10 @@ stack:
 .rept STACK_SIZE
 	.byte 0
 .endr
+
+	/* pointer to guarded stack */
+.globl init_stack_vaddr
+	init_stack_vaddr: .quad 0
+
+.globl init_stack_paddr
+	init_stack_paddr: .quad 0

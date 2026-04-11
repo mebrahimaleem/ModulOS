@@ -41,6 +41,11 @@ cpu_pause:
 pause
 ret
 
+.globl cpu_invlpg
+cpu_invlpg:
+invlpg (%rdi)
+ret
+
 .globl cpu_wait_loop
 cpu_wait_loop:
 hlt
@@ -51,3 +56,18 @@ cpu_halt_loop:
 cli
 hlt
 jmp cpu_halt_loop
+
+.globl cpu_trap
+cpu_trap:
+// setting a breakpoint here will catch traps
+ret
+
+.globl cpu_read_cr2
+cpu_read_cr2:
+movq %cr2, %rax
+ret
+
+.globl cpu_wbinvd
+cpu_wbinvd:
+wbinvd
+ret

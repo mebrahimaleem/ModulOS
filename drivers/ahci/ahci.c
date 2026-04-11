@@ -77,8 +77,8 @@
 #define SSTS_DET_MASK	0x000Fu
 #define SSTS_DET_EST	0x0003u
 
-#define CL_SIZE		256
-#define FIS_SIZE	1024
+#define CL_SIZE		1024
+#define FIS_SIZE	256
 
 #define SLOT_NO_SLOT	0xFF
 
@@ -174,11 +174,12 @@ static uint8_t find_slot(struct ahci_t* ahci, uint32_t port) {
 	read = hba_read(ahci, PXCI_OFF(port));
 
 	for (slot = 0; slot < ahci->num_com_slots; slot++) {
-		if (!(ahci->used_com && (1u << slot)) && !(read && (1u << slot))) {
+		if (!(ahci->used_com & (1u << slot)) && !(read & (1u << slot))) {
 			return slot;
 		}
 	}
 
+	//TODO: assert valid slot before using
 	return SLOT_NO_SLOT;
 }
 
@@ -245,7 +246,7 @@ static enum disk_error_t ahci_read_lba(void* cntx, void* buffer, uint64_t lba, u
 
 	port_clear_errors(ahci, port);
 
-	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+	kmemset(ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
 
 	ahci->ports[port]->com_list[slot].flg = 5;
 	ahci->ports[port]->com_list[slot].prdtl = 1;
@@ -371,7 +372,7 @@ static enum disk_error_t ahci_write_lba(void* cntx, void* buffer, uint64_t lba, 
 
 	port_clear_errors(ahci, port);
 
-	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+	kmemset(ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
 
 	ahci->ports[port]->com_list[slot].flg = 5 | SATA_FIS_CMD_W;
 	ahci->ports[port]->com_list[slot].prdtl = 1;
@@ -453,7 +454,7 @@ static enum disk_error_t ahci_flush_cache(void* cntx) {
 
 	port_clear_errors(ahci, port);
 
-	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+	kmemset(ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
 
 	ahci->ports[port]->com_list[slot].flg   = 5;
 	ahci->ports[port]->com_list[slot].prdtl = 0;
@@ -534,7 +535,7 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 
 	port_clear_errors(ahci, port);
 
-	kmemset(&ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
+	kmemset(ahci->ports[port]->recv_fis, 0, sizeof(struct ahci_recv_fis_t));
 
 	ahci->ports[port]->com_list[slot].flg = 5;
 	ahci->ports[port]->com_list[slot].prdtl = 1;
@@ -565,7 +566,7 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 
 	lba48 = *(uint64_t*)&identity[100];
 
-	logging_log_info("Found ATA drive %s 0x%lx", &model[0], lba48);
+	logging_log_debug("Found ATA drive %s 0x%lx", &model[0], lba48);
 
 	paging_unmap((uint64_t)identity, PAGE_4K);
 

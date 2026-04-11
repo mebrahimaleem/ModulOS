@@ -29,3 +29,24 @@ uint8_t hash_byte_sum(const void* ptr, size_t c) {
 
 	return sum;
 }
+
+uint32_t crc32_ansi(const void* data, size_t length) {
+	uint32_t crc = 0xFFFFFFFF;
+	const uint8_t *p = (const uint8_t*)data;
+	uint8_t i;
+
+	while (length--) {
+		crc ^= *p++;
+
+		for (i = 0; i < 8; i++) {
+			if (crc & 1) {
+				crc = (crc >> 1) ^ 0xEDB88320;
+			}
+			else {
+				crc >>= 1;
+			}
+		}
+	}
+
+	return crc ^ 0xFFFFFFFF;
+}

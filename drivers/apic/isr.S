@@ -35,6 +35,40 @@ pushq %rbp
 movq %rsp, %rdi
 jmp process_preempt_entry
 
+.globl apic_isr_tlb_shootdown
+apic_isr_tlb_shootdown:
+pushq %rax
+pushq %rcx
+pushq %rdx
+pushq %rsi
+pushq %rdi
+pushq %r8
+pushq %r9
+pushq %r10
+pushq %r11
+pushq %rbp
+
+movq %rsp, %rbp
+movq %rsp, %rax
+andq $0xF, %rax
+jz .aligned_tlb
+subq %rax, %rsp
+.aligned_tlb:
+call apic_tlb_shootdown_dispatch
+movq %rbp, %rsp
+
+popq %rbp
+popq %r11
+popq %r10
+popq %r9
+popq %r8
+popq %rdi
+popq %rsi
+popq %rdx
+popq %rcx
+popq %rax
+iretq
+
 .globl apic_isr_error
 apic_isr_error:
 pushq %rax

@@ -111,6 +111,7 @@ movb %bl, %dil
 
 movq AP_STACKS, %rax
 movq (%rax,%rdi,8), %rsp
+addq $0x5000, %rsp
 
 // switch to correct gdt
 movq ap_gdt_ptr_64, %rax

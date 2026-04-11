@@ -1,5 +1,5 @@
-/* cpu_instr.h - cpu instruction interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* kstrcpy.c - kernel string copy implementation */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,31 +15,25 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_CPU_INSTR_H
-#define KERNEL_CORE_CPU_INSTR_H
+#include <lib/kstrcpy.h>
 
-#include <stdint.h>
+char* kstrcpy(char* dest, const char* src) {
+	while (*src) {
+		*dest = *src;
+		src++;
+		dest++;
+	}
 
-extern void cpu_lidt(uint64_t idt_ptr);
+	*dest = 0;
+	return dest + 1;
+}
 
-extern void cpu_ltr_28(void);
+char* kstrcpy_no_null(char* dest, const char* src) {
+	while (*src) {
+		*dest = *src;
+		src++;
+		dest++;
+	}
 
-extern void cpu_cli(void);
-
-extern void cpu_sti(void);
-
-extern void cpu_pause(void);
-
-extern void cpu_invlpg(uint64_t addr);
-
-extern void cpu_wait_loop(void) __attribute__((noreturn));
-
-extern void cpu_halt_loop(void) __attribute__((noreturn));
-
-extern void cpu_trap(void);
-
-extern uint64_t cpu_read_cr2(void);
-
-extern void cpu_wbinvd(void);
-
-#endif /* KERNEL_CORE_CPU_INSTR_H */
+	return dest;
+}

@@ -21,6 +21,7 @@
 
 #include <kernel/core/kentry.h>
 #include <kernel/core/mm.h>
+#include <kernel/core/paging.h>
 #include <kernel/core/gdt.h>
 #include <kernel/core/logging.h>
 #include <kernel/core/proc_data.h>
@@ -103,6 +104,9 @@ struct mb2_info_t {
 extern volatile struct gdt_t gdt[GDT_NUM_ENTRIES];
 
 static volatile struct mb2_tag_t* memmap_tag;
+
+extern uint64_t init_stack_paddr;
+extern uint64_t init_stack_vaddr;
 
 static void first_segment(uint64_t* handle) {
 	*handle = 0;
@@ -201,6 +205,15 @@ void multiboot2_init(struct mb2_info_t* info) {
 		// enforce 8 byte alignment
 		i = (i + 7) & ~MOD8_MASK;
 	}
+
+	init_stack_paddr = mm_alloc_p(PAGE_SIZE_4K * 4);
+	init_stack_vaddr = mm_alloc_v(PAGE_SIZE_4K * 5);
+
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 1, init_stack_paddr + PAGE_SIZE_4K * 0, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 2, init_stack_paddr + PAGE_SIZE_4K * 1, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 3, init_stack_paddr + PAGE_SIZE_4K * 2, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_map(init_stack_vaddr + PAGE_SIZE_4K * 4, init_stack_paddr + PAGE_SIZE_4K * 3, PAGE_PRESENT | PAGE_RW, PAGE_4K);
+	paging_install_guard(init_stack_vaddr);
 
 	boot_context.gdt = &gdt;
 	return;

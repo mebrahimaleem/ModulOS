@@ -23,6 +23,8 @@
 
 #define DISK_ID_FIRST	0
 
+#define SECTOR_SIZE	512
+
 enum disk_error_t {
 	DISK_OK,
 	DISK_ERROR
@@ -43,5 +45,7 @@ extern struct disk_t* disk_get(uint64_t id);
 extern enum disk_error_t disk_read(struct disk_t* disk, void* pbuffer, uint64_t lba, uint16_t count);
 extern enum disk_error_t disk_write(struct disk_t* disk, void* pbuffer, uint64_t lba, uint16_t count);
 extern enum disk_error_t disk_flush(struct disk_t* disk);
+
+extern uint64_t disk_get_id(struct disk_t* disk);
 
 #endif /* DRIVERS_DISK_DISK_H */

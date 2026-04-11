@@ -43,6 +43,14 @@ ifdef BUILD_DRIVERS_SATA
 $(call add_directory,sata,SATA)
 endif
 
+ifdef BUILD_DRIVERS_GPT
+$(call add_directory,gpt,GPT)
+endif
+
+ifdef BUILD_DRIVERS_EXT2
+$(call add_directory,ext2,EXT2)
+endif
+
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 

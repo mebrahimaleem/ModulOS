@@ -29,6 +29,7 @@
 
 #define IST_ABORT_SIZE	0x1000
 #define IST_SCHED_SIZE	0x1000
+#define IST_PF_SIZE			0x1000
 
 #define IST_LO_MASK			0xFFFFFFFF
 #define IST_HI_SHFT			32
@@ -47,6 +48,10 @@ void tss_init(volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES]) {
 	const uint64_t ist2 = (uint64_t)kmalloc(IST_SCHED_SIZE) + IST_SCHED_SIZE;
 	tss->ist2_lo = ist2 & IST_LO_MASK;
 	tss->ist2_hi = (uint32_t)(ist2 >> IST_HI_SHFT);
+
+	const uint64_t ist3 = (uint64_t)kmalloc(IST_SCHED_SIZE) + IST_SCHED_SIZE;
+	tss->ist3_lo = ist3 & IST_LO_MASK;
+	tss->ist3_hi = (uint32_t)(ist3 >> IST_HI_SHFT);
 
 	logging_log_debug("New TSS @ 0x%lX - 0x%lX 0x%lX (ist1) 0x%lX (ist2)",
 			(uint64_t)tss, ist1, ist2);

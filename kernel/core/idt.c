@@ -61,7 +61,7 @@ void idt_init(void) {
 	idt_install(0x0b, (uint64_t)isr_0b, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	idt_install(0x0c, (uint64_t)isr_0c, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	idt_install(0x0d, (uint64_t)isr_0d, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
-	idt_install(0x0e, (uint64_t)isr_0e, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
+	idt_install(0x0e, (uint64_t)isr_0e, GDT_CODE_SEL, IST_PF, IDT_GATE_INT, 0);
 	idt_install(0x10, (uint64_t)isr_10, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	idt_install(0x11, (uint64_t)isr_11, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	idt_install(0x12, (uint64_t)isr_12, GDT_CODE_SEL, IST_ABORT, IDT_GATE_INT, 0);

@@ -51,16 +51,20 @@ struct pcb_t {
 	uint64_t pid;
 	uint32_t k_rsp_lo;
 	uint32_t k_rsp_hi;
-	uint64_t init_rsp;
-	uint64_t init_k_rsp;
+	uint64_t init_rsp_vaddr;
+	uint64_t init_rsp_paddr;
+	uint64_t init_k_rsp_vaddr;
+	uint64_t init_k_rsp_paddr;
+
+	struct pcb_t* next;
+
 	enum {
 		SCHED_READY,
 		SCHED_KILL,
 		SCHED_SKIP
 	} sched_cntr;
 
-	struct pcb_t* next;
-};
+} __attribute__((packed));
 
 struct preempt_frame_t {
 	uint64_t rbp;
@@ -90,9 +94,9 @@ typedef void (*process_function_t)(void* cntx);
 
 extern uint64_t process_get_pid(void);
 
-extern void process_init(uint64_t init_rsp);
+extern void process_init(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr);
 
-extern void process_init_ap(uint64_t init_rsp);
+extern void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr);
 
 extern struct pcb_t* process_from_vaddr(uint64_t vaddr);
 

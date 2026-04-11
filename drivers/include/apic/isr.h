@@ -22,4 +22,6 @@ extern void apic_isr_timer(void) __attribute__((noreturn));
 
 extern void apic_isr_error(void);
 
+extern void apic_isr_tlb_shootdown(void);
+
 #endif /* DRIVERS_APIC_ISR_H */

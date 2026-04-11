@@ -25,6 +25,8 @@
 #include <core/proc_data.h>
 #include <core/gdt.h>
 
+#include <drivers/apic/apic_regs.h>
+
 static uint8_t lock_sched;
 static volatile struct pcb_t* active_queue;
 static volatile struct pcb_t* active_queue_tail;
@@ -55,11 +57,12 @@ void scheduler_run(void) {
 	struct pcb_t* current_pcb = pd->current_process;
 	switch (current_pcb->sched_cntr) {
 		case SCHED_SKIP:
+			cpu_cli();
+			apic_write_reg(APIC_REG_EOI, APIC_EOI);
 			process_resume(current_pcb);
 			break;
 		case SCHED_KILL:
-			kfree((void*)current_pcb->init_rsp);
-			kfree((void*)current_pcb->init_k_rsp);
+			process_discard(current_pcb);
 			break;
 		default:
 			scheduler_schedule(current_pcb);
@@ -85,5 +88,8 @@ void scheduler_run(void) {
 	pd->tss->rsp0_lo = 	run->k_rsp_lo;
 	pd->tss->rsp0_hi = 	run->k_rsp_hi;
 	pd->current_process = run;
+
+	cpu_cli();
+	apic_write_reg(APIC_REG_EOI, APIC_EOI);
 	process_resume(run);
 }
