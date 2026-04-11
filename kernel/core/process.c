@@ -195,7 +195,5 @@ void process_preempt_entry(struct preempt_frame_t* context) {
 	pcb->rflags = context->rflags;
 	pcb->ss = context->ss;
 
-	apic_write_reg(APIC_REG_EOI, APIC_EOI);
-
 	scheduler_run();
 }

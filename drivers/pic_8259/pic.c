@@ -63,8 +63,8 @@ void pic_disab(void) {
 	outb(PIC2_DATA, ICW4_8086);
 	io_wait();
 
-	idt_install(PIC1_IRQ_BASE + PIC_SPURIOUS, (uint64_t)pic_spurious_master, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
-	idt_install(PIC2_IRQ_BASE + PIC_SPURIOUS, (uint64_t)pic_spurious_slave, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(PIC1_IRQ_BASE + PIC_SPURIOUS, (uint64_t)pic_spurious_master, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
+	idt_install(PIC2_IRQ_BASE + PIC_SPURIOUS, (uint64_t)pic_spurious_slave, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 
 	// mask
 	outb(PIC1_DATA, 0xff);

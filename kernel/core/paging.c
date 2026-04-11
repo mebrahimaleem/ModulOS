@@ -40,16 +40,11 @@
 #define GET_PDPT_INDEX(addr)	((addr & 0x7FC0000000) >> 30)
 #define GET_PML4_INDEX(addr)	((addr & 0xFF8000000000) >> 39)
 
+#define AVL_GUARD	0x800
+
 extern uint64_t kernel_pml4[512];
 
 static uint8_t paging_lock;
-
-struct addr_list_t {
-	struct addr_list_t* next;
-	uint64_t addr;
-};
-
-static struct addr_list_t* stack_guard_list;
 
 static enum page_size_t page_walk(uint64_t vaddr, uint64_t** access) {
 	uint64_t entry;
@@ -88,28 +83,7 @@ static enum page_size_t page_walk(uint64_t vaddr, uint64_t** access) {
 	return PAGE_4K;
 }
 
-void paging_init(void) {
-	lock_init(&paging_lock);
-
-	stack_guard_list = 0;
-}
-
-uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size) {
-	uint64_t* access;
-	enum page_size_t lvl = page_walk(vaddr, &access);
-
-	if (lvl < page_size) {
-		logging_log_error("Cannot override page of finer granularity from 0x%lx-0x%lx (%u) to 0x%lx-0x%lx (%u)",
-				vaddr, *access - IDENT_BASE, (uint32_t)lvl, vaddr, paddr | flg, (uint32_t)page_size);
-		return *access - IDENT_BASE;
-	}
-
-	if (*access & PAGE_PRESENT) {
-		logging_log_error("Cannot override page from 0x%lx-0x%lx (%u) to 0x%lx-0x%lx (%u)",
-				vaddr, *access, (uint32_t)lvl, vaddr, paddr | flg, (uint32_t)page_size);
-		return *access;
-	}
-
+static uint64_t* increase_granularity(uint64_t vaddr, uint64_t* access, enum page_size_t lvl, enum page_size_t page_size) {
 	for (; lvl > page_size; lvl--) {
 		*access = mm_alloc_p(0x1000);
 		if (!access) {
@@ -130,6 +104,34 @@ uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size
 				access = &(access)[GET_PT_INDEX(vaddr)];
 				break;
 		}
+	}
+
+	return access;
+}
+
+void paging_init(void) {
+	lock_init(&paging_lock);
+}
+
+uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size) {
+	uint64_t* access;
+	enum page_size_t lvl = page_walk(vaddr, &access);
+
+	if (lvl < page_size) {
+		logging_log_error("Cannot override page of finer granularity from 0x%lx-0x%lx (%u) to 0x%lx-0x%lx (%u)",
+				vaddr, *access - IDENT_BASE, (uint32_t)lvl, vaddr, paddr | flg, (uint32_t)page_size);
+		return *access - IDENT_BASE;
+	}
+
+	if (*access & PAGE_PRESENT) {
+		logging_log_error("Cannot override page from 0x%lx-0x%lx (%u) to 0x%lx-0x%lx (%u)",
+				vaddr, *access, (uint32_t)lvl, vaddr, paddr | flg, (uint32_t)page_size);
+		return *access;
+	}
+
+	access = increase_granularity(vaddr, access, lvl, page_size);
+	if (!access) {
+		return 0;
 	}
 
 	if (page_size != PAGE_4K) {
@@ -159,45 +161,45 @@ uint64_t paging_ident(uint64_t paddr) {
 }
 
 void paging_install_guard(uint64_t vaddr) {
-	struct addr_list_t* guard = kmalloc(sizeof(struct addr_list_t));
-	guard->addr = vaddr & PAGE_ADDR_MASK;
-
+	uint64_t* access;
 	lock_acquire(&paging_lock);
-	guard->next = stack_guard_list;
-	stack_guard_list = guard;
+	enum page_size_t lvl = page_walk(vaddr, &access);
+
+	if (*access & PAGE_PRESENT) {
+		logging_log_error("Cannot install page guard over mapped page");
+		panic(PANIC_STATE);
+	}
+
+	access = increase_granularity(vaddr, access, lvl, PAGE_4K);
+	if (!access) {
+		logging_log_error("Failed to install page guard");
+		panic(PANIC_STATE);
+	}
+
+	*access |= AVL_GUARD;
 	lock_release(&paging_lock);
 }
 
 void paging_remove_guard(uint64_t vaddr) {
-	struct addr_list_t* i, ** prev = &stack_guard_list;
-
+	uint64_t* access;
 	lock_acquire(&paging_lock);
-	for (i = stack_guard_list; i; i = i->next) {
-		if (i->addr == vaddr) {
-			*prev = i->next;
-			kfree(i);
-			break;
-		}
+	enum page_size_t lvl = page_walk(vaddr, &access);
 
-		prev = &i->next;
-	}
+	if (lvl != PAGE_4K || !(*access & AVL_GUARD)) {
+		logging_log_error("Attempted to remove guard from ungaurded page @ 0x%x", vaddr);
+	}	
 
+	*access = 0;
 	lock_release(&paging_lock);
 }
 
 uint8_t paging_check_guard(uint64_t vaddr) {
-	struct addr_list_t* i;
-	uint64_t addr = vaddr & PAGE_ADDR_MASK;
-	uint8_t ret = 0;
-
+	uint64_t* access, access_value;
 	lock_acquire(&paging_lock);
-	for (i = stack_guard_list; i; i = i->next) {
-		if (i->addr == addr) {
-			ret = 1;
-			break;
-		}
-	}
+	enum page_size_t lvl = page_walk(vaddr, &access);
+
+	access_value = *access;
 	lock_release(&paging_lock);
 
-	return ret;
+	return lvl == PAGE_4K && (access_value & AVL_GUARD);
 }

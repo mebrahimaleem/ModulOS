@@ -172,6 +172,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include <kernel/core/cpu_instr.h>
+
 #ifdef ACPI_USE_STANDARD_HEADERS
 #undef ACPI_USE_STANDARD_HEADERS
 #endif /* ACPI_USE_STANDARD_HEADERS */
@@ -210,7 +212,7 @@ static uint8_t _stub(void) {
 	return 0;
 }
 
-#define ACPI_FLUSH_CPU_CACHE() _stub() //TODO cpu_instr tlb invl
+#define ACPI_FLUSH_CPU_CACHE() cpu_wbinvd();
 
 #define ACPI_ACQUIRE_GLOBAL_LOCK(facsPtr, acc) acc = _stub() //TODO: sync
 #define ACPI_RELEASE_GLOBAL_LOCK(facsPtr, pen) pen = _stub()

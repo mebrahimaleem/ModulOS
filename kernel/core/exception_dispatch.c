@@ -117,7 +117,7 @@ void exception_dispatch(struct exception_context_t* context) {
 
 	switch (context->vector) {
 		case VECTOR_PF:
-			if (paging_check_guard(read_cr2())) {
+			if (paging_check_guard(cpu_read_cr2())) {
 				logging_log_error("Stack Overflow");
 			}
 			break;

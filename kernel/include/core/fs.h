@@ -24,7 +24,8 @@
 struct mount_cntx_t;
 
 struct file_handle_t;
-struct dir_handle_t;
+
+struct fs_handle_t;
 
 enum file_status_t {
 	FILE_OK,
@@ -42,16 +43,25 @@ struct file_info_t {
 	uint64_t size;
 };
 
-typedef enum file_status_t (*fs_stat_t)(struct mount_cntx_t* cntx, const char*, struct file_info_t*);
 
-enum file_status_t fs_stat(const char* name, struct file_info_t* info);
+typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, char*);
+typedef void (*fs_close_t)(struct file_handle_t*);
+
+typedef enum file_status_t (*fs_stat_t)(struct file_handle_t*, struct file_info_t*);
 
 void fs_init(void);
 
 enum file_status_t fs_mount(
 		const char* mountpoint,
 		struct mount_cntx_t* cntx,
+		fs_open_t open,
+		fs_close_t close,
 		fs_stat_t stat
 		);
+
+struct fs_handle_t* fs_open(const char* path);
+void fs_close(struct fs_handle_t* handle);
+
+enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
 
 #endif /* KERNEL_CORE_FS_H */

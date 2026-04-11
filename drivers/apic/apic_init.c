@@ -114,8 +114,8 @@ void apic_init(void) {
 	error_vector = idt_get_vector();
 
 	// install idts
-	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, IST_SCHED, IDT_GATE_INT, 0);
-	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, IST_SCHED, IDT_GATE_TRP, 0);
+	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 
 	apic_init_shootdowns(num_apic);
 

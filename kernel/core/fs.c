@@ -33,7 +33,15 @@ static uint8_t fs_lock;
 
 struct vfs_mount_t {
 	struct mount_cntx_t* cntx;
+
+	fs_open_t open;
+	fs_close_t close;
 	fs_stat_t stat;
+};
+
+struct fs_handle_t {
+	struct vfs_mount_t* mount;
+	struct file_handle_t* handle;
 };
 
 struct vfs_tree_node_t {
@@ -47,17 +55,7 @@ struct vfs_tree_node_t {
 
 static struct vfs_tree_node_t vfs_root;
 
-static inline const char* simplify_path(const char* path) {
-	while (
-			*path == '/' ||
-			(*path == '.' && (*(path+1) == '/' || !*(path+1)))) {
-		path++;
-	}
-
-	return path;
-}
-
-static inline const char* path_next(const char* path, uint8_t* len) {
+static inline char* path_next(char* path, size_t* len) {
 	*len = 0;
 
 	while (*path && *path != '/') {
@@ -65,42 +63,11 @@ static inline const char* path_next(const char* path, uint8_t* len) {
 		(*len)++;
 	}
 
-	return simplify_path(path);
-}
-
-static struct vfs_mount_t* find_mountpoint_sub(struct vfs_tree_node_t* root, const char* path) {
-	struct vfs_tree_node_t* walk;
-	struct vfs_mount_t* sub_mount = 0;
-	const char* next = path;
-	uint8_t len;
-
-	path = path_next(path, &len);
-
-	for (walk = root->sub; walk; walk = walk->co) {
-		if (len == kstrlen(walk->name) && kmemcmp(walk->name, next, len) == 0) {
-			if (*next) {
-				sub_mount = find_mountpoint_sub(walk, path);
-			}
-
-			break;
-		}
+	if (*path) {
+		return path + 1;
 	}
 
-	if (sub_mount) {
-		return sub_mount;
-	}
-
-	return walk->mount;
-}
-
-static struct vfs_mount_t* find_mountpoint(const char* path) {
-	path = simplify_path(path);
-
-	if (kstrcmp(path, "") == 0) {
-		return vfs_root.mount;
-	}
-
-	return find_mountpoint_sub(&vfs_root, path);
+	return path;
 }
 
 void fs_init(void) {
@@ -115,6 +82,8 @@ void fs_init(void) {
 enum file_status_t fs_mount(
 		const char* mountpoint,
 		struct mount_cntx_t* cntx,
+		fs_open_t open,
+		fs_close_t close,
 		fs_stat_t stat
 		) {
 
@@ -127,6 +96,8 @@ enum file_status_t fs_mount(
 		}
 
 		vfs_root.mount->cntx = cntx;
+		vfs_root.mount->open = open;
+		vfs_root.mount->close = close;
 		vfs_root.mount->stat = stat;
 
 		return FILE_OK;
@@ -137,12 +108,115 @@ enum file_status_t fs_mount(
 	return FILE_ERROR;
 }
 
-enum file_status_t fs_stat(const char* name, struct file_info_t* info) {
-	struct vfs_mount_t* mount = find_mountpoint(name);
+struct fs_handle_t* fs_open(const char* path) {
+	struct vfs_tree_node_t* node = &vfs_root, * walk = 0;
+	size_t len = kstrlen(path);
+	char* clean_path = kmalloc(len + 1);
+	char* mount_path = (char*)"";
+	struct vfs_mount_t* mount = 0;
 
-	if (!mount) {
-		return FILE_DNE;
+
+	uint64_t num_chars = 0;
+	uint64_t skip = 0;
+	uint8_t dot_only = 1;
+
+	const char* path_read = path + len;
+	char* path_write = clean_path + len;
+
+	for (; path_read >= path; --path_read) {
+		switch (*path_read) {
+			case '/': // absolute paths must start with /
+				if (dot_only && num_chars == 1) {
+					path_write += num_chars;
+				}
+				else if (dot_only && num_chars == 2) {
+					skip++;
+					path_write += num_chars;
+				}
+				else if (num_chars > 0) {
+					if (skip) {
+						path_write += num_chars;
+						skip--;
+					}
+					else {
+						*path_write = '/';
+						path_write--;
+					}
+				}
+
+				num_chars = 0;
+				dot_only = 1;
+				break;
+			default:
+				dot_only = 0;
+				__attribute__((fallthrough));
+			case '.':
+				num_chars++;
+				__attribute__((fallthrough));
+			case 0:
+				*path_write = *path_read;
+				path_write--;
+				break;
+		}
 	}
 
-	return mount->stat(mount->cntx, name, info);
+	path_write++; // one to rewind write pointer
+
+	if (*path_write == '/') {
+		path_write++; // one to skip /
+	}
+
+
+	lock_acquire(&fs_lock);
+
+	do {
+		if (node->mount) {
+			mount_path = path_write;
+			mount = node->mount;
+		}
+
+		path_read = path_write;
+		path_write = path_next(path_write, &len);
+
+		for (walk = node->sub; walk; walk = walk->co) {
+			if (kstrlen(node->name) == len && kmemcmp(node->name, path_read, len) == 0) {
+				node = walk;
+				break;
+			}
+		}
+
+	} while (walk && node != walk);
+
+	lock_release(&fs_lock);
+
+	if (!mount) {
+		kfree(clean_path);
+		return 0;
+	}
+
+	struct file_handle_t* handle = mount->open(mount->cntx, mount_path);
+
+	kfree(clean_path);
+
+	struct fs_handle_t* fs_handle = kmalloc(sizeof(struct fs_handle_t));
+	fs_handle->handle = handle;
+	fs_handle->mount = mount;
+	return fs_handle;
+}
+
+void fs_close(struct fs_handle_t* handle) {
+	lock_acquire(&fs_lock);
+
+	handle->mount->close(handle->handle);
+	lock_release(&fs_lock);
+
+	kfree(handle);
+}
+
+enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
+	lock_acquire(&fs_lock);
+
+	enum file_status_t ret = handle->mount->stat(handle->handle, info);
+	lock_release(&fs_lock);
+	return ret;
 }
