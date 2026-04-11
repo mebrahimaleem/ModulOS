@@ -669,27 +669,7 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 
 		logging_log_debug("Root directory %u (%u)", stat_buf.size, stat_buf.type);
 
-		struct fs_handle_t* gpl_handle = fs_open("/usr/share/doc/ModulOS/LICENSES/GPLV3");
-		if (!gpl_handle) {
-			logging_log_error("Failed to open GPL license");
-		}
-
-		if ((sts = fs_stat(gpl_handle, &stat_buf)) != FILE_OK) {
-			logging_log_error("Failed to stat GPL license %u", (uint32_t)sts);
-		}
-
-		char* GPL = kmalloc(stat_buf.size + 1);
-
-		if (stat_buf.size != fs_read(gpl_handle, GPL, stat_buf.size)) {
-			logging_log_error("Failed to read GPL license");
-		}
-
-		GPL[stat_buf.size] = 0;
-
-		logging_log_debug("Read License\n%s", GPL);
-
 		fs_close(root_handle);
-		fs_close(gpl_handle);
 	}
 
 	//TODO: mount other volumes
