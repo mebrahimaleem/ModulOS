@@ -120,7 +120,9 @@ void kentry(void) {
 			&ap_bootstrap_start,
 			(uint64_t)&ap_bootstrap_end - (uint64_t)&ap_bootstrap_start);
 
+#ifdef SMP_ENABLE
 	apic_start_ap();
+#endif /* SMP_ENABLE */
 
 	logging_log_info("AP bootstrap sequence done");
 

@@ -55,8 +55,10 @@ static void enumerate_bus(uint16_t seg, uint8_t bus);
 static void configure_function(uint16_t seg, uint8_t bus, uint8_t dev, uint8_t func) {
 	DISABLE_INT(seg, bus, dev, func);
 
+#if defined(DEBUG) || defined(DEBUG_LOGGING)
 	const uint16_t vendor_id = VENDOR_ID(seg, bus, dev, func);
 	const uint16_t device_id = DEVICE_ID(seg, bus, dev, func);
+#endif /* defined(DEBUG) || defined(DEBUG_LOGGING) */
 	const uint8_t class_code = CLASS_CODE(seg, bus, dev, func);
 	const uint8_t subclass = SUBCLASS(seg, bus, dev, func);
 	const uint8_t prog_if = PROG_IF(seg, bus, dev, func);

@@ -78,5 +78,8 @@ ret
 
 .globl cpu_set_cr3
 cpu_set_cr3:
+testq %rdi, %rdi
+jz skip_cr3
 movq %rdi, %cr3
+skip_cr3:
 ret

@@ -30,7 +30,7 @@ LD_USR_FLAGS := -std=c23 -fno-pie -mno-mmx -mno-sse -mno-sse2 \
 	-static -D_MODULOS $(CDEBUG)
 
 ifndef DEBUG
-	LD_USR_FLAGS := $(LD_FLAGS) -flto=thin
+	LD_USR_FLAGS := $(LD_USR_FLAGS) -flto=thin
 endif
 
 LD_FLAGS := $(LD_USR_FLAGS) -mcmodel=kernel -mno-red-zone

@@ -20,9 +20,9 @@
 
 #include <lib/kmemset.h>
 
-void* memset(void* ptr, uint64_t v, size_t c) __attribute__((weak));
+void* memset(void* ptr, int32_t v, size_t c) __attribute__((weak));
 
-void* memset(void* ptr, uint64_t v, size_t c) {
+void* memset(void* ptr, int32_t v, size_t c) {
 	uint8_t* p = ptr;
 
 	for (size_t i = 0; i < c; i++) {
@@ -32,4 +32,4 @@ void* memset(void* ptr, uint64_t v, size_t c) {
 	return ptr;
 }
 
-void* kmemset(void* ptr, uint64_t v, size_t c) __attribute__((alias("memset")));
+void* kmemset(void* ptr, int32_t v, size_t c) __attribute__((alias("memset")));

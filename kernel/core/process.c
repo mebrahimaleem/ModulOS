@@ -41,8 +41,6 @@
 static uint64_t next_pid;
 static uint8_t lock_proc;
 
-extern uint8_t kernel_pml4;
-
 __attribute__((noreturn)) static void function_setup(process_function_t func, void* cntx) {
 	func(cntx);
 	process_kill_current();
@@ -72,6 +70,7 @@ void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	pcb->sched_cntr = SCHED_SKIP;
 	proc_data_get()->current_process = pcb;
 	proc_data_get()->current_process->pid = process_assign_pid();
+	proc_data_get()->current_process->cr3 = 0;
 }
 
 struct pcb_t* process_from_vaddr(uint64_t vaddr) {
@@ -117,7 +116,7 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 
 	pcb->sched_cntr = SCHED_READY;
 
-	pcb->cr3 = (uint64_t)&kernel_pml4;
+	pcb->cr3 = 0;
 
 	pcb->pid = process_assign_pid();
 
@@ -157,7 +156,9 @@ void process_discard(struct pcb_t* pcb) {
 	mm_free_v(pcb->init_k_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
 	mm_free_p(pcb->init_k_rsp_paddr, INIT_STACK_SIZE);
 
-	paging_free_userspace((uint64_t*)pcb->cr3);
+	if (pcb->cr3) {
+		paging_free_userspace((uint64_t*)pcb->cr3);
+	}
 
 	logging_log_debug("Killed %ld", pcb->pid);
 

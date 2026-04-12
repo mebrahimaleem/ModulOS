@@ -109,12 +109,18 @@ static void serial_com12(uint8_t b) {
 }
 
 static void serial_printf(const char* s, void (*printer)(uint8_t), va_list args) {
+	uint8_t flg;
+	uint64_t width;
+	uint64_t precision;
+	const char* str;
+
+
 	for (; *s != 0; s++) {
 		switch (*s) {
 			case '%':
-				uint8_t flg = 0;
-				uint64_t width = 0;
-				uint64_t precision = 0;
+				flg = 0;
+				width = 0;
+				precision = 0;
 next_specifier:
 				s++;
 				switch (*s) {
@@ -132,7 +138,7 @@ next_specifier:
 						CHOSE_SIZE(uint, 16, upper)
 						break;
 					case 's':
-						const char* str = va_arg(args, const char*);
+						str = va_arg(args, const char*);
 						if ((flg & FLG_LM) == FLG_LM) {
 							for (; width && *str; width--) {
 								printer((uint8_t)*(str++));

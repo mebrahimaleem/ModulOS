@@ -262,6 +262,7 @@ uint8_t paging_check_guard(uint64_t vaddr) {
 
 uint64_t paging_create_pml4(void) {
 	uint64_t* access;
+	uint64_t* k_access;
 	uint64_t pml4 = mm_alloc_p(PAGE_SIZE_4K);
 	uint16_t i;
 
@@ -270,17 +271,43 @@ uint64_t paging_create_pml4(void) {
 	}
 
 	access = (uint64_t*)paging_ident(pml4);
+	k_access = (uint64_t*)paging_ident((uint64_t)&kernel_pml4[0]);
 
 	kmemset(access, 0, PAGE_SIZE_4K);
 
 	// copy upper half top level pages
 	for (i = PML4_CONSISTENT_START; i < PML4_CONSISTENT_END; i++) {
-		access[i] = kernel_pml4[i];
+		access[i] = k_access[i];
 	}
 
 	return pml4;
 }
 
+static void free_pages(uint64_t entry, enum page_size_t lvl) {
+	uint64_t* access = (uint64_t*)paging_ident((entry & PAGE_ADDR_MASK));
+
+	for (uint16_t i = 0; i < 512; i++) {
+		if (access[i] & PAGE_PRESENT) {
+			if (lvl == PAGE_4K || (access[i] & PAGE_PS)) {
+				mm_free_v(access[i] & PAGE_ADDR_MASK, PAGE_SIZE_4K);
+			}
+			else {
+				free_pages(access[i], lvl-1);
+			}
+		}
+	}
+
+	mm_free_p(entry * PAGE_ADDR_MASK, PAGE_SIZE_4K);
+}
+
 void paging_free_userspace(uint64_t* pml4) {
-	//TODO: implement
+	uint64_t* access = (uint64_t*)paging_ident((uint64_t)pml4);
+
+	for (uint16_t i = 0; i < PML4_CONSISTENT_START; i++) {
+		if (access[i] & PAGE_PRESENT) {
+			free_pages(access[i], _PAGE_512G); // lvl being the size of each entry, not entry itself
+		}
+	}
+
+	mm_free_p((uint64_t)pml4, PAGE_SIZE_4K);
 }

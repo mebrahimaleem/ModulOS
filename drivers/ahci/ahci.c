@@ -496,7 +496,6 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 	uint32_t paddr_identity;
 	volatile uint16_t* identity;
 	uint8_t model[41];
-	uint64_t lba48;
 
 	paddr_identity = (uint32_t)mm_alloc_pmax(PAGE_SIZE_4K, 0, ~0u);
 	if (!paddr_identity) {
@@ -564,9 +563,7 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 	}
 	model[40] = 0;
 
-	lba48 = *(uint64_t*)&identity[100];
-
-	logging_log_debug("Found ATA drive %s 0x%lx", &model[0], lba48);
+	logging_log_debug("Found ATA drive %s 0x%lx", &model[0], *(uint64_t*)&identity[100]);
 
 	paging_unmap((uint64_t)identity, PAGE_4K);
 
