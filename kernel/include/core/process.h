@@ -98,6 +98,8 @@ typedef void (*process_function_t)(void* cntx);
 
 extern uint64_t process_get_pid(void);
 
+extern uint64_t process_assign_pid(void);
+
 extern void process_init(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr);
 
 extern void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr);

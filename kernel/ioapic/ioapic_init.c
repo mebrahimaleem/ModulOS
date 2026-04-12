@@ -26,8 +26,10 @@
 #include <core/logging.h>
 #include <core/alloc.h>
 #include <core/cpu_instr.h>
-#include <lib/kmemset.h>
+#include <core/mm.h>
 #include <core/panic.h>
+
+#include <lib/kmemset.h>
 
 #define IOAPIC_OFF_IOREGSEL	0x00
 #define IOAPIC_OFF_IOWIN		0x10
@@ -58,8 +60,15 @@ void ioapic_init(void) {
 			acpi_parse_madt_ics((void*)&ioapic, &handle, MADT_ICS_IO_APIC)) {
 
 		logging_log_info("Initializing IO APIC 0x%lX", (uint64_t)ioapic->IOAPICID);
-		const uint64_t ioapic_base = ioapic->IOAPICAddress;
-		if (!paging_map(ioapic_base, ioapic_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
+		const uint64_t ioapic_base_paddr = ioapic->IOAPICAddress;
+		const uint64_t ioapic_base = mm_alloc_v(PAGE_SIZE_4K);
+
+		if (!ioapic_base) {
+			logging_log_error("Failed to map in ioapic");
+			panic(PANIC_NO_MEM);
+		}
+
+		if (!paging_map(ioapic_base, ioapic_base_paddr, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
 			logging_log_error("Failed to map memory for IOAPIC");
 			panic(PANIC_PAGING);
 		}
@@ -74,15 +83,8 @@ void ioapic_init(void) {
 			gsi_max = lcl_max_gsi;
 		}
 
-		// unlikely, but map extra pages if needed
-		for (uint64_t mapping_base = ioapic_base + PAGE_SIZE_4K;
-				mapping_base < ioapic_base + IOAPIC_REDIR_ST + num_redir * 2;
-				mapping_base += PAGE_SIZE_4K) {
-			if (!paging_map(mapping_base, mapping_base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
-				logging_log_error("Failed to map memory for IOAPIC");
-				panic(PANIC_PAGING);
-			}
-		}
+		paging_unmap(ioapic_base, PAGE_4K);
+		mm_free_v(ioapic_base, PAGE_SIZE_4K);
 	}
 
 	// map all gsis back to ioapics (second pass after knowing gsi_max)
@@ -94,11 +96,29 @@ void ioapic_init(void) {
 			handle != 0;
 			acpi_parse_madt_ics((void*)&ioapic, &handle, MADT_ICS_IO_APIC)) {
 
-		const uint64_t ioapic_base = ioapic->IOAPICAddress;
+		const uint64_t ioapic_base_paddr = ioapic->IOAPICAddress;
+		const uint64_t ioapic_base = mm_alloc_v(PAGE_SIZE_4K);
+
+		if (!ioapic_base) {
+			logging_log_error("Failed to map in ioapic");
+			panic(PANIC_NO_MEM);
+		}
+
+		if (!paging_map(ioapic_base, ioapic_base_paddr, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
+			logging_log_error("Failed to map memory for IOAPIC");
+			panic(PANIC_PAGING);
+		}
 
 		*(volatile uint32_t*)(ioapic_base + IOAPIC_OFF_IOREGSEL) = IOAPIC_IOAPICVER;
 		const uint64_t num_redir = 1 + (MAX_REDIR_ENTRY_MSK &
 			(*(volatile uint32_t*)(ioapic_base + IOAPIC_OFF_IOWIN) >> MAX_REDIR_ENTRY_SHF));
+
+		if (IOAPIC_REDIR_ST + num_redir * 2 > PAGE_SIZE_4K) {
+			logging_log_error("IOAPIC takes more than one page");
+			panic(PANIC_APIC);
+		}
+
+		*(volatile uint32_t*)(ioapic_base + IOAPIC_OFF_IOREGSEL) = IOAPIC_IOAPICVER;
 
 		for (uint64_t i = 0; i < num_redir; i++) {
 			redir_index[i].ioapic_base = ioapic_base;

@@ -31,6 +31,8 @@
 #include <core/process.h>
 #include <core/lock.h>
 #include <core/fs.h>
+#include <core/msr.h>
+#include <core/gdt.h>
 
 #include <lib/kmemcpy.h>
 
@@ -78,6 +80,10 @@ void kentry(void) {
 	idt_init();
 	paging_ensure_mapped();
 	scheduler_init();
+
+
+	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+
 	logging_log_debug("TSS and IDT init done");
 
 	logging_log_debug("ACPI init");
@@ -127,6 +133,8 @@ void kapentry(uint64_t arb_id) {
 
 	proc_data_set_id((uint8_t)arb_id);
 	proc_data_get()->arb_id = (uint8_t)arb_id;
+
+	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
 
 	alloc_init();
 

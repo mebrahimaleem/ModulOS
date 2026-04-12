@@ -56,7 +56,7 @@ export CC := clang
 export AR := llvm-ar
 export STRIP := llvm-strip
 
-SUBDIRS := kernel boot drivers test
+SUBDIRS := kernel boot drivers test userland
 KERNEL_TARGETS := \
 									$(OBJ_DIR)/kernel.a
 BOOT_TARGETS := \
@@ -68,6 +68,8 @@ TEST_TARGETS := \
 									$(OBJ_DIR)/test_lib.a \
 									$(OBJ_DIR)/test_testsuite.a
 
+USERLAND_TARGETS := $(OBJ_DIR)/userland_files/
+
 export RUNTIME_DRIVERS_TARGETS := \
 																		$(OBJ_DIR)/drivers/driver_list.txt
 
@@ -77,6 +79,8 @@ TEST_EXEC := $(basename $(TEST_TARGETS))
 COPY_DOC_TO := $(OBJ_DIR)/rootfs/usr/share/doc/ModulOS/
 
 COPY_DRIVERS_TO := $(OBJ_DIR)/rootfs/lib/drivers/
+
+COPY_USERLAND_TO := $(OBJ_DIR)/rootfs/
 
 SRC := $(shell find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \))
 
@@ -118,6 +122,7 @@ $(KERNEL_TARGETS): kernel
 $(BOOT_TARGETS): boot
 $(DRIVERS_TARGETS): drivers
 $(RUNTIME_DRIVERS_TARGETS): drivers
+$(USERLAND_TARGETS): userland
 
 $(TEST_TARGETS): test
 
@@ -132,6 +137,9 @@ copy-doc: COPYING LICENSES | $(COPY_DOC_TO)
 copy-runtime-drivers: $(RUNTIME_DRIVERS_TARGETS) | $(COPY_DRIVERS_TO)
 	cp -r $^ $|
 
+.PHONY: copy-userland
+copy-userland: $(USERLAND_TARGETS) | $(COPY_USERLAND_TO)
+	cp -r $^/* $|
 
 $(OBJ_DIR)/stub.img: | $(OBJ_DIR)/
 	truncate -s 4G $@
@@ -147,7 +155,7 @@ $(OBJ_DIR)/stub-esp.dummy: $(OBJ_DIR)/stub.img $(OBJ_DIR)/modulos $(OBJ_DIR)/esp
 
 # 54525952 is for 52MiB offset (512 * 1024 * 1024)
 # 1034240 is for 52MiB initial (4MiB align + 48MiB ESP) and 4MiB tail for gpt
-$(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img copy-runtime-drivers copy-doc
+$(OBJ_DIR)/stub-fs.dummy: $(OBJ_DIR)/stub.img copy-runtime-drivers copy-userland copy-doc
 	yes | mke2fs -L rootfs -E offset=54525952 -d $(OBJ_DIR)/rootfs/ -t ext2 \
 		-b 4096 $< 1034240
 	touch $@
@@ -168,4 +176,4 @@ $(OBJ_DIR)/modulos-dbg: $(OBJ_DIR)/modulos.ld \
 	$(OBJ_DIR)/boot.a \
 	$(OBJ_DIR)/kernel.a \
 	$(OBJ_DIR)/drivers.a
-	$(CC) -o $@ $(LTO) $(LD_FLAGS) -fuse-ld=lld -T $^
+	$(CC) -o $@ $(LD_FLAGS) -fuse-ld=lld -T $^

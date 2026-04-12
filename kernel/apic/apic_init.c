@@ -103,8 +103,15 @@ volatile struct gdt_ptr_64_t** ap_gdt_ptr_64;
 uint8_t* ap_init_locks;
 
 void apic_init(void) {
-	apic_base = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
-	if (!paging_map(apic_base, apic_base,
+	uint64_t apic_base_paddr = msr_read(MSR_APIC_BASE) & APIC_BASE_MASK;
+	apic_base = mm_alloc_v(PAGE_SIZE_4K);
+
+	if (!apic_base) {
+		logging_log_error("Failed to map in apic");
+		panic(PANIC_NO_MEM);
+	}
+
+	if (!paging_map(apic_base, apic_base_paddr,
 			PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K)) {
 		logging_log_error("Failed to map memory for LAPIC");
 		panic(PANIC_PAGING);

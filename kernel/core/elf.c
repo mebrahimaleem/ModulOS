@@ -27,6 +27,7 @@
 #include <core/gdt.h>
 #include <core/syscall.h>
 #include <core/cpu_instr.h>
+#include <core/proc_data.h>
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemset.h>
@@ -129,6 +130,13 @@ typedef struct {
 
 _Static_assert(sizeof(Elf64_Phdr) == 56, "Bad ELF program header size");
 
+struct mem_reg_t {
+	uint64_t base;
+	uint64_t top;
+	uint64_t perms;
+	struct mem_reg_t* next;
+};
+
 static const uint8_t elf_magic[4] = {0x7f, 'E', 'L', 'F'};
 
 static uint8_t check_valid(struct fs_handle_t* file, Elf64_Ehdr* header) {
@@ -216,29 +224,17 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 	Elf64_Off img_off;
 
 	uint64_t paddr;
-	uint16_t page_flags;
+	uint64_t page_flags;
 
-	uint64_t old_cr3 = cpu_get_cr3();
+	struct mem_reg_t* mem_regs = 0;
+	struct mem_reg_t* j;
+	struct mem_reg_t* temp;
 
-	cpu_set_cr3(pcb->cr3);
-
-	for (img_off = INIT_USERLAND_RSP - INIT_STACK_SIZE; img_off < INIT_USERLAND_RSP; img_off += PAGE_SIZE_4K) {
-		paddr = mm_alloc_p(PAGE_SIZE_4K);
-
-		if (!paddr) {
-			cpu_set_cr3(old_cr3);
-			paging_free_userspace((uint64_t*)pcb->cr3);
-			kfree(pcb);
-			return 0;
-		}
-
-		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
-		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
-	}
-
+	// first pass to determine memory layout
 	for (Elf64_Half i = 0; i < header.e_phnum; i++) {
 		fs_seek(file, ph_off);
 		fs_read(file, &pheader, sizeof(pheader));
+		ph_off += header.e_phentsize;
 
 		if (pheader.p_type != PT_LOAD) {
 			// TODO: support other pt types
@@ -246,15 +242,9 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 		}
 
 		if (pheader.p_vaddr + pheader.p_memsz >= INIT_USERLAND_SB) {
-			// image stack collision
+			// stack collision
 			kfree(pcb);
-			cpu_set_cr3(old_cr3);
-			return 0;
-		}
-
-		if (pheader.p_vaddr % PAGE_SIZE_4K) {
-			kfree(pcb);
-			cpu_set_cr3(old_cr3);
+			pcb = 0;
 			return 0;
 		}
 
@@ -268,26 +258,120 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 			page_flags |= PAGE_XD;
 		}
 
-		for (img_off = 0; img_off < pheader.p_memsz; img_off += PAGE_SIZE_4K) {
-			paddr = mm_alloc_p(PAGE_SIZE_4K);
+		uint64_t base = pheader.p_vaddr;
+		uint64_t top = pheader.p_vaddr + pheader.p_memsz;
 
-			if (!paddr) {
-				cpu_set_cr3(old_cr3);
-				paging_free_userspace((uint64_t*)pcb->cr3);
+		base -= base % PAGE_SIZE_4K;
+
+		if (top % PAGE_SIZE_4K) {
+			top += PAGE_SIZE_4K - (top % PAGE_SIZE_4K);
+		}
+
+		struct mem_reg_t** insert = &mem_regs;
+		for (j = mem_regs; j; j = j->next) {
+			if (base < j->base) {
+				break;
+			}
+
+			insert = &j->next;
+		}
+
+		// insert in order
+		
+		j = (*insert);
+		*insert = kmalloc(sizeof(struct mem_reg_t));
+		(*insert)->base = base;
+		(*insert)->top = top;
+		(*insert)->perms = page_flags;
+		(*insert)->next = j;
+	}
+
+	// detect overlaping memory
+	for (j = mem_regs; j && j->next; j = j->next) {
+		if (j->top > j->next->base) {
+			if (j->perms != j->next->perms) {
+				// overlap
 				kfree(pcb);
 				return 0;
 			}
 
-			paging_map_proc(pheader.p_vaddr + img_off, paddr, page_flags, PAGE_4K, (uint64_t*)pcb->cr3);
+			// merge
+			j->top = j->top > j->next->top ? j->top : j->next->top;
+			temp = j->next;
+			j->next = j->next->next;
+			kfree(temp);
+		}
+	}
+
+	uint64_t old_cr3 = proc_data_get()->current_process->cr3;
+	proc_data_get()->current_process->cr3 = pcb->cr3;
+
+	cpu_set_cr3(pcb->cr3);
+
+	// map in memory for copying
+	for (j = mem_regs; j; j = j->next) {
+		for (uint64_t off = 0; off < j->top - j->base; off += PAGE_SIZE_4K) {
+			paddr = mm_alloc_p(PAGE_SIZE_4K);
+
+			if (!paddr) {
+				paging_free_userspace((uint64_t*)pcb->cr3);
+				kfree(pcb);
+				pcb = 0;
+				goto restore_cr3;
+			}
+
+			paging_map_proc(j->base + off, paddr, PAGE_PRESENT | PAGE_RW, PAGE_4K, (uint64_t*)pcb->cr3);
+		}
+	}
+
+	// map in stack
+	for (img_off = INIT_USERLAND_RSP - INIT_STACK_SIZE; img_off < INIT_USERLAND_RSP; img_off += PAGE_SIZE_4K) {
+		paddr = mm_alloc_p(PAGE_SIZE_4K);
+
+		if (!paddr) {
+			paging_free_userspace((uint64_t*)pcb->cr3);
+			kfree(pcb);
+			pcb = 0;
+			goto restore_cr3;
+		}
+
+		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
+	}
+
+	// copy in executable
+	ph_off = header.e_phoff;
+	for (Elf64_Half i = 0; i < header.e_phnum; i++) {
+		fs_seek(file, ph_off);
+		fs_read(file, &pheader, sizeof(pheader));
+		ph_off += header.e_phentsize;
+
+		if (pheader.p_type != PT_LOAD) {
+			// TODO: support other pt types
+			continue;
 		}
 
 		fs_seek(file, pheader.p_offset);
 		fs_read(file, (void*)pheader.p_vaddr, pheader.p_filesz);
 		kmemset((void*)(pheader.p_vaddr + pheader.p_memsz - pheader.p_filesz), 0, pheader.p_memsz - pheader.p_filesz);
-
-		ph_off += header.e_phentsize;
 	}
 
+	// update page permissions
+	for (j = mem_regs; j; j = j->next) {
+		for (uint64_t off = 0; off < j->top - j->base; off += PAGE_SIZE_4K) {
+			paging_update_perms(j->base + off, j->perms, PAGE_4K, (uint64_t*)pcb->cr3);
+		}
+	}
+
+restore_cr3:
+
+	while (mem_regs) {
+		temp = mem_regs->next;
+		kfree(mem_regs);
+		mem_regs = temp;
+	}
+
+	proc_data_get()->current_process->cr3 = old_cr3;
 	cpu_set_cr3(old_cr3);
 
 	return pcb;

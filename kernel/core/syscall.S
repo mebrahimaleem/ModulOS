@@ -21,4 +21,4 @@ movq %rdi, %rcx // rip
 movq %rsi, %r11 // rflags
 movq %rdx, %rsp // rsp
 
-sysret
+sysretq

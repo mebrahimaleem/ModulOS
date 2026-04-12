@@ -54,7 +54,7 @@ void process_init(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	process_init_ap(init_rsp_vaddr, init_rsp_paddr);
 }
 
-static uint64_t assign_pid(void) {
+uint64_t process_assign_pid(void) {
 	lock_acquire(&lock_proc);
 	const uint64_t ret = next_pid++;
 	lock_release(&lock_proc);
@@ -69,11 +69,9 @@ void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	struct pcb_t* pcb = kmalloc(sizeof(struct pcb_t));
 	pcb->init_k_rsp_vaddr = init_rsp_vaddr;
 	pcb->init_k_rsp_paddr = init_rsp_paddr;
-	pcb->init_k_rsp_vaddr =
-		pcb->init_k_rsp_paddr = 0;
 	pcb->sched_cntr = SCHED_SKIP;
 	proc_data_get()->current_process = pcb;
-	proc_data_get()->current_process->pid = assign_pid();
+	proc_data_get()->current_process->pid = process_assign_pid();
 }
 
 struct pcb_t* process_from_vaddr(uint64_t vaddr) {
@@ -121,13 +119,17 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 
 	pcb->cr3 = (uint64_t)&kernel_pml4;
 
-	pcb->pid = assign_pid();
+	pcb->pid = process_assign_pid();
 
 	return pcb;
 }
 
 struct pcb_t* process_from_func(process_function_t func, void* cntx) {
 	struct pcb_t* pcb = process_from_vaddr((uint64_t)function_setup);
+
+	if (!pcb) {
+		return 0;
+	}
 
 	pcb->rdi = (uint64_t)func;
 	pcb->rsi = (uint64_t)cntx;
@@ -194,13 +196,13 @@ uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr,
 
 	stack_vaddr = mm_alloc_v(INIT_STACK_SIZE + PAGE_SIZE_4K); // extra guard page
 	if (!stack_vaddr) {
-		return 0;
+		return 1;
 	}
 
 	stack_paddr = mm_alloc_p(INIT_STACK_SIZE);
 	if (!stack_paddr) {
 		mm_free_v(stack_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
-		return 0;
+		return 1;
 	}
 
 	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be four pages (16KiB)");
@@ -218,5 +220,5 @@ uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr,
 	*init_paddr = stack_paddr;
 	*stack = stack_vaddr + PAGE_SIZE_4K * 5;
 
-	return 1;
+	return 0;
 }

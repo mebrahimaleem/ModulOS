@@ -26,6 +26,9 @@
 #include <kernel/core/fs.h>
 #include <kernel/core/lock.h>
 #include <kernel/core/panic.h>
+#include <kernel/core/process.h>
+#include <kernel/core/elf.h>
+#include <kernel/core/scheduler.h>
 
 #include <kernel/lib/kmemcmp.h>
 #include <kernel/lib/kmemcpy.h>
@@ -683,14 +686,31 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 		if (!root_handle) {
 			logging_log_error("Failed to open root directory");
 		}
+		else {
+			if ((sts = fs_stat(root_handle, &stat_buf)) != FILE_OK) {
+				logging_log_error("Failed to stat root directory %u", (uint32_t)sts);
+			}
+			else {
+				logging_log_debug("Root directory %u (%u)", stat_buf.size, stat_buf.type);
+			}
 
-		if ((sts = fs_stat(root_handle, &stat_buf)) != FILE_OK) {
-			logging_log_error("Failed to stat root directory %u", (uint32_t)sts);
+			fs_close(root_handle);
 		}
 
-		logging_log_debug("Root directory %u (%u)", stat_buf.size, stat_buf.type);
 
-		fs_close(root_handle);
+		struct fs_handle_t* test_file = fs_open("/test");
+		if (!test_file) {
+			logging_log_error("Failed to open test file");
+		}
+		else {
+			struct pcb_t* test_pcb = elf_load(test_file, process_assign_pid());
+			if (!test_pcb) {
+				logging_log_error("Failed to load test file");
+			}
+			fs_close(test_file);
+
+			scheduler_schedule(test_pcb);
+		}
 	}
 
 	//TODO: mount other volumes
