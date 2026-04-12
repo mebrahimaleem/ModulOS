@@ -25,7 +25,7 @@
 #include <core/proc_data.h>
 #include <core/gdt.h>
 
-#include <drivers/apic/apic_regs.h>
+#include <apic/apic_regs.h>
 
 static uint8_t lock_sched;
 static volatile struct pcb_t* active_queue;
@@ -91,5 +91,7 @@ void scheduler_run(void) {
 
 	cpu_cli();
 	apic_write_reg(APIC_REG_EOI, APIC_EOI);
+
+	cpu_set_cr3(run->cr3);
 	process_resume(run);
 }

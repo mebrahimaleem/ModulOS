@@ -1,4 +1,4 @@
-/* kmemcmp.h - library memcmp interface */
+/* isr_dispatch.h - APIC ISR dispatcher interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_APIC_ISR_DISPATCH_H
+#define KERNEL_APIC_ISR_DISPATCH_H
 
-#include <stdint.h>
-#include <stddef.h>
+extern void apic_error_dispatch(void);
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
-
-#endif /* KERNEL_LIB_KMEMCMP_H */
+#endif /* KERNEL_APIC_ISR_DISPATCH_H */

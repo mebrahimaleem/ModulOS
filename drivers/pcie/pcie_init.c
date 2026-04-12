@@ -19,7 +19,7 @@
 #include <pcie/pcie.h>
 #include <pcie/generic_database.h>
 
-#include <acpi/tables.h>
+#include <kernel/acpi/tables.h>
 
 #include <kernel/core/alloc.h>
 #include <kernel/core/mm.h>

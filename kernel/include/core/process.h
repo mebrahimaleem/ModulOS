@@ -19,6 +19,7 @@
 #define KERNEL_CORE_PROCESS_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #include <kernel/core/exception_dispatch.h>
 
@@ -51,10 +52,13 @@ struct pcb_t {
 	uint64_t pid;
 	uint32_t k_rsp_lo;
 	uint32_t k_rsp_hi;
-	uint64_t init_rsp_vaddr;
-	uint64_t init_rsp_paddr;
+	uint64_t saved_usr_rsp;
 	uint64_t init_k_rsp_vaddr;
 	uint64_t init_k_rsp_paddr;
+
+	struct process_memory_region_t* mem;
+
+	uint64_t cr3;
 
 	struct pcb_t* next;
 
@@ -109,5 +113,7 @@ extern void process_kill_current(void) __attribute__((noreturn));
 extern void process_discard(struct pcb_t* pcb);
 
 extern void process_preempt_entry(struct preempt_frame_t* context) __attribute__((noreturn));
+
+extern uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr, uint64_t* stack);
 
 #endif /* KERNEL_CORE_PROCESS_H */

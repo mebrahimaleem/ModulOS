@@ -1,4 +1,4 @@
-/* kmemcmp.h - library memcmp interface */
+/* sci.h - system control interrupt interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,9 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_ACPI_SCI_H
+#define KERNEL_ACPI_SCI_H
 
-#include <stdint.h>
-#include <stddef.h>
+extern void sci_isr(void);
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
-
-#endif /* KERNEL_LIB_KMEMCMP_H */
+#endif /* KERNEL_ACPI_SCI_H */

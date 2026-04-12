@@ -26,7 +26,7 @@
 #include <kernel/core/logging.h>
 #include <kernel/core/proc_data.h>
 
-#include <drivers/acpi/tables.h>
+#include <kernel/acpi/tables.h>
 
 #ifdef SERIAL
 #include <drivers/serial/serial.h>

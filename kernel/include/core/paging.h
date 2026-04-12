@@ -43,6 +43,10 @@ enum page_size_t {
 
 extern void paging_init(void);
 
+extern void paging_ensure_mapped(void);
+
+extern uint64_t paging_map_proc(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size, uint64_t* pml4);
+
 extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size);
 extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
 extern uint64_t paging_ident(uint64_t paddr);
@@ -50,5 +54,7 @@ extern uint64_t paging_ident(uint64_t paddr);
 extern void paging_install_guard(uint64_t vaddr);
 extern void paging_remove_guard(uint64_t vaddr);
 extern uint8_t paging_check_guard(uint64_t vaddr);
+
+extern uint64_t paging_create_pml4(void);
 
 #endif /* KERNEL_CORE_PAGING_H */

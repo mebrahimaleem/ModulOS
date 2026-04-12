@@ -1,4 +1,4 @@
-/* kmemcmp.h - library memcmp interface */
+/* ioapic_init.h - IO/APIC initialization interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,21 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_IOAPIC_IOAPIC_INIT_H
+#define KERNEL_IOAPIC_IOAPIC_INIT_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+#define IOAPIC_REDIR_TRG_EDG	0x00000
+#define IOAPIC_REDIR_TRG_LVL	0x08000
+#define IOAPIC_REDIR_POL_HI		0x00000
+#define IOAPIC_REDIR_POL_LO		0x02000
+#define IOAPIC_REDIR_MASK			0x10000
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+#define IOAPIC_REDIR_NMI	0x500
+
+extern void ioapic_init(void);
+
+extern void ioapic_conf_gsi(uint64_t gsi, uint8_t v, uint32_t flg, uint8_t dest);
+
+#endif /* KERNEL_IOAPIC_IOAPIC_INIT_H */

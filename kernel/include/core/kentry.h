@@ -23,7 +23,7 @@
 
 #include <kernel/core/gdt.h>
 
-#include <drivers/acpi/tables.h>
+#include <kernel/acpi/tables.h>
 
 #ifdef GRAPHICSBASE
 #include <kernel/graphicsbase/framebuffer.h>

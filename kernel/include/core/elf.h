@@ -1,5 +1,5 @@
-/* kmemcmp.h - library memcmp interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* elf.h - Executable and Linking Format loading interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,12 +15,16 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_CORE_ELF_H
+#define KERNEL_CORE_ELF_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+#include <kernel/core/fs.h>
+#include <kernel/core/process.h>
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+extern uint8_t elf_is_elf(struct fs_handle_t* file);
+
+extern struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid);
+
+#endif /* KERNEL_CORE_ELF_H */

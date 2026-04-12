@@ -1,5 +1,5 @@
-/* kmemcmp.h - library memcmp interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* kmemset.c - library memset implementation */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,12 +15,21 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
-
 #include <stdint.h>
 #include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+#include <lib/kmemset.h>
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+void* memset(void* ptr, uint64_t v, size_t c) __attribute__((weak));
+
+void* memset(void* ptr, uint64_t v, size_t c) {
+	uint8_t* p = ptr;
+
+	for (size_t i = 0; i < c; i++) {
+		p[i] = (uint8_t)v;
+	}
+
+	return ptr;
+}
+
+void* kmemset(void* ptr, uint64_t v, size_t c) __attribute__((alias("memset")));

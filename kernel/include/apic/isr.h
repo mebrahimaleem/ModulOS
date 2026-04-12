@@ -1,4 +1,4 @@
-/* kmemcmp.h - library memcmp interface */
+/* isr.h - APIC ISRs interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_APIC_ISR_H
+#define KERNEL_APIC_ISR_H
 
-#include <stdint.h>
-#include <stddef.h>
+extern void apic_isr_timer(void) __attribute__((noreturn));
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+extern void apic_isr_error(void);
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+extern void apic_isr_tlb_shootdown(void);
+
+#endif /* KERNEL_APIC_ISR_H */

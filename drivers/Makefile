@@ -19,11 +19,6 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
 export OBJ_DIR := $(OBJ_DIR)/drivers
 
-$(call add_directory,pic_8259,PIC_8259)
-$(call add_directory,apic,APIC)
-$(call add_directory,ioapic,IOAPIC)
-$(call add_directory,acpi,ACPI)
-$(call add_directory,acpica_osl,ACPICA_OSL)
 $(call add_directory,pcie,PCIE)
 $(call add_directory,disk,DISK)
 
@@ -58,12 +53,12 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.targets
 all: build
 
 .PHONY: build
-build: $(OBJ_DIR)/../drivers.a $(OBJ_DIR)/../acpica.a $(LDS)
-
-.PHONY: $(OBJ_DIR)/acpica.a
-$(OBJ_DIR)/acpica.a:
-	$(MAKE) -C acpica/ build
+build: $(OBJ_DIR)/../drivers.a $(LDS) \
+																				$(OBJ_DIR)/driver_list.txt
 
 $(OBJ_DIR)/drivers.a: $(TARGETS) | $(BUILD_DIRS)
 	rm -f $@
 	$(AR) rcs $@ $(TARGETS)
+
+$(OBJ_DIR)/driver_list.txt:
+	echo drivers > $@

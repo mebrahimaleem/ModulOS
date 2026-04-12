@@ -59,7 +59,6 @@ jmp cpu_halt_loop
 
 .globl cpu_trap
 cpu_trap:
-// setting a breakpoint here will catch traps
 ret
 
 .globl cpu_read_cr2
@@ -70,4 +69,14 @@ ret
 .globl cpu_wbinvd
 cpu_wbinvd:
 wbinvd
+ret
+
+.globl cpu_get_cr3
+cpu_get_cr3:
+movq %cr3, %rax
+ret
+
+.globl cpu_set_cr3
+cpu_set_cr3:
+movq %rdi, %cr3
 ret

@@ -1,4 +1,4 @@
-/* kmemcmp.h - library memcmp interface */
+/* apic_init.h - Local advanced programmable interrupt controller initialization interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,23 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_APIC_APIC_INIT_H
+#define KERNEL_APIC_APIC_INIT_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+extern void apic_init(void);
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+extern void apic_init_ap(void);
+
+extern void apic_nmi_enab(void);
+
+extern void apic_disab(void);
+
+extern void apic_timer_calib(uint8_t id);
+
+extern uint8_t apic_get_bsp_id(void);
+
+extern void apic_start_ap(void);
+
+#endif /* KERNEL_APIC_APIC_INIT_H */

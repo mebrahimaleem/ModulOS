@@ -16,7 +16,8 @@
 */
 
 #include <hpet/hpet_init.h>
-#include <acpi/tables.h>
+
+#include <kernel/acpi/tables.h>
 
 #include <kernel/core/logging.h>
 #include <kernel/core/panic.h>

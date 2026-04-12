@@ -38,12 +38,14 @@
 #include <mem_test/alloc_test.h>
 #endif /* MEM_TEST */
 
-#include <drivers/acpi/tables.h>
-#include <drivers/acpica_osl/init.h>
-#include <drivers/pic_8259/pic.h>
-#include <drivers/apic/apic_init.h>
-#include <drivers/apic/ipi.h>
-#include <drivers/ioapic/ioapic_init.h>
+#include <acpi/tables.h>
+#include <apic/apic_init.h>
+#include <apic/ipi.h>
+
+#include <pic_8259/pic.h>
+
+#include <ioapic/ioapic_init.h>
+
 #include <drivers/pcie/pcie_init.h>
 #include <drivers/disk/disk.h>
 
@@ -74,6 +76,7 @@ void kentry(void) {
 	tss_init((void*)paging_ident((uint64_t)boot_context.gdt));
 	process_init(init_stack_vaddr, init_stack_paddr);
 	idt_init();
+	paging_ensure_mapped();
 	scheduler_init();
 	logging_log_debug("TSS and IDT init done");
 
@@ -102,10 +105,6 @@ void kentry(void) {
 	pcie_init();
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
-
-	logging_log_debug("ACPICA init");
-	acpica_init();
-	logging_log_debug("ACPICA init done");
 
 	logging_log_info("Boot Complete ModulOS");
 

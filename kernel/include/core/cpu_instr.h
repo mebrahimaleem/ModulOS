@@ -42,4 +42,8 @@ extern uint64_t cpu_read_cr2(void);
 
 extern void cpu_wbinvd(void);
 
+extern uint64_t cpu_get_cr3(void);
+
+extern void cpu_set_cr3(uint64_t cr3);
+
 #endif /* KERNEL_CORE_CPU_INSTR_H */

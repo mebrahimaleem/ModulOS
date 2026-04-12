@@ -1,5 +1,5 @@
-/* kmemcmp.h - library memcmp interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* kmemcmp.c - library memcmp implementation */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,12 +15,28 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
-
 #include <stdint.h>
 #include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+#include <lib/kmemcmp.h>
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+int memcmp(const void* l, const void* r, size_t c) __attribute__((weak));
+
+int memcmp(const void* l, const void* r, size_t c) {
+	const uint8_t* p1 = l;
+	const uint8_t* p2 = r;
+
+	while (c && *p1 == *p2) {
+		p1++;
+		p2++;
+		c--;
+	}
+
+	if (c) {
+		return (int)(*p1 - *p2);
+	}
+	
+	return 0;
+}
+
+int kmemcmp(const void*l, const void* r, size_t c) __attribute__((alias("memcmp")));

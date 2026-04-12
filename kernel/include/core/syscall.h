@@ -1,5 +1,5 @@
-/* kmemcmp.h - library memcmp interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* process.h - kernel system call interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,12 +15,11 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_CORE_SYSCALL_H
+#define KERNEL_CORE_SYSCALL_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+extern void syscall_return(uint64_t rip, uint64_t rfl, uint64_t rsp);
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+#endif /* KERNEL_CORE_SYSCALL_H */

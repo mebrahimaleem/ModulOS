@@ -1,4 +1,4 @@
-/* kmemcmp.h - library memcmp interface */
+/* routing.h - IO/APIC interrupt routing interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KMEMCMP_H
-#define KERNEL_LIB_KMEMCMP_H
+#ifndef KERNEL_IOAPIC_ROUTING_H
+#define KERNEL_IOAPIC_ROUTING_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-extern int kmemcmp(const void* l, const void* r, size_t c);
+extern void ioapic_routing_init(uint64_t num_gsi);
 
-#endif /* KERNEL_LIB_KMEMCMP_H */
+extern uint64_t ioapic_routing_legacy_gsi(uint8_t isa_irq);
+
+#endif /* KERNEL_IOAPIC_ROUTING_H */
