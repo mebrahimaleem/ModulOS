@@ -21,6 +21,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-extern int64_t kmemcmp(const void* l, const void* r, size_t c);
+extern int kmemcmp(const void* l, const void* r, size_t c);
 
 #endif /* KERNEL_LIB_KMEMCMP_H */

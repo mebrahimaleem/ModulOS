@@ -21,6 +21,10 @@ OBJ_DIR := $(OBJ_DIR)/kernel
 
 $(call add_directory,core,CORE)
 $(call add_directory,lib,LIB)
+$(call add_directory,apic,APIC)
+$(call add_directory,ioapic,IOAPIC)
+$(call add_directory,pic_8259,PIC_8259)
+$(call add_directory,acpi,ACPI)
 
 ifdef BUILD_KERNEL_GRAPHICSBASE
 $(call add_directory,graphicsbase,GRAPHICSBASE)

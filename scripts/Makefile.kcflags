@@ -22,7 +22,7 @@ ifndef DEBUG
 	CWARN := $(CWARN) -Werror
 endif
 
-LD_FLAGS := -std=c23 -mcmodel=kernel -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
+LD_USR_FLAGS := -std=c23 -fno-pie -mno-mmx -mno-sse -mno-sse2 \
 	-fomit-frame-pointer -nodefaultlibs -nostdlib -mcmodel=kernel \
 	-ffreestanding -fno-unwind-tables -fno-exceptions -fno-rtti \
 	-fno-semantic-interposition -fvisibility=hidden \
@@ -30,8 +30,11 @@ LD_FLAGS := -std=c23 -mcmodel=kernel -fno-pie -mno-red-zone -mno-mmx -mno-sse -m
 	-static -D_MODULOS $(CDEBUG)
 
 ifndef DEBUG
-	LD_FLAGS := $(LD_FLAGS) -flto=thin
+	LD_USR_FLAGS := $(LD_USR_FLAGS) -flto=thin
 endif
+
+LD_FLAGS := $(LD_USR_FLAGS) -mcmodel=kernel -mno-red-zone
+
 
 CFLAGS := $(CWARN) $(LD_FLAGS) $(DEFINES) -I include/ -I $(SRC_TREE_ROOT)/include/ -MMD -MP -c
 

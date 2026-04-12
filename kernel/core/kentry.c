@@ -31,6 +31,8 @@
 #include <core/process.h>
 #include <core/lock.h>
 #include <core/fs.h>
+#include <core/msr.h>
+#include <core/gdt.h>
 
 #include <lib/kmemcpy.h>
 
@@ -38,12 +40,14 @@
 #include <mem_test/alloc_test.h>
 #endif /* MEM_TEST */
 
-#include <drivers/acpi/tables.h>
-#include <drivers/acpica_osl/init.h>
-#include <drivers/pic_8259/pic.h>
-#include <drivers/apic/apic_init.h>
-#include <drivers/apic/ipi.h>
-#include <drivers/ioapic/ioapic_init.h>
+#include <acpi/tables.h>
+#include <apic/apic_init.h>
+#include <apic/ipi.h>
+
+#include <pic_8259/pic.h>
+
+#include <ioapic/ioapic_init.h>
+
 #include <drivers/pcie/pcie_init.h>
 #include <drivers/disk/disk.h>
 
@@ -74,7 +78,12 @@ void kentry(void) {
 	tss_init((void*)paging_ident((uint64_t)boot_context.gdt));
 	process_init(init_stack_vaddr, init_stack_paddr);
 	idt_init();
+	paging_ensure_mapped();
 	scheduler_init();
+
+
+	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+
 	logging_log_debug("TSS and IDT init done");
 
 	logging_log_debug("ACPI init");
@@ -103,10 +112,6 @@ void kentry(void) {
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
 
-	logging_log_debug("ACPICA init");
-	acpica_init();
-	logging_log_debug("ACPICA init done");
-
 	logging_log_info("Boot Complete ModulOS");
 
 	logging_log_info("Begining AP bootstrap sequence");
@@ -115,7 +120,9 @@ void kentry(void) {
 			&ap_bootstrap_start,
 			(uint64_t)&ap_bootstrap_end - (uint64_t)&ap_bootstrap_start);
 
+#ifdef SMP_ENABLE
 	apic_start_ap();
+#endif /* SMP_ENABLE */
 
 	logging_log_info("AP bootstrap sequence done");
 
@@ -128,6 +135,8 @@ void kapentry(uint64_t arb_id) {
 
 	proc_data_set_id((uint8_t)arb_id);
 	proc_data_get()->arb_id = (uint8_t)arb_id;
+
+	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
 
 	alloc_init();
 

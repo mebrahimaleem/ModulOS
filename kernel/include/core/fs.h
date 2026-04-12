@@ -49,6 +49,8 @@ typedef void (*fs_close_t)(struct file_handle_t*);
 
 typedef enum file_status_t (*fs_stat_t)(struct file_handle_t*, struct file_info_t*);
 typedef size_t (*fs_read_t)(struct file_handle_t*, void*, size_t);
+typedef uint64_t (*fs_get_seek_t)(struct file_handle_t*);
+typedef enum file_status_t (*fs_seek_t)(struct file_handle_t*, uint64_t);
 
 void fs_init(void);
 
@@ -58,7 +60,9 @@ enum file_status_t fs_mount(
 		fs_open_t open,
 		fs_close_t close,
 		fs_stat_t stat,
-		fs_read_t read
+		fs_read_t read,
+		fs_get_seek_t get_seek,
+		fs_seek_t seek
 		);
 
 extern struct fs_handle_t* fs_open(const char* path);
@@ -66,5 +70,7 @@ extern void fs_close(struct fs_handle_t* handle);
 
 extern enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
 extern size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count);
+extern uint64_t fs_get_seek(struct fs_handle_t* handle);
+extern enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek);
 
 #endif /* KERNEL_CORE_FS_H */

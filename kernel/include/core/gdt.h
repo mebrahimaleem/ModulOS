@@ -43,10 +43,10 @@
 #define GDT_UDATA_INDEX	4
 #define GDT_TSS_INDEX		5
 
-#define GDT_KERNEL_CS		0x8
-#define GDT_KERNEL_SS		0x10
-#define GDT_USER_CS			0x18
-#define GDT_USER_SS			0x20
+#define GDT_KERNEL_CS		0x8uLL
+#define GDT_KERNEL_SS		0x10uLL
+#define GDT_USER_SS			0x18uLL
+#define GDT_USER_CS			0x20uLL
 
 struct gdt_ptr_64_t {
 	uint16_t limit;

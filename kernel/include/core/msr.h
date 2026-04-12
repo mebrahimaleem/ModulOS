@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #define MSR_APIC_BASE	0x0000001B
+#define MSR_STAR			0xC0000081
 
 extern void msr_write(uint64_t msr, uint64_t val);
 

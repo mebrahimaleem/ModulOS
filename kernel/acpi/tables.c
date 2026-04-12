@@ -1,0 +1,497 @@
+/* tables.c - ACPI tables */
+/* Copyright (C) 2025-2026  Ebrahim Aleem
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <https://www.gnu.org/licenses/>
+*/
+
+#include <stdint.h>
+
+#include <acpi/tables.h>
+
+#include <core/kentry.h>
+#include <core/panic.h>
+#include <core/logging.h>
+#include <core/paging.h>
+#include <core/alloc.h>
+#include <core/mm.h>
+
+#include <lib/kmemcmp.h>
+#include <lib/kmemcpy.h>
+#include <lib/hash.h>
+
+#define V1_TABLE_SIZE	20
+
+#define RSDPV1	1
+#define RSDPV2	2
+
+#define FOUND_FADT	0x01
+#define FOUND_MADT	0x02
+#ifdef HPET
+#define FOUND_HPET	0x04
+#else /* HPET */
+#define FOUND_HPET	0x00
+#endif /* HPET */
+#define FOUND_MCFG	0x08
+
+#define FOUND_ALL		(FOUND_FADT | FOUND_MADT | FOUND_HPET | FOUND_MCFG)
+
+#define GAS_TYPE_SYS	0
+#define GAS_TYPE_IO		1
+
+struct acpi_gen_header_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+};
+
+struct acpi_gas_t {
+	uint8_t AddressSpaceID;
+	uint8_t RegisterBitWidth;
+	uint8_t RegisterBitOffset;
+	uint8_t AccessSize;
+	uint64_t Address;	
+} __attribute__((packed));
+
+struct acpi_xsdt_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint64_t Entry[];
+} __attribute__((packed));
+
+struct acpi_rsdt_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint32_t Entry[];
+} __attribute__((packed));
+
+struct acpi_fadt_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t FADTMajorVersion;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint32_t FIRMWARE_CTRL;
+	uint32_t DSDT;
+	uint8_t Reserved0;
+	uint8_t Preferred_PM_Profile;
+	uint16_t SCI_INT;
+	uint32_t SMI_CMD;
+	uint8_t ACPI_ENABLE;
+	uint8_t ACPI_DISABLE;
+	uint8_t S4BIOS_REQ;
+	uint8_t PSTATE_CNT;
+	uint32_t PM1a_EVT_BLK;
+	uint32_t PM1b_EVT_BLK;
+	uint32_t PM1a_CNT_BLK;
+	uint32_t PM1b_CNT_BLK;
+	uint32_t PM2_CNT_BLK;
+	uint32_t PM_TMR_BLK;
+	uint32_t GPE0_BLK;
+	uint32_t GPE1_BLK;
+	uint8_t PM1_EVT_LEN;
+	uint8_t PM1_CNT_LEN;
+	uint8_t PM2_CNT_LEN;
+	uint8_t PM_TMR_LEN;
+	uint8_t GPE0_BLK_LEN;
+	uint8_t GPE1_BLK_LEN;
+	uint8_t GPE1_BASE;
+	uint8_t CST_CNT;
+	uint16_t P_LVL2_LAT;
+	uint16_t P_LVL3_LAT;
+	uint16_t FLUSH_SIZE;
+	uint16_t FLUSH_STRIDE;
+	uint8_t DUTY_OFFSET;
+	uint8_t DUTY_WIDTH;
+	uint8_t DAY_ALRM;
+	uint8_t MON_ALRM;
+	uint8_t CENTURY;
+	uint16_t IAPC_BOOT_ARCH;
+	uint8_t Reserved1;
+	uint32_t Flags;
+	struct acpi_gas_t RESET_REG;
+	uint8_t RESET_VALUE;
+	uint16_t ARM_BOOT_ARCH;
+	uint8_t FADTMinorVersion;
+	uint64_t X_FIRMWARE_CTRL;
+	uint64_t X_DSDT;
+	struct acpi_gas_t X_PM1a_EVT_BLK;
+	struct acpi_gas_t X_PM1b_EVT_BLK;
+	struct acpi_gas_t X_PM1a_CNT_BLK;
+	struct acpi_gas_t X_PM1b_CNT_BLK;
+	struct acpi_gas_t X_PM2_CNT_BLK;
+	struct acpi_gas_t X_PM_TMR_BLK;
+	struct acpi_gas_t X_GPE0_BLK;
+	struct acpi_gas_t X_GPE1_BLK;
+	struct acpi_gas_t SLEEP_CONTROL_REG;
+	struct acpi_gas_t SLEEP_STATUS_REG;
+	uint64_t HypervisorVendorIdentity;
+} __attribute__((packed));
+
+struct acpi_madt_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint32_t LocalInterruptControllerAddress;
+	uint32_t Flags;
+	uint8_t InterruptControllerStructure[];
+} __attribute__((packed));
+
+struct acpi_mcfg_conf_entry_t {
+	uint64_t base;
+	uint16_t group;
+	uint8_t bus_start;
+	uint8_t bus_end;
+	uint32_t resv;
+} __attribute__((packed));
+
+struct acpi_mcfg_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	uint64_t Reserved;
+	struct acpi_mcfg_conf_entry_t conf[];
+} __attribute__((packed));
+
+#ifdef HPET
+struct acpi_hpet_t {
+	uint8_t Signature[4];
+	uint32_t Length;
+	uint8_t Revision;
+	uint8_t Checksum;
+	uint8_t OEMID[6];
+	uint8_t OEMTableID[8];
+	uint32_t OEMRevision;
+	uint32_t CreatorID;
+	uint32_t CreatorRevision;
+	struct {
+		uint8_t HardwareRevID;
+		uint8_t NumComparator_CounterSizer_Legacy;
+		uint16_t PCIVendorID;
+	} __attribute__((packed)) EventTimerBlockID;
+	struct acpi_gas_t BASE_ADDRESS;
+	uint8_t HPETNumber;
+	uint16_t MainCounterMinimumClockTick;
+	uint8_t PageProtectionAndOEMAttribute;
+} __attribute__((packed));
+#endif /* HPET */
+
+static struct acpi_fadt_t* acpi_fadt;
+static struct acpi_madt_t* acpi_madt;
+static struct acpi_mcfg_t* acpi_mcfg;
+#ifdef HPET
+static struct acpi_hpet_t* acpi_hpet[8];
+static uint8_t hpet_count;
+#endif /* HPET */
+
+#define CHECK_FAIL_RSDPV1(sig) \
+	logging_log_error("Bad ACPI " sig " checksum"); \
+	panic(PANIC_ACPI)
+
+#define CHECK_FAIL_RSDPV2(sig) \
+	logging_log_warning("Bad ACPI " sig " checksum. Falling back to RSDPV1"); \
+	goto fallback
+
+#define CHECK_AND_COPY(sig, tbl, store, fnd, post) \
+	do { \
+		if (!kmemcmp((uint8_t*)gen->Signature, sig, 4)) { \
+			logging_log_info("Copying ACPI "  tbl " @ 0x%lX", (uint64_t)gen); \
+			store = kmalloc(gen->Length); \
+			kmemcpy((void*)store, (void*)gen, gen->Length); \
+			found |= fnd; \
+			post; \
+		} \
+	} \
+	while (0)
+
+static inline uint8_t verify_checksum(const volatile struct acpi_gen_header_t* table) {
+	const volatile struct acpi_gen_header_t* gen = (struct acpi_gen_header_t*)table;
+	return hash_byte_sum((void*)gen, gen->Length);
+}
+
+static volatile void* map_table(const volatile void* table) {
+	uint64_t base = (uint64_t)table & PAGE_BASE_MASK, vaddr, len, off;
+	volatile struct acpi_gen_header_t* v_table;
+
+	vaddr = mm_alloc_v(PAGE_SIZE_4K * 2);
+	if (!vaddr) {
+		logging_log_error("Failed to allocate memory for ACPI table");
+		panic(PANIC_NO_MEM);
+	}
+
+	paging_map(vaddr, base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	paging_map(vaddr + PAGE_SIZE_4K, base + PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+
+	v_table = (volatile struct acpi_gen_header_t*)(vaddr + (uint64_t)table - base);
+	if (!vaddr) {
+		logging_log_error("Failed to allocate memory for ACPI table");
+		panic(PANIC_NO_MEM);
+	}
+
+	logging_log_debug("Found ACPI table %4.4s", &v_table->Signature[0]);
+	if (verify_checksum(v_table)) {
+		paging_unmap(vaddr + base, PAGE_4K);
+		paging_unmap(vaddr + PAGE_SIZE_4K, PAGE_4K);
+
+		mm_free_v(vaddr, PAGE_SIZE_4K * 2);
+
+		logging_log_warning("Bad Checksum for %4.4s", &v_table->Signature[0]);
+		return 0;
+	}
+
+	len = v_table->Length + (uint64_t)table - base;
+
+	paging_unmap(vaddr, PAGE_4K);
+	paging_unmap(vaddr + PAGE_SIZE_4K, PAGE_4K);
+
+	mm_free_v(vaddr, PAGE_SIZE_4K * 2);
+
+	vaddr = mm_alloc_v(len);
+	for (off = 0; off < len; off += PAGE_SIZE_4K) {
+		paging_map(vaddr + off, base + off, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
+	}
+
+	return (void*)(vaddr + (uint64_t)table - base);
+}
+
+static void unmap_table(const volatile void* table) {
+	volatile struct acpi_gen_header_t* v_table = (volatile struct acpi_gen_header_t*)table;
+	uint64_t base, len, off;
+
+	base = (uint64_t)table & PAGE_BASE_MASK;
+	len = v_table->Length + (uint64_t)table - base;
+
+	for (off = 0; off < len; off += PAGE_SIZE_4K) {
+		paging_unmap(base + off, PAGE_4K);
+	}
+
+	mm_free_v(base, len);
+}
+
+void acpi_copy_tables(void) {
+#ifdef HPET
+	hpet_count = 0;
+#endif /* HPET */
+
+	const volatile struct acpi_gen_header_t* gen;
+	uint8_t found;
+
+	if (kmemcmp(boot_context.rsdp.Signature, "RSD PTR ", 8)) {
+		logging_log_error("Bad ACPI RSD PTR signature");
+		panic(PANIC_ACPI);
+	}
+
+	if (hash_byte_sum(&boot_context.rsdp, V1_TABLE_SIZE)) {
+		logging_log_error("Bad ACPI RSDPV1 checksum");
+		panic(PANIC_ACPI);
+	}
+
+	switch (boot_context.rsdp.Revision) {
+		case RSDPV1:
+fallback:
+			found = 0;
+			volatile struct acpi_rsdt_t* rsdt = (volatile struct acpi_rsdt_t*)(uint64_t)boot_context.rsdp.RsdtAddress;
+			rsdt = map_table(rsdt);
+			if (!rsdt) {
+				logging_log_error("Bad RSDT checksum");
+				panic(PANIC_ACPI);
+			}
+
+			if (kmemcmp((void*)rsdt->Signature, "RSDT", 4)) {
+				logging_log_error("Bad ACPI RSDT signature");
+				panic(PANIC_ACPI);
+			}
+
+			logging_log_info("Parsing ACPI RSDT entries @ 0x%lX", (uint64_t)&rsdt->Entry[0]);
+
+			for (const volatile uint32_t* entry = &rsdt->Entry[0];
+					(uint64_t)entry < (uint64_t)rsdt + rsdt->Length; entry++) {
+				gen = (const volatile struct acpi_gen_header_t*)(uint64_t)*entry;
+				gen = map_table(gen);
+
+				if (!gen) {
+					continue;
+				}
+
+#define CHECK_FAIL(sig) CHECK_FAIL_RSDPV1(sig)
+				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT, (void)0);
+				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT, (void)0);
+#ifdef HPET
+				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
+#endif /* HPET */
+				CHECK_AND_COPY("MCFG", "MCFG", acpi_mcfg, FOUND_MCFG, (void)0);
+#undef CHECK_FAIL
+
+				unmap_table(gen);
+			}
+
+			if (found != FOUND_ALL) {
+				logging_log_error("Could not find all ACPI tables");
+				unmap_table(rsdt);
+				panic(PANIC_ACPI);
+			}
+
+			if (kmemcmp((uint8_t*)rsdt->OEMTableID, (uint8_t*)acpi_fadt->OEMTableID, 8)) {
+				logging_log_error("Bad ACPI FACP OEM Table ID");
+				unmap_table(rsdt);
+				panic(PANIC_ACPI);
+			}
+
+			unmap_table(rsdt);
+			break;
+		default:
+			// backwards compat, so everything else is v2
+			logging_log_warning("Unkown ACPI Revision. Assuming v2");
+			__attribute__((fallthrough));
+		case RSDPV2:
+			if (hash_byte_sum(&boot_context.rsdp, boot_context.rsdp.Length)) {
+				logging_log_warning("Bad ACPI RSDPV2 checksum. Falling back to RSDPV1");
+				goto fallback;
+			}
+
+			found = 0;
+			volatile struct acpi_xsdt_t* xsdt = (volatile struct acpi_xsdt_t*)boot_context.rsdp.XsdtAddress;
+			xsdt = map_table(xsdt);
+
+			if (!xsdt) {
+				logging_log_warning("Bad ACPI XSDT checksum. Falling back to RSDPV1");
+				goto fallback;
+			}
+
+			if (kmemcmp((void*)xsdt->Signature, "XSDT", 4)) {
+				logging_log_warning("Bad ACPI XSDT signature. Falling back to RSDPV1");
+				goto fallback;
+			}
+
+			logging_log_info("Parsing ACPI XSDT entries @ 0x%lX", (uint64_t)&xsdt->Entry[0]);
+
+			for (const volatile uint64_t* entry = &xsdt->Entry[0];
+					(uint64_t)entry < (uint64_t)xsdt + xsdt->Length; entry++) {
+				gen = (const volatile struct acpi_gen_header_t*)*entry;
+				gen = map_table(gen);
+
+				if (!gen) {
+					continue;
+				}
+
+#define CHECK_FAIL(sig) CHECK_FAIL_RSDPV2(sig)
+				CHECK_AND_COPY("FACP", "FADT", acpi_fadt, FOUND_FADT, (void)0);
+				CHECK_AND_COPY("APIC", "MADT", acpi_madt, FOUND_MADT, (void)0);
+#ifdef HPET
+				CHECK_AND_COPY("HPET", "HPET", acpi_hpet[hpet_count], FOUND_HPET, hpet_count++);
+#endif /* HPET */
+				CHECK_AND_COPY("MCFG", "MCFG", acpi_mcfg, FOUND_MCFG, (void)0);
+#undef CHECK_FAIL
+
+				unmap_table(gen);
+			}
+
+			if (found != FOUND_ALL) {
+				logging_log_warning("Could not find all ACPI tables. Falling back to RSDPV1");
+				unmap_table(xsdt);
+				goto fallback;
+			}
+
+			if (kmemcmp((uint8_t*)xsdt->OEMTableID, (uint8_t*)acpi_fadt->OEMTableID, 8)) {
+				logging_log_error("Bad ACPI FACP OEM Table ID. Falling back to RSDPV1");
+				unmap_table(xsdt);
+				goto fallback;
+			}
+
+			unmap_table(xsdt);
+			break;
+	}
+}
+
+void acpi_parse_madt_ics_start(uint64_t* handle) {
+	*handle = (uint64_t)&acpi_madt->InterruptControllerStructure[0];
+}
+
+void acpi_parse_madt_ics(struct acpi_madt_ics_gen_t** ics, uint64_t* handle, uint8_t type) {
+	do {
+		if (*handle >= (uint64_t)acpi_madt + acpi_madt->Length) {
+			*handle = 0;
+			return;
+		}
+		*ics = (struct acpi_madt_ics_gen_t*)*handle;
+		*handle += (*ics)->Length;
+	} while ((*ics)->Type != type);
+}
+
+uint16_t acpi_get_sci_int(void) {
+	return acpi_fadt->SCI_INT;
+}
+
+void acpi_parse_mcfg_conf_start(uint64_t* handle) {
+	*handle = (uint64_t)&acpi_mcfg->conf[0];
+}
+
+void acpi_parse_mcfg_conf(struct acpi_mcfg_conf_t* conf, uint64_t* handle) {
+	if (*handle + sizeof(struct acpi_mcfg_conf_entry_t) > (uint64_t)acpi_mcfg + acpi_mcfg->Length) {
+		*handle = 0;
+		return;
+	}
+
+	const struct acpi_mcfg_conf_entry_t* entry = (struct acpi_mcfg_conf_entry_t*)*handle;
+	conf->base = entry->base;
+	conf->segment = entry->group;
+	conf->bus_start = entry->bus_start;
+	conf->bus_end = entry->bus_end;
+	*handle = (uint64_t)(entry + 1);
+}
+
+#ifdef HPET
+void acpi_get_hpet_bases(uint64_t* bases) {
+	bases[0] = bases[1] = bases[2] = bases[3] = 
+	bases[4] = bases[5] = bases[6] = bases[7] = 0;
+
+	for (uint8_t i = 0; i < hpet_count; i++) {
+		if (acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_SYS &&
+				acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID != GAS_TYPE_IO) {
+			logging_log_error("HPET base addr type must be sys or io. got: 0x%lx", 
+					(uint64_t)acpi_hpet[i]->BASE_ADDRESS.AddressSpaceID);
+			panic(PANIC_ACPI);
+		}
+		bases[acpi_hpet[i]->HPETNumber] = acpi_hpet[i]->BASE_ADDRESS.Address;
+	}
+}
+#endif /* HPET */

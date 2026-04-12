@@ -37,7 +37,7 @@ TEST_NAME("libary test suite")
 TEST("kmemset") {
 	char* actual = malloc(MEM_TEST_SIZE);
 
-	for (uint64_t i = 0; i < 256; i += (i % 7) + 1) {
+	for (int32_t i = 0; i < 256; i += (i % 7) + 1) {
 		ASSERT_TRUE(actual == kmemset(actual, i, MEM_TEST_SIZE), "kernel memset return value changed");
 
 	}

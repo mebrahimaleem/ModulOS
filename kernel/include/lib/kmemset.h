@@ -21,6 +21,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-extern void* kmemset(void* ptr, uint64_t v, size_t c);
+extern void* kmemset(void* ptr, int32_t v, size_t c);
 
 #endif /* KERNEL_LIB_KMEMSET_H */

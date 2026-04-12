@@ -54,6 +54,9 @@
 
 #define EFER	0xC0000080
 #define LME		0x100
+#define SYS		0x1
+#define NXE		0x800
+
 #define PG		(1 << 31)
 
 #define KERNEL_PAGE_FLAGS	(1 + 2)
@@ -186,7 +189,9 @@ _start:
 
 	movl $EFER, %ecx /* EFER */
 	rdmsr
+	orl $SYS, %eax /* syscall enable */
 	orl $LME, %eax /* LME */
+	orl $NXE, %eax /* execute disable bit */
 	wrmsr
 
 	movl %cr0, %eax
@@ -259,19 +264,19 @@ gdt:
 		.byte		0x92 		/* access: P */
 		.byte		0x00		/* limit 16:19 flag: */
 		.byte		0x00		/* base 24:31 */
+	gdt.udataseg:
+		.short	0x0000	/* limit 0:15 */
+		.short	0x0000	/* base 0:15 */
+		.byte		0x00		/* base 16:23 */
+		.byte		0xF2 		/* access: P */
+		.byte		0x00		/* limit 16:19 flag: */
+		.byte		0x00		/* base 24:31 */
 	gdt.ucodeseg:
 		.short	0x0000	/* limit 0:15 */
 		.short	0x0000	/* base 0:15 */
 		.byte		0x00		/* base 16:23 */
 		.byte		0xF8 		/* access: DPL=3 P */
 		.byte		0x20 		/* limit 16:19 flag: L */
-		.byte		0x00		/* base 24:31 */
-	gdt.udataseg:
-		.short	0x0000	/* limit 0:15 */
-		.short	0x0000	/* base 0:15 */
-		.byte		0x00		/* base 16:23 */
-		.byte		0x92 		/* access: P */
-		.byte		0x00		/* limit 16:19 flag: */
 		.byte		0x00		/* base 24:31 */
 	gdt.tss:
 		.quad 0
