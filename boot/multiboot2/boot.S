@@ -54,6 +54,9 @@
 
 #define EFER	0xC0000080
 #define LME		0x100
+#define SYS		0x1
+#define NXE		0x800
+
 #define PG		(1 << 31)
 
 #define KERNEL_PAGE_FLAGS	(1 + 2)
@@ -186,7 +189,9 @@ _start:
 
 	movl $EFER, %ecx /* EFER */
 	rdmsr
+	orl $SYS, %eax /* syscall enable */
 	orl $LME, %eax /* LME */
+	orl $NXE, %eax /* execute disable bit */
 	wrmsr
 
 	movl %cr0, %eax

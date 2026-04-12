@@ -155,7 +155,7 @@ void process_discard(struct pcb_t* pcb) {
 	mm_free_v(pcb->init_k_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
 	mm_free_p(pcb->init_k_rsp_paddr, INIT_STACK_SIZE);
 
-	//TODO: reap lower pml4 mapped pages
+	paging_free_userspace((uint64_t*)pcb->cr3);
 
 	logging_log_debug("Killed %ld", pcb->pid);
 

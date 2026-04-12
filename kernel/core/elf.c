@@ -26,8 +26,10 @@
 #include <core/mm.h>
 #include <core/gdt.h>
 #include <core/syscall.h>
+#include <core/cpu_instr.h>
 
 #include <lib/kmemcmp.h>
+#include <lib/kmemset.h>
 
 #define EI_MAG0				0
 #define EI_CLASS			4
@@ -69,6 +71,8 @@
 
 #define INIT_USERLAND_RFL		0x200
 #define INIT_USERLAND_RSP		0x800000000000
+#define INIT_USERLAND_SB		0x7FFFFF800000
+#define INIT_STACK_SIZE			PAGE_SIZE_4K * 8
 
 typedef uint64_t	Elf64_Addr;
 typedef uint64_t	Elf64_Off;
@@ -205,9 +209,86 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 		kfree(pcb);
 		return 0;
 	}
+	
+	Elf64_Phdr pheader;
 
-	//TODO: initialize pages and copy data and setup stack
+	Elf64_Off ph_off = header.e_phoff;
+	Elf64_Off img_off;
 
+	uint64_t paddr;
+	uint16_t page_flags;
+
+	uint64_t old_cr3 = cpu_get_cr3();
+
+	cpu_set_cr3(pcb->cr3);
+
+	for (img_off = INIT_USERLAND_RSP - INIT_STACK_SIZE; img_off < INIT_USERLAND_RSP; img_off += PAGE_SIZE_4K) {
+		paddr = mm_alloc_p(PAGE_SIZE_4K);
+
+		if (!paddr) {
+			cpu_set_cr3(old_cr3);
+			paging_free_userspace((uint64_t*)pcb->cr3);
+			kfree(pcb);
+			return 0;
+		}
+
+		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
+	}
+
+	for (Elf64_Half i = 0; i < header.e_phnum; i++) {
+		fs_seek(file, ph_off);
+		fs_read(file, &pheader, sizeof(pheader));
+
+		if (pheader.p_type != PT_LOAD) {
+			// TODO: support other pt types
+			continue;
+		}
+
+		if (pheader.p_vaddr + pheader.p_memsz >= INIT_USERLAND_SB) {
+			// image stack collision
+			kfree(pcb);
+			cpu_set_cr3(old_cr3);
+			return 0;
+		}
+
+		if (pheader.p_vaddr % PAGE_SIZE_4K) {
+			kfree(pcb);
+			cpu_set_cr3(old_cr3);
+			return 0;
+		}
+
+		page_flags = PAGE_PRESENT | PAGE_US;
+
+		if (pheader.p_flags & PF_W) {
+			page_flags |= PAGE_RW;
+		}
+
+		if (!(pheader.p_flags & PF_X)) {
+			page_flags |= PAGE_XD;
+		}
+
+		for (img_off = 0; img_off < pheader.p_memsz; img_off += PAGE_SIZE_4K) {
+			paddr = mm_alloc_p(PAGE_SIZE_4K);
+
+			if (!paddr) {
+				cpu_set_cr3(old_cr3);
+				paging_free_userspace((uint64_t*)pcb->cr3);
+				kfree(pcb);
+				return 0;
+			}
+
+			paging_map_proc(pheader.p_vaddr + img_off, paddr, page_flags, PAGE_4K, (uint64_t*)pcb->cr3);
+		}
+
+		fs_seek(file, pheader.p_offset);
+		fs_read(file, (void*)pheader.p_vaddr, pheader.p_filesz);
+		kmemset((void*)(pheader.p_vaddr + pheader.p_memsz - pheader.p_filesz), 0, pheader.p_memsz - pheader.p_filesz);
+
+		ph_off += header.e_phentsize;
+	}
+
+	cpu_set_cr3(old_cr3);
 
 	return pcb;
 }

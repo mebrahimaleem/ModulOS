@@ -138,7 +138,7 @@ void paging_ensure_mapped(void) {
 	}
 }
 
-uint64_t paging_map_proc(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size, uint64_t* pml4) {
+uint64_t paging_map_proc(uint64_t vaddr, uint64_t paddr, uint64_t flg, enum page_size_t page_size, uint64_t* pml4) {
 	uint64_t* access;
 	lock_acquire(&paging_lock);
 	enum page_size_t lvl = page_walk(vaddr, &access, pml4);
@@ -172,7 +172,7 @@ uint64_t paging_map_proc(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page
 	return paddr;
 }
 
-uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size) {
+uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint64_t flg, enum page_size_t page_size) {
 	return paging_map_proc(vaddr, paddr, flg, page_size, kernel_pml4);
 }
 
@@ -260,4 +260,8 @@ uint64_t paging_create_pml4(void) {
 	}
 
 	return pml4;
+}
+
+void paging_free_userspace(uint64_t* pml4) {
+	//TODO: implement
 }

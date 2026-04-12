@@ -23,6 +23,8 @@
 
 #define PAGE_PRESENT	0x1
 #define PAGE_RW				0x2
+#define PAGE_US				0x4
+#define PAGE_XD				0x8000000000000000
 #define PAT_MMIO_4K		0x98
 #define PAT_MMIO_2M		0x1018
 
@@ -45,9 +47,9 @@ extern void paging_init(void);
 
 extern void paging_ensure_mapped(void);
 
-extern uint64_t paging_map_proc(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size, uint64_t* pml4);
+extern uint64_t paging_map_proc(uint64_t vaddr, uint64_t paddr, uint64_t flg, enum page_size_t page_size, uint64_t* pml4);
 
-extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint16_t flg, enum page_size_t page_size);
+extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint64_t flg, enum page_size_t page_size);
 extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
 extern uint64_t paging_ident(uint64_t paddr);
 
@@ -56,5 +58,7 @@ extern void paging_remove_guard(uint64_t vaddr);
 extern uint8_t paging_check_guard(uint64_t vaddr);
 
 extern uint64_t paging_create_pml4(void);
+
+extern void paging_free_userspace(uint64_t* pml4);
 
 #endif /* KERNEL_CORE_PAGING_H */

@@ -77,7 +77,9 @@ movl %edi, %cr3
 // enter compat
 movl $0xC0000080, %ecx
 rdmsr
-orl $0x100, %eax
+orl $0x100, %eax /* system call enable */
+orl $0x001, %eax /* LME */
+orl $0x800, %eax /* NXE */
 wrmsr
 
 movl %cr0, %ecx
