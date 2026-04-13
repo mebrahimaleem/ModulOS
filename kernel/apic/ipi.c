@@ -26,6 +26,8 @@
 #include <core/alloc.h>
 #include <core/idt.h>
 #include <core/proc_data.h>
+#include <core/mm.h>
+#include <core/paging.h>
 
 #include <lib/kmemset.h>
 
@@ -37,40 +39,18 @@
 
 #define ICR_PID_SHFT	24
 
-static uint8_t tlb_shootdown_lock;
-static uint8_t* registered_barrier;
-static volatile uint8_t* tlb_shootdown_barrier = 0;
 static uint8_t tlb_shootdown_vector;
-static uint8_t barrier_len;
-static volatile uint64_t tlb_shootdown_addr;
+uint8_t shootdown_enable = 0;
 
 struct shootdown_node_t {
 	struct shootdown_node_t* next;
 	uint8_t apic_id;
 };
 
-static struct shootdown_node_t* shootdown_list;
-
 static uint8_t ipi_lock;
 
 void apic_ipi_init(void) {
 	lock_init(&ipi_lock);
-}
-
-void apic_init_shootdowns(uint8_t num_apic) {
-	lock_init(&tlb_shootdown_lock);
-
-	registered_barrier = kmalloc(sizeof(uint8_t) * num_apic);
-
-	kmemset(registered_barrier, 0, sizeof(uint8_t) * num_apic);
-	shootdown_list = 0;
-
-	tlb_shootdown_barrier = kmalloc(sizeof(uint8_t) * num_apic);
-	barrier_len = num_apic;
-
-	tlb_shootdown_vector = idt_get_vector();
-
-	idt_install(tlb_shootdown_vector, (uint64_t)apic_isr_tlb_shootdown, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
 }
 
 void apic_wait_for_ipi(void) {
@@ -103,64 +83,38 @@ void apic_send_ipi_sipi(uint8_t apic_id) {
 	lock_release(&ipi_lock);
 }
 
-static inline uint8_t check_barrier(volatile uint8_t* barrier) {
-	uint8_t i;
-	for (i = 0; i < barrier_len; i++) {
-		if (barrier[i]) {
-			return 1;
-		}
-	}
+void apic_init_shootdowns(void) {
+	tlb_shootdown_vector = idt_get_vector();
 
-	return 0;
+	idt_install(tlb_shootdown_vector, (uint64_t)apic_isr_tlb_shootdown, GDT_CODE_SEL, 0, IDT_GATE_INT, 0);
+
+	shootdown_enable = 1;
 }
 
-void apic_tlb_shootdown(uint64_t vaddr) {
-	struct shootdown_node_t* node;
-	if (!tlb_shootdown_barrier) {
+void apic_shootdown(uint8_t id) {
+	if (!shootdown_enable) {
 		return;
 	}
 
-	lock_acquire(&tlb_shootdown_lock);
-
-	uint8_t i;
-	for (i = 0; i < barrier_len; i++) {
-		tlb_shootdown_barrier[i] = registered_barrier[i];
-	}
-
-	tlb_shootdown_addr = vaddr;
-
-
-	for (node = shootdown_list; node; node = node->next) {
-		lock_acquire(&ipi_lock);
-		apic_wait_for_ipi();
-		apic_wait_for_ipi();
-		apic_write_reg(APIC_REG_ICH, (uint32_t)node->apic_id << ICR_PID_SHFT);
-		apic_write_reg(APIC_REG_ICL, tlb_shootdown_vector | ICR_ASSERT);
-		lock_release(&ipi_lock);
-	}
-
-	while (check_barrier(tlb_shootdown_barrier)) cpu_pause();
-
-	lock_release(&tlb_shootdown_lock);
+	lock_acquire(&ipi_lock);
+	apic_wait_for_ipi();
+	apic_wait_for_ipi();
+	apic_write_reg(APIC_REG_ICH, (uint32_t)id << ICR_PID_SHFT);
+	apic_write_reg(APIC_REG_ICL, tlb_shootdown_vector | ICR_ASSERT);
+	lock_release(&ipi_lock);
 }
 
 void apic_tlb_shootdown_dispatch(void) {
-	cpu_invlpg(tlb_shootdown_addr);
+	uint64_t off;
+	struct free_transaction_list_t* list;
 
-	tlb_shootdown_barrier[proc_data_get()->arb_id] = 0;
+	for (list = mm_get_shootdown_list(); list; list = list->next) {
+		for (off = 0; off < list->size; off += PAGE_SIZE_4K) {
+			cpu_invlpg(list->base + off);
+		}
+	}
+
+	mm_barrier_disarm(proc_data_get()->arb_id);
 
 	apic_write_reg(APIC_REG_EOI, APIC_EOI);
-}
-
-void apic_register_barrier(uint8_t apic_id) {
-	struct shootdown_node_t* node = kmalloc(sizeof(struct shootdown_node_t));
-	node->apic_id = apic_id;
-
-	lock_acquire(&tlb_shootdown_lock);
-
-	node->next = shootdown_list;
-	shootdown_list = node;
-	registered_barrier[proc_data_get()->arb_id] = 1;
-
-	lock_release(&tlb_shootdown_lock);
 }

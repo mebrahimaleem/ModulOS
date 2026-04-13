@@ -209,7 +209,6 @@ void paging_unmap(uint64_t vaddr, enum page_size_t page_size) {
 
 	*access = 0;
 	lock_release(&paging_lock);
-	apic_tlb_shootdown(vaddr);
 }
 
 uint64_t paging_ident(uint64_t paddr) {

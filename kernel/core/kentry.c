@@ -34,6 +34,7 @@
 #include <core/msr.h>
 #include <core/gdt.h>
 #include <core/syscall.h>
+#include <core/mm.h>
 
 #include <lib/kmemcpy.h>
 
@@ -90,6 +91,8 @@ void kentry(void) {
 	paging_ensure_mapped();
 	scheduler_init();
 
+	mm_transaction_init();
+
 	write_syscall_msr();
 
 	logging_log_debug("TSS and IDT init done");
@@ -110,6 +113,7 @@ void kentry(void) {
 	apic_timer_calib(apic_get_bsp_id());
 	apic_nmi_enab();
 	ioapic_init();
+	apic_init_shootdowns();
 	cpu_sti();
 	logging_log_debug("APIC and IOAPIC init done");
 
