@@ -33,6 +33,7 @@
 #include <core/fs.h>
 #include <core/msr.h>
 #include <core/gdt.h>
+#include <core/syscall.h>
 
 #include <lib/kmemcpy.h>
 
@@ -51,6 +52,8 @@
 #include <drivers/pcie/pcie_init.h>
 #include <drivers/disk/disk.h>
 
+#define RFL_MASK	0xD5
+
 struct boot_context_t boot_context;
 
 extern uint8_t ap_bootstrap_start;
@@ -64,6 +67,12 @@ extern uint64_t init_stack_paddr;
 
 extern uint64_t* init_stacks_paddr;
 extern uint64_t* init_stacks_vaddr;
+
+static inline void write_syscall_msr(void) {
+	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+	msr_write(MSR_LSTAR, (uint64_t)syscall_entry);
+	msr_write(MSR_FMASK, RFL_MASK);
+}
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
@@ -81,8 +90,7 @@ void kentry(void) {
 	paging_ensure_mapped();
 	scheduler_init();
 
-
-	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+	write_syscall_msr();
 
 	logging_log_debug("TSS and IDT init done");
 
@@ -136,7 +144,7 @@ void kapentry(uint64_t arb_id) {
 	proc_data_set_id((uint8_t)arb_id);
 	proc_data_get()->arb_id = (uint8_t)arb_id;
 
-	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+	write_syscall_msr();
 
 	alloc_init();
 

@@ -1,5 +1,5 @@
-/* lock.S - spinlock routines */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* syscall_dispatch.h - kernel system call dispatching interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,23 +15,17 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.globl lock_init
-lock_init:
-movb $0, (%rdi)
-ret
+#ifndef KERNEL_CORE_SYSCALL_DISPATCH_H
+#define KERNEL_CORE_SYSCALL_DISPATCH_H
 
-.globl lock_acquire
-lock_acquire:
-movb $1, %al
-.loop:
-pause
-xchgb %al, (%rdi)
-testb %al, %al
-jnz .loop
-ret
+#include <stdint.h>
 
-.globl lock_release
-lock_release:
-xorb %al, %al
-xchgb %al, (%rdi)
-ret
+extern void syscall_dispatch(
+		uint64_t vector,
+		uint64_t argc,
+		uint64_t* argv,
+		uint64_t saved_rip,
+		uint64_t saved_rsp,
+		uint64_t saved_rflags) __attribute__((noreturn));
+
+#endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

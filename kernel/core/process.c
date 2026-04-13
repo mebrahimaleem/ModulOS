@@ -104,7 +104,6 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 	pcb->init_k_rsp_vaddr = stack_vaddr;
 	pcb->init_k_rsp_paddr = stack_paddr;
 
-	pcb->saved_usr_rsp = 0;
 	pcb->k_rsp_lo = 0;
 	pcb->k_rsp_hi = 0;
 

@@ -42,5 +42,5 @@ $(USERLAND_DIR)/test: $(OBJ_DIR)/test.o | $(USERLAND_DIR)
 	$(CC) -o $@ $(LD_USR_FLAGS) -fuse-ld=lld $^
 
 $(OBJ_DIR)/test.o: test.S | $(OBJ_DIR)
-	$(CC) $(LD_USR_FLAGS) -c -o $@ $<
+	$(CC) $(LD_USR_FLAGS) -Ilibc/ -c -o $@ $<
 

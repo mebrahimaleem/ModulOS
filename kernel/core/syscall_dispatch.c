@@ -1,4 +1,4 @@
-/* process.h - kernel system call interface */
+/* syscall_dispatch.c - kernel system call dispatcher */
 /* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,32 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_SYSCALL_H
-#define KERNEL_CORE_SYSCALL_H
-
 #include <stdint.h>
 
-extern void syscall_return(uint64_t rip, uint64_t rfl, uint64_t rsp, uint64_t rax) __attribute__((noreturn));
+#include <core/syscall_dispatch.h>
+#include <core/syscall.h>
+#include <core/syscall_vectors.h>
+#include <core/process.h>
+#include <core/logging.h>
 
-extern void syscall_entry(void) __attribute__((noreturn));
+extern void syscall_dispatch(
+		uint64_t vector,
+		uint64_t argc,
+		uint64_t* argv,
+		uint64_t saved_rip,
+		uint64_t saved_rsp,
+		uint64_t saved_rflags) {
 
-#endif /* KERNEL_CORE_SYSCALL_H */
+	switch (vector) {
+		case SYSCALL_EXIT:
+			if (argc != 1) {
+				goto syscall_fail;
+			}
+
+			logging_log_debug("Process %lu terminated with %d", process_get_pid(), argv[0]);
+			process_kill_current();
+		default:
+syscall_fail:
+			syscall_return(saved_rip, saved_rflags, saved_rsp, ~0uLL);
+	}
+}

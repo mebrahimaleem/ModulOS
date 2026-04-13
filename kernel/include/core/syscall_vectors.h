@@ -1,5 +1,5 @@
-/* lock.S - spinlock routines */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* syscall_vectors.h - ModulOS system call vectors */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,23 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-.globl lock_init
-lock_init:
-movb $0, (%rdi)
-ret
-
-.globl lock_acquire
-lock_acquire:
-movb $1, %al
-.loop:
-pause
-xchgb %al, (%rdi)
-testb %al, %al
-jnz .loop
-ret
-
-.globl lock_release
-lock_release:
-xorb %al, %al
-xchgb %al, (%rdi)
-ret
+/*
+ * argc - 1
+ * argv - exit code (int)
+ */
+#define SYSCALL_EXIT				0

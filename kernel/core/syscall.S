@@ -15,10 +15,24 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+.section .text
+
 .globl syscall_return
 syscall_return:
 movq %rdi, %rcx // rip
 movq %rsi, %r11 // rflags
 movq %rdx, %rsp // rsp
+movq %rcx, %rax // return value
 
 sysretq
+
+.globl syscall_entry
+syscall_entry:
+movq %rsp, %r8 // rsp
+
+movq %gs:0, %rax
+movq (%rax), %rsp
+
+movq %r11, %r9 // rflags
+
+call syscall_dispatch

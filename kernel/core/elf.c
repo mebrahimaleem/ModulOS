@@ -189,8 +189,6 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 		pcb->r15 = 0;
 
 
-	pcb->saved_usr_rsp = INIT_USERLAND_RSP;
-
 	pcb->init_k_rsp_paddr = stack_paddr;
 	pcb->init_k_rsp_vaddr = stack_vaddr;
 	pcb->rsp = rsp;
@@ -202,7 +200,7 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 
 	pcb->rdi = header.e_entry; // rip
 	pcb->rsi = INIT_USERLAND_RFL; // rflags
-	pcb->rdx = pcb->saved_usr_rsp; // rsp
+	pcb->rdx = INIT_USERLAND_RSP; // rsp
 
 	pcb->rip = (uint64_t)syscall_return;
 	pcb->cs = GDT_KERNEL_CS;

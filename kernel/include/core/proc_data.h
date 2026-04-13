@@ -24,6 +24,7 @@
 #include <kernel/core/process.h>
 
 struct proc_data_t {
+	uint64_t kernel_rsp; // order matters
 	uint8_t arb_id;
 	volatile struct tss_t* tss;
 	struct pcb_t* current_process;

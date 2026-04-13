@@ -305,7 +305,7 @@ void paging_free_userspace(uint64_t* pml4) {
 
 	for (uint16_t i = 0; i < PML4_CONSISTENT_START; i++) {
 		if (access[i] & PAGE_PRESENT) {
-			free_pages(access[i], _PAGE_512G); // lvl being the size of each entry, not entry itself
+			free_pages(access[i], PAGE_1G);
 		}
 	}
 
