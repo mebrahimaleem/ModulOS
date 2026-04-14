@@ -1,4 +1,4 @@
-/* tty.h - tty device interface */
+/* interrupts.h - serial interrupts interface */
 /* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,27 +15,13 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_DEVFS_TTY_H
-#define KERNEL_DEVFS_TTY_H
+#ifndef DRIVERS_SERIAL_INTERRUPTS_H
+#define DRIVERS_SERIAL_INTERRUPTS_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-#define TTY_READ_BUFFER_SIZE		0x4000
+extern void serial_init_interrupts(void);
 
-struct tty_handle_t;
+extern void serial_isr_dispatch(uint16_t com);
 
-extern void tty_init(void);
-
-#ifdef SERIAL
-extern struct tty_handle_t* tty_com1(void);
-extern struct tty_handle_t* tty_com2(void);
-#endif /* SERIAL */
-
-extern struct tty_handle_t* tty_open(char* name);
-extern void tty_close(struct tty_handle_t* tty);
-extern void tty_read(struct tty_handle_t* tty, void* buffer, size_t count);
-extern uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte);
-extern void tty_write(struct tty_handle_t* tty, void* buffer, size_t count);
-
-#endif /* KERNEL_DEVFS_TTY_H */
+#endif /* DRIVERS_SERIAL_INTERRUPTS_H */

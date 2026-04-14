@@ -55,6 +55,10 @@
 #include <drivers/pcie/pcie_init.h>
 #include <drivers/disk/disk.h>
 
+#ifdef SERIAL
+#include <drivers/serial/interrupts.h>
+#endif /* SERIAL */
+
 #define RFL_MASK	0xD5
 
 struct boot_context_t boot_context;
@@ -76,6 +80,22 @@ static inline void write_syscall_msr(void) {
 	msr_write(MSR_LSTAR, (uint64_t)syscall_entry);
 	msr_write(MSR_FMASK, RFL_MASK);
 }
+
+#ifdef SERIAL
+static void echo_com1(void* cntx) {
+	(void)cntx;
+
+	struct fs_handle_t* handle = fs_open("/dev/ttyS0");
+	char buf;
+
+	struct tty_handle_t* com1 = tty_com1();
+
+	while (1) {
+		fs_read(handle, &buf, 1);
+		tty_write(com1, &buf, 1);
+	}
+}
+#endif /* SERIAL */
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
@@ -119,6 +139,12 @@ void kentry(void) {
 	cpu_sti();
 	logging_log_debug("APIC and IOAPIC init done");
 
+#ifdef SERIAL
+	serial_init_interrupts();
+
+	scheduler_schedule(process_from_func(echo_com1, 0));
+#endif /* SERIAL */
+
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
@@ -126,12 +152,6 @@ void kentry(void) {
 	pcie_init();
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
-
-	struct fs_handle_t* handle = fs_open("/dev/ttyS0");
-	char buf[4];
-	fs_read(handle, buf, 4);
-	logging_log_debug("%s", buf);
-	fs_close(handle);
 
 	logging_log_info("Boot Complete ModulOS");
 

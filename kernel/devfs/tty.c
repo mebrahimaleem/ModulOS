@@ -52,28 +52,33 @@ static struct tty_handle_t com2;
 
 #endif /* SERIAL */
 
-#define CLEAR_SCREEN	"\x1b[2J"
-
 void tty_init(void) {
 #ifdef SERIAL
 	com1.writer = serial_write_com1;
 	com1.read_buffer = (uint8_t*)paging_ident(mm_alloc_p(TTY_READ_BUFFER_SIZE));
-	com1.write_index = (uint16_t)kstrlen(CLEAR_SCREEN);
+	com1.write_index = 0;
 	com1.read_index = 0;
-	com1.bytes_ready = 1;
+	com1.bytes_ready = 0;
 	lock_init(&com1.lock);
 
 	com2.writer = serial_write_com1;
 	com2.read_buffer = (uint8_t*)paging_ident(mm_alloc_p(TTY_READ_BUFFER_SIZE));
-	com2.write_index = (uint16_t)kstrlen(CLEAR_SCREEN);
+	com2.write_index = 0;
 	com2.read_index = 0;
-	com2.bytes_ready = 1;
+	com2.bytes_ready = 0;
 	lock_init(&com1.lock);
-
-	kmemcpy(com1.read_buffer, CLEAR_SCREEN, kstrlen(CLEAR_SCREEN));
-	kmemcpy(com2.read_buffer, CLEAR_SCREEN, kstrlen(CLEAR_SCREEN));
 #endif /* SERIAL */
 }
+
+#ifdef SERIAL
+struct tty_handle_t* tty_com1(void) {
+	return &com1;
+}
+
+struct tty_handle_t* tty_com2(void) {
+	return &com2;
+}
+#endif /* SERIAL */
 
 struct tty_handle_t* tty_open(char* name) {
 #ifdef SERIAL
@@ -115,5 +120,32 @@ void tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
 
 		tty->bytes_ready = tty->read_index != tty->write_index;
 		lock_release(&tty->lock);
+	}
+}
+
+uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
+	uint8_t ret = 0;
+
+	lock_acquire(&tty->lock);
+	if (!tty->bytes_ready || tty->read_index != tty->write_index) {
+		tty->read_buffer[tty->write_index] = byte;
+		ret = 1;
+
+		tty->write_index++;
+
+		if (tty->write_index == TTY_READ_BUFFER_SIZE) {
+			tty->write_index = 0;
+		}
+
+		tty->bytes_ready = 1;
+	}
+	lock_release(&tty->lock);
+
+	return ret;
+}
+
+void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {
+	for (size_t i = 0; i < count; i++) {
+		tty->writer(((uint8_t*)buffer)[i]);
 	}
 }
