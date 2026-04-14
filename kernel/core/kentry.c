@@ -38,6 +38,8 @@
 
 #include <lib/kmemcpy.h>
 
+#include <devfs/tty.h>
+
 #ifdef MEM_TEST
 #include <mem_test/alloc_test.h>
 #endif /* MEM_TEST */
@@ -120,9 +122,16 @@ void kentry(void) {
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
+	tty_init();
 	pcie_init();
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
+
+	struct fs_handle_t* handle = fs_open("/dev/ttyS0");
+	char buf[4];
+	fs_read(handle, buf, 4);
+	logging_log_debug("%s", buf);
+	fs_close(handle);
 
 	logging_log_info("Boot Complete ModulOS");
 

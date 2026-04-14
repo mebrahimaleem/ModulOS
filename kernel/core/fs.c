@@ -29,6 +29,8 @@
 #include <lib/kstrcpy.h>
 #include <lib/kstrlen.h>
 
+#include <devfs/devfs.h>
+
 static uint8_t fs_lock;
 
 struct vfs_mount_t {
@@ -57,6 +59,17 @@ struct vfs_tree_node_t {
 };
 
 static struct vfs_tree_node_t vfs_root;
+static struct vfs_tree_node_t dev_root;
+
+static struct vfs_mount_t dev_mount = {
+	.cntx = 0,
+	.open = devfs_open,
+	.close = devfs_close,
+	.stat = devfs_stat,
+	.read = devfs_read,
+	.get_seek = devfs_get_seek,
+	.seek = devfs_seek
+};
 
 static inline char* path_next(char* path, size_t* len) {
 	*len = 0;
@@ -77,9 +90,14 @@ void fs_init(void) {
 	lock_init(&fs_lock);
 
 	vfs_root.co = 0;
-	vfs_root.sub = 0;
+	vfs_root.sub = &dev_root;
 	vfs_root.name = "";
 	vfs_root.mount = 0;
+
+	dev_root.co = 0;
+	dev_root.sub = 0;
+	dev_root.name = "dev";
+	dev_root.mount = &dev_mount;
 }
 
 enum file_status_t fs_mount(
@@ -188,13 +206,13 @@ struct fs_handle_t* fs_open(const char* path) {
 		path_write = path_next(path_write, &len);
 
 		for (walk = node->sub; walk; walk = walk->co) {
-			if (kstrlen(node->name) == len && kmemcmp(node->name, path_read, len) == 0) {
+			if (kstrlen(walk->name) == len && kmemcmp(walk->name, path_read, len) == 0) {
 				node = walk;
 				break;
 			}
 		}
 
-	} while (walk && node != walk);
+	} while (walk && node == walk);
 
 	lock_release(&fs_lock);
 
