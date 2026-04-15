@@ -40,6 +40,7 @@
 #include <core/alloc.h>
 
 #include <lib/kmemcpy.h>
+#include <lib/kmemset.h>
 
 #define APIC_BASE_MASK	0xFFFFFFFFFF000
 
@@ -139,6 +140,7 @@ void apic_init(void) {
 
 	for (--num_apic; num_apic; num_apic--) {
 		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
+		kmemset(proc_data_ptr[num_apic], 0, sizeof(struct proc_data_t));
 		init_stacks_vaddr[num_apic] = mm_alloc_v(PAGE_SIZE_4K * 5);
 
 		if (!init_stacks_vaddr[num_apic]) {

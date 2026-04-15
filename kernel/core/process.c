@@ -28,6 +28,7 @@
 #include <core/scheduler.h>
 #include <core/paging.h>
 #include <core/mm.h>
+#include <core/time.h>
 
 #include <lib/kmemset.h>
 
@@ -166,26 +167,28 @@ void process_discard(struct pcb_t* pcb) {
 
 void process_preempt_entry(struct preempt_frame_t* context) {
 	struct pcb_t* pcb = proc_data_get()->current_process;
-	pcb->rsp = context->rsp;
-	pcb->rbp = context->rbp;
-	pcb->r15 = context->r15;
-	pcb->r14 = context->r14;
-	pcb->r13 = context->r13;
-	pcb->r12 = context->r12;
-	pcb->r11 = context->r11;
-	pcb->r10 = context->r10;
-	pcb->r9 = context->r9;
-	pcb->r8 = context->r8;
-	pcb->rdi = context->rdi;
-	pcb->rsi = context->rsi;
-	pcb->rdx = context->rdx;
-	pcb->rcx = context->rcx;
-	pcb->rbx = context->rbx;
-	pcb->rax = context->rax;
-	pcb->rip = context->rip;
-	pcb->cs = context->cs;
-	pcb->rflags = context->rflags;
-	pcb->ss = context->ss;
+	if (pcb) {
+		pcb->rsp = context->rsp;
+		pcb->rbp = context->rbp;
+		pcb->r15 = context->r15;
+		pcb->r14 = context->r14;
+		pcb->r13 = context->r13;
+		pcb->r12 = context->r12;
+		pcb->r11 = context->r11;
+		pcb->r10 = context->r10;
+		pcb->r9 = context->r9;
+		pcb->r8 = context->r8;
+		pcb->rdi = context->rdi;
+		pcb->rsi = context->rsi;
+		pcb->rdx = context->rdx;
+		pcb->rcx = context->rcx;
+		pcb->rbx = context->rbx;
+		pcb->rax = context->rax;
+		pcb->rip = context->rip;
+		pcb->cs = context->cs;
+		pcb->rflags = context->rflags;
+		pcb->ss = context->ss;
+	}
 
 	scheduler_run();
 }
@@ -221,4 +224,15 @@ uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr,
 	*stack = stack_vaddr + PAGE_SIZE_4K * 5;
 
 	return 0;
+}
+
+void process_sleep(uint64_t wake_time) {
+	struct pcb_t* current = proc_data_get()->current_process;
+
+	current->sleep_state.wake_time = wake_time;
+	current->sched_cntr = SCHED_SLEEP;
+
+	while (time_since_init_fs() < wake_time) {
+		cpu_hlt();
+	}
 }

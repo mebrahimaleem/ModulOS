@@ -23,11 +23,14 @@
 #include <kernel/core/tss.h>
 #include <kernel/core/process.h>
 
+#define PROC_STS_INT_READY	0x01
+
 struct proc_data_t {
 	uint64_t kernel_rsp; // order matters
 	uint8_t arb_id;
 	volatile struct tss_t* tss;
 	struct pcb_t* current_process;
+	uint64_t sts;
 };
 
 extern struct proc_data_t bsp_proc_data;

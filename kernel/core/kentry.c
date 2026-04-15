@@ -139,6 +139,8 @@ void kentry(void) {
 	cpu_sti();
 	logging_log_debug("APIC and IOAPIC init done");
 
+	proc_data_get()->sts |= PROC_STS_INT_READY;
+
 #ifdef SERIAL
 	serial_init_interrupts();
 
@@ -193,6 +195,8 @@ void kapentry(uint64_t arb_id) {
 	apic_nmi_enab();
 	cpu_sti();
 	logging_log_debug("AP APIC init done");
+
+	proc_data_get()->sts |= PROC_STS_INT_READY;
 
 	logging_log_info("AP init complete");
 

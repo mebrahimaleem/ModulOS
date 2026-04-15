@@ -15,6 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+.section .text
+
 .globl cpu_lidt
 cpu_lidt:
 lidt (%rdi)
@@ -82,4 +84,9 @@ testq %rdi, %rdi
 jz skip_cr3
 movq %rdi, %cr3
 skip_cr3:
+ret
+
+.globl cpu_hlt
+cpu_hlt:
+hlt
 ret

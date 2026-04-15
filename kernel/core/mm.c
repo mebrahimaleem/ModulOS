@@ -27,6 +27,7 @@
 #include <core/cpu_instr.h>
 #include <core/process.h>
 #include <core/scheduler.h>
+#include <core/time.h>
 
 #include <lib/mergesort.h>
 
@@ -38,6 +39,8 @@
 #define MAX_INIT_NODES	64
 #define WITHIN_NODE(base, b, l)	(base >= b && base < b + l)
 
+#define SHOOTDOWN_DELAY_MS	5000
+
 struct mm_tree_node_t {
 	struct mm_tree_node_t* less;
 	struct mm_tree_node_t* more;
@@ -48,7 +51,7 @@ struct mm_tree_node_t {
 struct disarm_list_t {
 	struct disarm_list_t* next;
 	uint8_t id;
-	uint8_t state;
+	volatile uint8_t state;
 };
 
 static struct mm_tree_node_t* p_tree;
@@ -65,7 +68,7 @@ static uint8_t n_lock;
 static struct mm_tree_node_t node_pool[MAX_INIT_NODES];
 static struct mm_tree_node_t* free_nodes;
 
-static struct free_transaction_list_t* pending_free;
+static struct free_transaction_list_t* volatile pending_free;
 static struct free_transaction_list_t* transaction_list;
 uint8_t pending_free_lock;
 static struct disarm_list_t* disarm_list;
@@ -193,6 +196,7 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, u
 		size += PAGE_SIZE_4K - adj;
 	}
 
+	cpu_cli_if();
 	lock_acquire(lock);
 
 	node = find_base_node(base, root->more, root);
@@ -225,6 +229,7 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, u
 	//TODO: coallese
 
 	lock_release(lock);
+	cpu_sti_if();
 }
 
 static uint64_t mm_alloc_max(size_t size, uint64_t align, uint64_t max, struct mm_tree_node_t* root, uint8_t* lock) {
@@ -421,12 +426,12 @@ void mm_free_p(uint64_t base, size_t size) {
 }
 
 void mm_free_v(uint64_t base, size_t size) {
-	struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
+	volatile struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
 	pending->base = base;
 	pending->size = size;
 	lock_acquire(&pending_free_lock);
 	pending->next = pending_free;
-	pending_free = pending;
+	pending_free = (struct free_transaction_list_t* volatile)pending;
 	lock_release(&pending_free_lock);
 }
 
@@ -438,9 +443,9 @@ static void free_all_pending(void* _ign) {
 	uint8_t cntrl;
 
 	while (1) {
-		while (!pending_free) {
-			cpu_pause();
-		}
+		do {
+			time_sleep(SHOOTDOWN_DELAY_MS);
+		} while (!pending_free);
 
 		lock_acquire(&pending_free_lock);
 

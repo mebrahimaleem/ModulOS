@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include <kernel/core/proc_data.h>
+
 extern void cpu_lidt(uint64_t idt_ptr);
 
 extern void cpu_ltr_28(void);
@@ -45,5 +47,17 @@ extern void cpu_wbinvd(void);
 extern uint64_t cpu_get_cr3(void);
 
 extern void cpu_set_cr3(uint64_t cr3);
+
+extern void cpu_hlt(void);
+
+static inline void cpu_sti_if(void) {
+	if (proc_data_get()->sts & PROC_STS_INT_READY) {
+		cpu_sti();
+	}
+}
+
+static inline void cpu_cli_if(void) {
+	cpu_cli();
+}
 
 #endif /* KERNEL_CORE_CPU_INSTR_H */

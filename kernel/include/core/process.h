@@ -62,10 +62,14 @@ struct pcb_t {
 	enum {
 		SCHED_READY,
 		SCHED_KILL,
-		SCHED_SKIP
+		SCHED_SKIP,
+		SCHED_SLEEP
 	} sched_cntr;
 
-} __attribute__((packed));
+	union {
+		uint64_t wake_time;
+	} sleep_state;
+};
 
 struct preempt_frame_t {
 	uint64_t rbp;
@@ -114,5 +118,7 @@ extern void process_discard(struct pcb_t* pcb);
 extern void process_preempt_entry(struct preempt_frame_t* context) __attribute__((noreturn));
 
 extern uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr, uint64_t* stack);
+
+extern void process_sleep(uint64_t wake_time);
 
 #endif /* KERNEL_CORE_PROCESS_H */
