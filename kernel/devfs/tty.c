@@ -30,6 +30,12 @@
 #include <lib/kmemcpy.h>
 #include <lib/kstrlen.h>
 
+#define TTY_RING_MASK	0x3FFF
+
+#define MASK(i)				((i) & TTY_RING_MASK)
+#define EMPTY(r, w)		(r == w)
+#define FULL(r, w)		(MASK(w + 1) == r)
+
 #ifdef SERIAL
 #include <drivers/serial/serial.h>
 #endif /* SERIAL */
@@ -39,9 +45,8 @@ typedef void (*tty_write_t)(uint8_t byte);
 struct tty_handle_t {
 	tty_write_t writer;
 	uint8_t* read_buffer;
-	uint16_t write_index;
-	uint16_t read_index;
-	uint8_t bytes_ready;
+	volatile uint16_t write_index;
+	volatile uint16_t read_index;
 	uint8_t lock;
 };
 
@@ -58,15 +63,13 @@ void tty_init(void) {
 	com1.read_buffer = (uint8_t*)paging_ident(mm_alloc_p(TTY_READ_BUFFER_SIZE));
 	com1.write_index = 0;
 	com1.read_index = 0;
-	com1.bytes_ready = 0;
 	lock_init(&com1.lock);
 
-	com2.writer = serial_write_com1;
+	com2.writer = serial_write_com2;
 	com2.read_buffer = (uint8_t*)paging_ident(mm_alloc_p(TTY_READ_BUFFER_SIZE));
 	com2.write_index = 0;
 	com2.read_index = 0;
-	com2.bytes_ready = 0;
-	lock_init(&com1.lock);
+	lock_init(&com2.lock);
 #endif /* SERIAL */
 }
 
@@ -99,49 +102,35 @@ void tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
 	uint8_t* write = buffer;
 
 	while (count) {
-		while (!tty->bytes_ready) {
+		while (EMPTY(tty->read_index, tty->write_index)) {
 			cpu_pause();
 		}
 
 		lock_acquire(&tty->lock);
-		if (tty->bytes_ready) {
-			do {
-				*write = tty->read_buffer[tty->read_index];
+		while (count && !EMPTY(tty->read_index, tty->write_index)) {
+			*write = tty->read_buffer[MASK(tty->read_index)];
 
-				tty->read_index++;
-				write++;
-				count--;
+			tty->read_index++;
+			write++;
+			count--;
 
-				if (tty->read_index == TTY_READ_BUFFER_SIZE) {
-					tty->read_index = 0;
-				}
-			} while (tty->read_index != tty->write_index && count);
+			tty->read_index &= TTY_RING_MASK;
 		}
-
-		tty->bytes_ready = tty->read_index != tty->write_index;
 		lock_release(&tty->lock);
 	}
 }
 
 uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
-	uint8_t ret = 0;
-
-	lock_acquire(&tty->lock);
-	if (!tty->bytes_ready || tty->read_index != tty->write_index) {
-		tty->read_buffer[tty->write_index] = byte;
-		ret = 1;
-
-		tty->write_index++;
-
-		if (tty->write_index == TTY_READ_BUFFER_SIZE) {
-			tty->write_index = 0;
-		}
-
-		tty->bytes_ready = 1;
+	if (FULL(tty->read_index, tty->write_index)) {
+		return 0;
 	}
-	lock_release(&tty->lock);
 
-	return ret;
+	tty->read_buffer[MASK(tty->write_index)] = byte;
+
+	tty->write_index++;
+	tty->write_index &= TTY_RING_MASK;
+
+	return 1;
 }
 
 void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {

@@ -31,6 +31,8 @@
 
 #include <devfs/devfs.h>
 
+//TODO: implement per file blocking
+
 static uint8_t fs_lock;
 
 struct vfs_mount_t {
@@ -194,7 +196,7 @@ struct fs_handle_t* fs_open(const char* path) {
 	}
 
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 
 	do {
 		if (node->mount) {
@@ -214,7 +216,7 @@ struct fs_handle_t* fs_open(const char* path) {
 
 	} while (walk && node == walk);
 
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	if (!mount) {
 		kfree(clean_path);
@@ -232,28 +234,28 @@ struct fs_handle_t* fs_open(const char* path) {
 }
 
 void fs_close(struct fs_handle_t* handle) {
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 
 	handle->mount->close(handle->handle);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	kfree(handle);
 }
 
 enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 	return ret;
 }
 
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 	ret = handle->mount->read(handle->handle, buffer, count);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	return ret;
 }
@@ -261,9 +263,9 @@ size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 uint64_t fs_get_seek(struct fs_handle_t* handle) {
 	uint64_t seek;
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 	seek = handle->mount->get_seek(handle->handle);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	return seek;
 }
@@ -271,9 +273,9 @@ uint64_t fs_get_seek(struct fs_handle_t* handle) {
 enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	enum file_status_t sts;
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 	sts = handle->mount->seek(handle->handle, seek);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	return sts;
 }

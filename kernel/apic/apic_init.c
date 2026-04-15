@@ -68,7 +68,7 @@
 #define APIC_CAL_BATCH		20
 #define APIC_CAL_TOL			8000
 
-#define APIC_CLOCK_MS			50
+#define APIC_CLOCK_MS			10
 
 // pic master spurious (irq 7, int 0x27) works for apic spurious as well
 #define PIC_SPURIOUS_VEC	0x27

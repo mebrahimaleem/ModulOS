@@ -84,7 +84,7 @@ movb $(DTR + RTS + OUT1 + OUT2), %al
 lea MCR(%rdi), %rdx
 out %al, %dx
 
-mov INT_EN, %al
+movb $INT_EN, %al
 lea IER(%rdi), %rdx
 out %al, %dx
 
