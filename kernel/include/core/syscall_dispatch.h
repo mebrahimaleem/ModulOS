@@ -20,12 +20,31 @@
 
 #include <stdint.h>
 
-extern void syscall_dispatch(
-		uint64_t vector,
-		uint64_t argc,
-		uint64_t* argv,
-		uint64_t saved_rip,
-		uint64_t saved_rsp,
-		uint64_t saved_rflags) __attribute__((noreturn));
+#include <kernel/core/syscall_vectors.h>
+
+#define DECLARE_SYSCALL(name) \
+	uint64_t syscall_dispatch_##name ( \
+			uint64_t arg1, \
+			uint64_t arg2, \
+			uint64_t arg3, \
+			uint64_t arg6, \
+			uint64_t arg4, \
+			uint64_t arg5)
+
+typedef uint64_t (*syscall_dispatch_t)(
+		uint64_t arg1,
+		uint64_t arg2,
+		uint64_t arg3,
+		uint64_t arg6,
+		uint64_t arg4,
+		uint64_t arg5);
+
+
+extern syscall_dispatch_t syscall_handlers[SYSCALL_MAX];
+
+extern DECLARE_SYSCALL(exit);
+extern DECLARE_SYSCALL(open);
+extern DECLARE_SYSCALL(close);
+extern DECLARE_SYSCALL(read);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

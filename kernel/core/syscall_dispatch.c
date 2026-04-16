@@ -22,25 +22,68 @@
 #include <core/syscall_vectors.h>
 #include <core/process.h>
 #include <core/logging.h>
+#include <core/fs.h>
 
-extern void syscall_dispatch(
-		uint64_t vector,
-		uint64_t argc,
-		uint64_t* argv,
-		uint64_t saved_rip,
-		uint64_t saved_rsp,
-		uint64_t saved_rflags) {
+#define ARGC_0 \
+	(void)arg1; \
+	(void)arg2; \
+	(void)arg3; \
+	(void)arg4; \
+	(void)arg5; \
+	(void)arg6
 
-	switch (vector) {
-		case SYSCALL_EXIT:
-			if (argc != 1) {
-				goto syscall_fail;
-			}
+#define ARGC_1 \
+	(void)arg2; \
+	(void)arg3; \
+	(void)arg4; \
+	(void)arg5; \
+	(void)arg6
 
-			logging_log_debug("Process %lu terminated with %d", process_get_pid(), argv[0]);
-			process_kill_current();
-		default:
-syscall_fail:
-			syscall_return(saved_rip, saved_rflags, saved_rsp, ~0uLL);
-	}
+#define ARGC_2 \
+	(void)arg3; \
+	(void)arg4; \
+	(void)arg5; \
+	(void)arg6
+
+#define ARGC_3 \
+	(void)arg4; \
+	(void)arg5; \
+	(void)arg6
+
+#define ARGC_4 \
+	(void)arg5; \
+	(void)arg6
+
+#define ARGC_5 \
+	(void)arg6
+
+#define ARGC_6
+
+DECLARE_SYSCALL(exit) {
+	ARGC_1;
+
+	//TODO: handle exit code
+	(void)arg1;
+
+	process_kill_current();
+}
+
+DECLARE_SYSCALL(open) {
+	ARGC_1;
+
+	return (uint64_t)fs_open((const char*)arg1);
+}
+
+DECLARE_SYSCALL(close) {
+	ARGC_1;
+
+	fs_close((struct fs_handle_t*)arg1);
+
+	return SYSCALL_STS_OK;
+}
+
+DECLARE_SYSCALL(read) {
+	ARGC_3;
+
+	return (uint64_t)fs_read((struct fs_handle_t*)arg1, (void*)arg2, (size_t)arg3);
 }

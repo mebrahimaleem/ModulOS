@@ -15,6 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#include <core/syscall_vectors.h>
+
 .section .text
 
 .globl syscall_return
@@ -28,11 +30,45 @@ sysretq
 
 .globl syscall_entry
 syscall_entry:
-movq %rsp, %r8 // rsp
+cmpq $SYSCALL_MAX, %rax
+jae syscall_fail
 
-movq %gs:0, %rax
-movq (%rax), %rsp
+pushq %rbp
+movq %rsp, %rbp
 
-movq %r11, %r9 // rflags
+movq %gs:0, %rsp
+movq (%rsp), %rsp
 
-call syscall_dispatch
+pushq %rcx
+pushq %r11
+
+movq %r10, %rcx
+
+call *syscall_handlers(,%rax,8)
+
+popq %r11
+popq %rcx
+
+movq %rbp, %rsp
+popq %rbp
+
+sysretq
+
+syscall_fail:
+movq $SYSCALL_STS_FAIL, %rax
+sysretq
+
+.section .rodata
+
+.extern syscall_dispatch_exit
+.extern syscall_dispatch_open
+.extern syscall_disaptch_close
+.extern syscall_dispatch_read
+
+.global syscall_handlers
+syscall_handlers:
+
+.quad syscall_dispatch_exit
+.quad syscall_dispatch_open
+.quad syscall_dispatch_close
+.quad syscall_dispatch_read

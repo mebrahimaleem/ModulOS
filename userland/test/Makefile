@@ -39,8 +39,8 @@ $(USERLAND_DIR)/hello_world.txt: | $(USERLAND_DIR)
 	echo Hello, World! > $@
 
 $(USERLAND_DIR)/test: $(OBJ_DIR)/test.o | $(USERLAND_DIR)
-	$(CC) -o $@ $(LD_USR_FLAGS) -fuse-ld=lld $^
+	$(CC) -g -o $@ $(LD_USR_FLAGS) -fuse-ld=lld $^
 
 $(OBJ_DIR)/test.o: test.S | $(OBJ_DIR)
-	$(CC) $(LD_USR_FLAGS) -Ilibc/ -c -o $@ $<
+	$(CC) -g $(LD_USR_FLAGS) -Ilibc/ -c -o $@ $<
 

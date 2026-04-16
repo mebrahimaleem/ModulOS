@@ -81,22 +81,6 @@ static inline void write_syscall_msr(void) {
 	msr_write(MSR_FMASK, RFL_MASK);
 }
 
-#ifdef SERIAL
-static void echo_com1(void* cntx) {
-	(void)cntx;
-
-	struct fs_handle_t* handle = fs_open("/dev/ttyS0");
-	char buf;
-
-	struct tty_handle_t* com1 = tty_com1();
-
-	while (1) {
-		fs_read(handle, &buf, 1);
-		tty_write(com1, &buf, 1);
-	}
-}
-#endif /* SERIAL */
-
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
 
@@ -143,8 +127,6 @@ void kentry(void) {
 
 #ifdef SERIAL
 	serial_init_interrupts();
-
-	scheduler_schedule(process_from_func(echo_com1, 0));
 #endif /* SERIAL */
 
 	logging_log_debug("Early PCIE init");

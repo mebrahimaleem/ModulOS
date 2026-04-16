@@ -16,7 +16,51 @@
 */
 
 /*
- * argc - 1
- * argv - exit code (int)
+ * System call convention
+ * rax: vector
+ * rdi: arg1
+ * rsi: arg2
+ * rdx: arg3
+ * r8 : arg4
+ * r9 : arg5
+ * r10: arg6
+ *
+ * arguments not guaranteed to be preserved
+ *
+ * rcx and r11 are clobbered
+ * all other registers are preserved
+ * return status stored in rax
+ */
+
+#define SYSCALL_STS_OK			0
+#define SYSCALL_STS_FAIL		-1uLL
+
+/*
+ * rdi: exit status (int)
+ * ret: (void)
  */
 #define SYSCALL_EXIT				0
+
+/*
+ * rdi: path (const char*)
+ * ret: handle (int)
+ */
+#define SYSCALL_OPEN				1
+
+/*
+ * rdi: handle (int)
+ * ret: (void)
+ */
+#define SYSCALL_CLOSE				2
+
+/*
+ * rdi: handle (int)
+ * rsi: buffer (char*)
+ * rdx: count (size_t)
+ * ret: bytes read (size_t)
+ */
+#define SYSCALL_READ				3
+
+#define SYSCALL_MAX					4
+
+
