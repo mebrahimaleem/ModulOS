@@ -29,6 +29,7 @@
 #include <core/paging.h>
 #include <core/mm.h>
 #include <core/time.h>
+#include <core/fs.h>
 
 #include <lib/kmemset.h>
 
@@ -69,6 +70,7 @@ void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	pcb->init_k_rsp_vaddr = init_rsp_vaddr;
 	pcb->init_k_rsp_paddr = init_rsp_paddr;
 	pcb->sched_cntr = SCHED_SKIP;
+	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
 	proc_data_get()->current_process = pcb;
 	proc_data_get()->current_process->pid = process_assign_pid();
 	proc_data_get()->current_process->cr3 = 0;
@@ -105,6 +107,8 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 	pcb->init_k_rsp_vaddr = stack_vaddr;
 	pcb->init_k_rsp_paddr = stack_paddr;
 
+	pcb->fsbase = 0;
+
 	pcb->k_rsp_lo = 0;
 	pcb->k_rsp_hi = 0;
 
@@ -119,6 +123,12 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 	pcb->cr3 = 0;
 
 	pcb->pid = process_assign_pid();
+
+	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
+
+	pcb->fd_table[0] = fs_open("/dev/ttyS0");
+	pcb->fd_table[1] = fs_open("/dev/ttyS0");
+	pcb->fd_table[2] = fs_open("/dev/ttyS0");
 
 	return pcb;
 }
@@ -160,6 +170,12 @@ void process_discard(struct pcb_t* pcb) {
 		paging_free_userspace((uint64_t*)pcb->cr3);
 	}
 
+	for (uint64_t i = 0; i < MAX_FD; i++) {
+		if (pcb->fd_table[i]) {
+			fs_close(pcb->fd_table[i]);
+		}
+	}
+
 	logging_log_debug("Killed %ld", pcb->pid);
 
 	kfree(pcb);
@@ -188,6 +204,7 @@ void process_preempt_entry(struct preempt_frame_t* context) {
 		pcb->cs = context->cs;
 		pcb->rflags = context->rflags;
 		pcb->ss = context->ss;
+		pcb->fsbase = cpu_get_fsbase();
 	}
 
 	scheduler_run();

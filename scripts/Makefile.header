@@ -43,3 +43,8 @@ endif
 ifdef SMP_ENABLE
 DEFINES := $(DEFINES) -DSMP_ENABLE
 endif
+
+ifdef CHECK_ALLOC
+DEFINES := $(DEFINES) -DCHECK_ALLOC
+endif
+

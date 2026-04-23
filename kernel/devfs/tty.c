@@ -135,6 +135,14 @@ uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
 
 void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {
 	for (size_t i = 0; i < count; i++) {
-		tty->writer(((uint8_t*)buffer)[i]);
+		uint8_t val = ((uint8_t*)buffer)[i];
+		switch (val) {
+			case '\n':
+				tty->writer('\r');
+				__attribute__((fallthrough));
+			default:
+				tty->writer(((uint8_t*)buffer)[i]);
+				break;
+		}
 	}
 }

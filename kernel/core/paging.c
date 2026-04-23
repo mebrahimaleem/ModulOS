@@ -287,10 +287,7 @@ static void free_pages(uint64_t entry, enum page_size_t lvl) {
 
 	for (uint16_t i = 0; i < 512; i++) {
 		if (access[i] & PAGE_PRESENT) {
-			if (lvl == PAGE_4K || (access[i] & PAGE_PS)) {
-				mm_free_v(access[i] & PAGE_ADDR_MASK, PAGE_SIZE_4K);
-			}
-			else {
+			if (lvl != PAGE_4K && !(access[i] & PAGE_PS)) {
 				free_pages(access[i], lvl-1);
 			}
 		}

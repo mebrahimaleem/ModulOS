@@ -64,6 +64,8 @@ sysretq
 .extern syscall_dispatch_open
 .extern syscall_disaptch_close
 .extern syscall_dispatch_read
+.extern syscall_dispatch_write
+.extern syscall_dispatch_alloc
 
 .global syscall_handlers
 syscall_handlers:
@@ -72,3 +74,5 @@ syscall_handlers:
 .quad syscall_dispatch_open
 .quad syscall_dispatch_close
 .quad syscall_dispatch_read
+.quad syscall_dispatch_write
+.quad syscall_dispatch_alloc

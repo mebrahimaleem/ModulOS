@@ -46,5 +46,7 @@ extern DECLARE_SYSCALL(exit);
 extern DECLARE_SYSCALL(open);
 extern DECLARE_SYSCALL(close);
 extern DECLARE_SYSCALL(read);
+extern DECLARE_SYSCALL(write);
+extern DECLARE_SYSCALL(alloc);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

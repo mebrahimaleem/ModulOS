@@ -22,6 +22,9 @@
 #include <stddef.h>
 
 #include <kernel/core/exception_dispatch.h>
+#include <kernel/core/fs.h>
+
+#define MAX_FD		256
 
 struct pcb_t {
 	// order is important
@@ -54,6 +57,8 @@ struct pcb_t {
 	uint32_t k_rsp_hi;
 	uint64_t init_k_rsp_vaddr;
 	uint64_t init_k_rsp_paddr;
+	uint64_t fsbase;
+	uint64_t mem_top;
 
 	uint64_t cr3;
 
@@ -69,6 +74,8 @@ struct pcb_t {
 	union {
 		uint64_t wake_time;
 	} sleep_state;
+
+	struct fs_handle_t* fd_table[MAX_FD];
 };
 
 struct preempt_frame_t {

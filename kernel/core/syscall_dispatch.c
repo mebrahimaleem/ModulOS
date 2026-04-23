@@ -23,6 +23,12 @@
 #include <core/process.h>
 #include <core/logging.h>
 #include <core/fs.h>
+#include <core/mm.h>
+#include <core/paging.h>
+#include <core/proc_data.h>
+#include <core/process.h>
+
+#include <lib/kmemset.h>
 
 #define ARGC_0 \
 	(void)arg1; \
@@ -69,21 +75,57 @@ DECLARE_SYSCALL(exit) {
 }
 
 DECLARE_SYSCALL(open) {
-	ARGC_1;
+	ARGC_0;
 
-	return (uint64_t)fs_open((const char*)arg1);
+	//TODO
+	return 1;
 }
 
 DECLARE_SYSCALL(close) {
-	ARGC_1;
+	ARGC_0;
 
-	fs_close((struct fs_handle_t*)arg1);
-
-	return SYSCALL_STS_OK;
+	//TODO
+	return 1;
 }
 
 DECLARE_SYSCALL(read) {
 	ARGC_3;
 
-	return (uint64_t)fs_read((struct fs_handle_t*)arg1, (void*)arg2, (size_t)arg3);
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	return (uint64_t)fs_read(pcb->fd_table[arg1], (void*)arg2, (size_t)arg3);
+}
+
+DECLARE_SYSCALL(write) {
+	ARGC_3;
+	
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	return (uint64_t)fs_write(pcb->fd_table[arg1], (void*)arg2, (size_t)arg3);
+}
+
+DECLARE_SYSCALL(alloc) {
+	ARGC_1;
+
+	if (arg1 % PAGE_SIZE_4K) {
+		arg1 += PAGE_SIZE_4K - (arg1 % PAGE_SIZE_4K);
+	}
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	uint64_t paddr = mm_alloc_p(arg1);
+	
+	if (!paddr) {
+		return 0;
+	}
+
+	uint64_t vaddr = pcb->mem_top;
+
+	for (uint64_t i = 0; i < arg1; i += PAGE_SIZE_4K) {
+		paging_map_proc(vaddr + i,
+										paddr + i,
+										PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K,
+										(uint64_t*)proc_data_get()->current_process->cr3);
+	}
+
+	pcb->mem_top += arg1;
+
+	return vaddr;
 }

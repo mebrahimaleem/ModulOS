@@ -44,6 +44,7 @@ struct vfs_mount_t {
 	fs_read_t read;
 	fs_get_seek_t get_seek;
 	fs_seek_t seek;
+	fs_write_t write;
 };
 
 struct fs_handle_t {
@@ -70,7 +71,8 @@ static struct vfs_mount_t dev_mount = {
 	.stat = devfs_stat,
 	.read = devfs_read,
 	.get_seek = devfs_get_seek,
-	.seek = devfs_seek
+	.seek = devfs_seek,
+	.write = devfs_write
 };
 
 static inline char* path_next(char* path, size_t* len) {
@@ -110,7 +112,8 @@ enum file_status_t fs_mount(
 		fs_stat_t stat,
 		fs_read_t read,
 		fs_get_seek_t get_seek,
-		fs_seek_t seek
+		fs_seek_t seek,
+		fs_write_t write
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -128,6 +131,7 @@ enum file_status_t fs_mount(
 		vfs_root.mount->read = read;
 		vfs_root.mount->get_seek = get_seek;
 		vfs_root.mount->seek = seek;
+		vfs_root.mount->write = write;
 
 		return FILE_OK;
 	}
@@ -278,4 +282,14 @@ enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	//lock_release(&fs_lock);
 
 	return sts;
+}
+
+size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
+	size_t ret;
+
+	//lock_acquire(&fs_lock);
+	ret = handle->mount->write(handle->handle, buffer, count);
+	//lock_release(&fs_lock);
+
+	return ret;
 }

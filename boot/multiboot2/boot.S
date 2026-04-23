@@ -50,7 +50,7 @@
 #define CPUID_LONGMODE				0x80000001
 #define CPUID_LONGMODE_EXIST	0x20000000
 
-#define PAEPSE	0x30
+#define PAEPSE		0x30
 
 #define EFER	0xC0000080
 #define LME		0x100

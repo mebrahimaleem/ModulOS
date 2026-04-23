@@ -129,3 +129,17 @@ enum file_status_t devfs_seek(struct file_handle_t* handle, uint64_t seek) {
 			return FILE_NO_SUPPORT;
 	}
 }
+
+size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count) {
+	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
+
+	if (!dev_handle) {
+		return FILE_ERROR;
+	}
+
+	switch (dev_handle->type) {
+		case DEV_TYPE_TTY:
+			tty_write(dev_handle->dev_handle.tty, buffer, count);
+			return count;
+	}
+}

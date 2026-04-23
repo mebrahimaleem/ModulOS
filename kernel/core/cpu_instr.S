@@ -90,3 +90,20 @@ ret
 cpu_hlt:
 hlt
 ret
+
+.globl cpu_set_cr4
+cpu_set_cr4:
+movq %cr4, %rax
+orq %rdi, %rax
+movq %rax, %cr4
+ret
+
+.globl cpu_get_fsbase
+cpu_get_fsbase:
+rdfsbaseq %rax
+ret
+
+.globl cpu_set_fsbase
+cpu_set_fsbase:
+wrfsbaseq %rdi
+ret

@@ -122,7 +122,7 @@ typedef struct {
 	Elf64_Word p_flags;
 	Elf64_Off p_offset;
 	Elf64_Addr p_vaddr;
-	Elf64_Addr v_paddr;
+	Elf64_Addr p_paddr;
 	Elf64_Xword p_filesz;
 	Elf64_Xword p_memsz;
 	Elf64_Xword p_align;
@@ -196,6 +196,8 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
 	pcb->k_rsp_hi = rsp >> 32;
 
+	pcb->fsbase = 0;
+
 	pcb->rflags = INIT_USERLAND_RFL;
 
 	pcb->rdi = header.e_entry; // rip
@@ -227,6 +229,8 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 	struct mem_reg_t* mem_regs = 0;
 	struct mem_reg_t* j;
 	struct mem_reg_t* temp;
+
+	uint64_t memtop = 0;
 
 	// first pass to determine memory layout
 	for (Elf64_Half i = 0; i < header.e_phnum; i++) {
@@ -308,6 +312,10 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 
 	// map in memory for copying
 	for (j = mem_regs; j; j = j->next) {
+		if (j->top > memtop) {
+			memtop = j->top;
+		}
+
 		for (uint64_t off = 0; off < j->top - j->base; off += PAGE_SIZE_4K) {
 			paddr = mm_alloc_p(PAGE_SIZE_4K);
 
@@ -321,6 +329,8 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 			paging_map_proc(j->base + off, paddr, PAGE_PRESENT | PAGE_RW, PAGE_4K, (uint64_t*)pcb->cr3);
 		}
 	}
+
+	pcb->mem_top = memtop + PAGE_SIZE_4K;
 
 	// map in stack
 	for (img_off = INIT_USERLAND_RSP - INIT_STACK_SIZE; img_off < INIT_USERLAND_RSP; img_off += PAGE_SIZE_4K) {
@@ -351,7 +361,7 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 
 		fs_seek(file, pheader.p_offset);
 		fs_read(file, (void*)pheader.p_vaddr, pheader.p_filesz);
-		kmemset((void*)(pheader.p_vaddr + pheader.p_memsz - pheader.p_filesz), 0, pheader.p_memsz - pheader.p_filesz);
+		kmemset((void*)(pheader.p_vaddr + pheader.p_filesz), 0, pheader.p_memsz - pheader.p_filesz);
 	}
 
 	// update page permissions
@@ -360,6 +370,12 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 			paging_update_perms(j->base + off, j->perms, PAGE_4K, (uint64_t*)pcb->cr3);
 		}
 	}
+
+	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
+
+	pcb->fd_table[0] = fs_open("/dev/ttyS0");
+	pcb->fd_table[1] = fs_open("/dev/ttyS0");
+	pcb->fd_table[2] = fs_open("/dev/ttyS0");
 
 restore_cr3:
 

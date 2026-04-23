@@ -61,6 +61,8 @@
 
 #define RFL_MASK	0xD5
 
+#define CR4_FSGSBASE		(1 << 16)
+
 struct boot_context_t boot_context;
 
 extern uint8_t ap_bootstrap_start;
@@ -100,6 +102,7 @@ void kentry(void) {
 	mm_transaction_init();
 
 	write_syscall_msr();
+	cpu_set_cr4(CR4_FSGSBASE);
 
 	logging_log_debug("TSS and IDT init done");
 
@@ -162,6 +165,7 @@ void kapentry(uint64_t arb_id) {
 	proc_data_get()->arb_id = (uint8_t)arb_id;
 
 	write_syscall_msr();
+	cpu_set_cr4(CR4_FSGSBASE);
 
 	alloc_init();
 

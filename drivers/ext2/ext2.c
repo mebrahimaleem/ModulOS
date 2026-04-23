@@ -619,6 +619,13 @@ static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek)
 	return FILE_OK;
 }
 
+static size_t ext2_write(struct file_handle_t* handle, void* buffer, size_t count) {
+	(void)handle;
+	(void)buffer;
+	(void)count;
+	return 0;
+}
+
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
 	struct ext2_bg_desc_t* bgdt;
@@ -673,7 +680,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_stat,
 					ext2_read,
 					ext2_get_seek,
-					ext2_seek
+					ext2_seek,
+					ext2_write
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);
@@ -698,7 +706,7 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 		}
 
 
-		struct fs_handle_t* test_file = fs_open("/test");
+		struct fs_handle_t* test_file = fs_open("/test1");
 		if (!test_file) {
 			logging_log_error("Failed to open test file");
 		}

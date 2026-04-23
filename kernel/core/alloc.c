@@ -77,6 +77,22 @@ static inline struct alloc_header_t* get_next(struct alloc_header_t* header) {
 	return IS_LAST(header->size) ? 0 : (struct alloc_header_t*)((uint64_t)header + GET_SIZE(header->size));
 }
 
+#ifdef CHECK_ALLOC
+static void alloc_check(void) {
+	for (struct alloc_arena_t* i = arena_head; i; i = i->next) {
+		lock_acquire(&i->arena_lock);
+
+		for (struct alloc_header_t* j = i->free; j; j = j->next_free.next_free) {
+			if (IS_USED(j->size)) {
+				logging_log_error("Inconsistent heap state. Used block on free list");
+				panic(PANIC_STATE);
+			}
+		}
+		lock_release(&i->arena_lock);
+	}
+}
+#endif /* CHECK_ALLOC */
+
 void alloc_init() {
 	lock_init(&alloc_lock);
 
@@ -176,6 +192,10 @@ void* kmalloc(size_t size) {
 			if (GET_SIZE(header->size) >= adjusted_size) {
 				ret = alloc(i, header, adjusted_size);
 				lock_release(&i->arena_lock);
+
+#ifdef CHECK_ALLOC
+				alloc_check();
+#endif /* CHECK_ALLOC */
 				return ret;
 			}
 		}
@@ -216,6 +236,9 @@ next_arena:
 	arena_head = i;
 	lock_release(&alloc_lock);
 
+#ifdef CHECK_ALLOC
+	alloc_check();
+#endif /* CHECK_ALLOC */
 	return ret;
 }
 
@@ -236,15 +259,20 @@ void kfree(void* ptr) {
 	arena = header->next_free.arena;
 
 	lock_acquire(&arena->arena_lock);
-	lock_release(&arena->arena_lock);
 
 	header->size = GET_SIZE(header->size) | TYPE_HEADER_FREE | (header->size & MASK_HEADER_LAST);
+
+	next = get_next(header);
 
 	// coallecse with prev
 	if (header->prev && IS_FREE(header->prev->size)) {
 		header->prev->size = (GET_SIZE(header->prev->size) + GET_SIZE(header->size)) | TYPE_HEADER_FREE | (header->size & MASK_HEADER_LAST);
 
 		header = header->prev;
+
+		if (next) {
+			next->prev = header;
+		}
 	}
 	else {
 		// insert into free list's begining
@@ -259,14 +287,21 @@ void kfree(void* ptr) {
 	}
 
 	// coallecse with next
-	next = get_next(header);
-	if (!IS_LAST(header->size) && IS_FREE(next->size)) {
+	if (next && IS_FREE(next->size)) {
 		header->size = (GET_SIZE(header->size) + GET_SIZE(next->size)) | TYPE_HEADER_FREE | (next->size & MASK_HEADER_LAST);
 
 		patch_list(arena, next);
+
+		next = get_next(next);
+
+		if (next) {
+			next->prev = header;
+		}
 	}
 
-
-
 	lock_release(&arena->arena_lock);
+
+#ifdef CHECK_ALLOC
+	alloc_check();
+#endif /* CHECK_ALLOC */
 }

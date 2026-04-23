@@ -61,6 +61,20 @@
  */
 #define SYSCALL_READ				3
 
-#define SYSCALL_MAX					4
+/*
+ * rdi: handle (int)
+ * rsi: buffer (char*)
+ * rdx: count (size_t)
+ * ret: bytes written (size_t)
+ */
+#define SYSCALL_WRITE				4
+
+/*
+ * rdi: size (long)
+ * ret: mem region (void*)
+ */
+#define SYSCALL_ALLOC				5
+
+#define SYSCALL_MAX					6
 
 

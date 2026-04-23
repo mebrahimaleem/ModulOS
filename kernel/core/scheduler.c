@@ -131,11 +131,12 @@ void scheduler_run(void) {
 	
 	cpu_cli();
 
-	pd->tss->rsp0_lo = 	run->k_rsp_lo;
-	pd->tss->rsp0_hi = 	run->k_rsp_hi;
+	pd->tss->rsp0_lo = run->k_rsp_lo;
+	pd->tss->rsp0_hi = run->k_rsp_hi;
 	pd->kernel_rsp = (uint64_t)run->k_rsp_lo | ((uint64_t)run->k_rsp_hi << 32);
 	pd->current_process = run;
 	cpu_set_cr3(run->cr3);
+	cpu_set_fsbase(run->fsbase);
 
 	apic_write_reg(APIC_REG_EOI, APIC_EOI);
 
