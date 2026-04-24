@@ -1,0 +1,20 @@
+[binaries]
+c = 'clang'
+cpp = 'clang++'
+ar = 'llvm-ar'
+ld = 'llvm-ld'
+strip = 'llvm-strip'
+
+[host_machine]
+system = 'modulos'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+
+[properties]
+sizeof_int = 4
+sizeof_void* = 8
+
+alignment_char = 1
+alignment_void* = 8
+alignment_double = 8

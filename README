@@ -3,7 +3,9 @@ An operating system that aims to be customizable and modular to provide a fast u
 
 ## Licensing
 
-This software is provided under the GPLv3 license, found in COPYING.
+This software is provided under the GPLv3 license, found in COPYING. The source tree under
+`userland/mlibc/` is from mlibc (https://github.com/managarm/mlibc), and has a seperate
+license in `userland/mlibc/LICENSE` which can also be found in `LICENSES/MLIBC`
 
 ## Installing
 

@@ -706,18 +706,18 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 		}
 
 
-		struct fs_handle_t* test_file = fs_open("/test1");
-		if (!test_file) {
-			logging_log_error("Failed to open test file");
+		struct fs_handle_t* shell = fs_open("/bin/shell");
+		if (!shell) {
+			logging_log_error("Failed to open shell file");
 		}
 		else {
-			struct pcb_t* test_pcb = elf_load(test_file, process_assign_pid(), "(system) ModulOS", "USER=root PWD=/");
-			if (!test_pcb) {
-				logging_log_error("Failed to load test file");
+			struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), "/bin/shell ModulOS", "USER=root PWD=/");
+			if (!shell_pcb) {
+				logging_log_error("Failed to load shell file");
 			}
-			fs_close(test_file);
+			fs_close(shell);
 
-			scheduler_schedule(test_pcb);
+			scheduler_schedule(shell_pcb);
 		}
 	}
 

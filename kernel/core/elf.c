@@ -215,15 +215,20 @@ struct mem_reg_t {
 static const uint8_t elf_magic[4] = {0x7f, 'E', 'L', 'F'};
 
 static uint8_t check_valid(struct fs_handle_t* file, Elf64_Ehdr* header) {
-	return 
+	if (
 			fs_seek(file, 0) != FILE_OK || /* file ok seek */
 			fs_read(file, header, sizeof(*header)) != sizeof(*header) || /* file ok read */
 			kmemcmp(elf_magic, &header->e_ident[EI_MAG0], sizeof(elf_magic)) || /* magic */
 			header->e_ident[EI_CLASS] != ELFCLASS64 || /* 64 bit */
 			header->e_ident[EI_DATA] != ELFDATA2LSB || /* little endian */
-			header->e_ident[EI_OSABI] != ELFOSABI_SYSV || /* sys V */
+			//header->e_ident[EI_OSABI] != ELFOSABI_SYSV || /* sys V */ // unreliable
 			header->e_type != ET_EXEC || /* executable */
-			header->e_machine != EM_X86_64; /* amd64 */
+			header->e_machine != EM_X86_64 /* amd64 */
+		) {
+		return 1;
+	}
+
+	return 0;
 }
 
 uint8_t elf_is_elf(struct fs_handle_t* file) {

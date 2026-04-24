@@ -14,21 +14,45 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-export SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
+SRC_TREE_ROOT := ../$(SRC_TREE_ROOT)
 include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
-export OBJ_DIR := $(OBJ_DIR)/userland
+OBJ_DIR := $(OBJ_DIR)/userland
 
-SUBTARGETS := test
+U_CFLAGS := -g -fno-pie -static \
+						-nostdlib -nostartfiles -nodefaultlibs \
+						-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables \
+						--sysroot=$(OBJ_DIR)/../userland_files/
+
+LIB := $(OBJ_DIR)/../userland_files/usr/lib
 
 .PHONY: all
 all: build
 
 .PHONY: build
-build: $(OBJ_DIR)/../userland_files/
+build: libc $(OBJ_DIR)/../userland_files/bin/shell
 
-$(OBJ_DIR)/../userland_files/: $(SUBTARGETS)
+%/:
+	mkdir -p $@
 
-.PHONY: $(SUBTARGETS)
-$(SUBTARGETS):
-	$(MAKE) -C $@ build
+.PHONY: libc
+libc: $(OBJ_DIR)/.mlibc-meson-setup | $(OBJ_DIR)/libc-build/
+	ninja -C $|
+	meson install -C $|
+
+$(OBJ_DIR)/.mlibc-meson-setup: | $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
+	meson setup \
+		--native-file mlibc/ci/linux-x86_64-clang.cross-file \
+		--cross-file mlibc/ci/modulos.cross-file \
+		--prefix $(abspath $(OBJ_DIR)/../userland_files/usr/) \
+		--reconfigure \
+		-Ddefault_library=static \
+		$(OBJ_DIR)/libc-build \
+		mlibc/
+	touch $@
+
+$(OBJ_DIR)/shell.o: shell/main.c | $(OBJ_DIR)
+	$(CC) $(U_CFLAGS) -c -o $(OBJ_DIR)/shell.o $<
+
+$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o | libc $(OBJ_DIR)/../userland_files/bin/
+	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a
