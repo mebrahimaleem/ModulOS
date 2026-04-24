@@ -63,6 +63,13 @@ static inline void cpu_cli_if(void) {
 extern void cpu_set_cr4(uint64_t bits);
 
 extern uint64_t cpu_get_fsbase(void);
+
 extern void cpu_set_fsbase(uint64_t base);
+
+extern void cpu_save_fx(uint8_t* data);
+
+extern void cpu_restore_fx(uint8_t* data);
+
+extern void cpu_init_fx(void);
 
 #endif /* KERNEL_CORE_CPU_INSTR_H */

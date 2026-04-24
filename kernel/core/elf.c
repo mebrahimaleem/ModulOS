@@ -285,6 +285,8 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 	pcb->sched_cntr = SCHED_READY;
 	pcb->pid = pid;
 
+	cpu_restore_fx(pcb->fxdata);
+
 	pcb->cr3 = paging_create_pml4();
 	if (!pcb->cr3) {
 		logging_log_error("Failed to create pml4 for process");

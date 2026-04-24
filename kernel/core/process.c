@@ -107,6 +107,8 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 	pcb->init_k_rsp_vaddr = stack_vaddr;
 	pcb->init_k_rsp_paddr = stack_paddr;
 
+	cpu_save_fx(pcb->fxdata);
+
 	pcb->fsbase = 0;
 
 	pcb->k_rsp_lo = 0;
@@ -205,6 +207,7 @@ void process_preempt_entry(struct preempt_frame_t* context) {
 		pcb->rflags = context->rflags;
 		pcb->ss = context->ss;
 		pcb->fsbase = cpu_get_fsbase();
+		cpu_save_fx(pcb->fxdata);
 	}
 
 	scheduler_run();

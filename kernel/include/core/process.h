@@ -64,6 +64,10 @@ struct pcb_t {
 
 	struct pcb_t* next;
 
+	struct fs_handle_t* fd_table[MAX_FD];
+
+	uint8_t fxdata[512] __attribute__((aligned(16)));
+
 	enum {
 		SCHED_READY,
 		SCHED_KILL,
@@ -75,7 +79,6 @@ struct pcb_t {
 		uint64_t wake_time;
 	} sleep_state;
 
-	struct fs_handle_t* fd_table[MAX_FD];
 };
 
 struct preempt_frame_t {

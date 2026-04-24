@@ -103,6 +103,7 @@ void kentry(void) {
 
 	write_syscall_msr();
 	cpu_set_cr4(CR4_FSGSBASE);
+	cpu_init_fx();
 
 	logging_log_debug("TSS and IDT init done");
 
@@ -166,6 +167,7 @@ void kapentry(uint64_t arb_id) {
 
 	write_syscall_msr();
 	cpu_set_cr4(CR4_FSGSBASE);
+	cpu_init_fx();
 
 	alloc_init();
 

@@ -137,6 +137,7 @@ void scheduler_run(void) {
 	pd->current_process = run;
 	cpu_set_cr3(run->cr3);
 	cpu_set_fsbase(run->fsbase);
+	cpu_restore_fx(run->fxdata);
 
 	apic_write_reg(APIC_REG_EOI, APIC_EOI);
 

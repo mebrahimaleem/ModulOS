@@ -107,3 +107,25 @@ ret
 cpu_set_fsbase:
 wrfsbaseq %rdi
 ret
+
+.globl cpu_save_fx
+cpu_save_fx:
+fxsave (%rdi)
+ret
+
+.globl cpu_restore_fx
+cpu_restore_fx:
+fxrstor (%rdi)
+ret
+
+.globl cpu_init_fx
+cpu_init_fx:
+movq %cr0, %rax
+andw $0xFFFB, %ax
+orw $2, %ax
+movq %rax, %cr0
+
+movq %cr4, %rax
+orq $(3 << 9), %rax
+movq %rax, %cr4
+ret
