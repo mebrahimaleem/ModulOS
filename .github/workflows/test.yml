@@ -14,7 +14,7 @@ jobs:
       - name: Install apt packages
         run: |
           sudo apt update
-          sudo apt install clang lld llvm grub-efi-amd64-bin mtools
+          sudo apt install clang lld llvm grub-efi-amd64-bin mtools meson ninja-build
 
       - name: Build ModulOS
         run: |
