@@ -28,9 +28,13 @@
 #include <core/syscall.h>
 #include <core/cpu_instr.h>
 #include <core/proc_data.h>
+#include <core/time.h>
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemset.h>
+#include <lib/kmemcpy.h>
+#include <lib/kstrlen.h>
+#include <lib/kstrcpy.h>
 
 #define EI_MAG0				0
 #define EI_CLASS			4
@@ -74,6 +78,77 @@
 #define INIT_USERLAND_RSP		0x800000000000
 #define INIT_USERLAND_SB		0x7FFFFF800000
 #define INIT_STACK_SIZE			PAGE_SIZE_4K * 8
+
+// auxv
+#define AT_NULL					0
+#define AT_IGNORE				1
+#define AT_EXECFD				2
+#define AT_PHDR					3
+#define AT_PHENT				4
+#define AT_PHNUM				5
+#define AT_PAGESZ				6
+#define AT_BASE					7
+#define AT_FLAGS				8
+#define AT_ENTRY				9
+#define AT_NOTELF				10
+#define AT_UID					11
+#define AT_EUID					12
+#define AT_GID					13
+#define AT_EGID					14
+
+// linux vector entries
+#define AT_PLATFORM 		15
+#define AT_HWCAP 				16
+#define AT_CLKTCK 			17
+#define AT_FPUCW 				18
+#define AT_SECURE 			23
+#define AT_RANDOM 			25
+#define AT_HWCAP2 			26
+#define AT_HWCAP3 			29
+#define AT_HWCAP4 			30
+#define AT_EXECFN 			31
+#define AT_SYSINFO_EHDR 33
+
+enum {
+	AT_INDEX_PHDR,
+	AT_INDEX_PHENT,
+	AT_INDEX_PHNUM,
+	AT_INDEX_PAGESZ,
+	AT_INDEX_UID,
+	AT_INDEX_EUID,
+	AT_INDEX_GID,
+	AT_INDEX_EGID,
+	AT_INDEX_SECURE,
+	AT_INDEX_RANDOM,
+	AT_INDEX_CLKTCK,
+
+	AT_INDEX_NULL
+} at_index_t;
+
+typedef struct {
+	int a_type;
+	union {
+		long a_val;
+		void *a_ptr;
+		void (*a_fnc)();
+	} a_un;
+} auxv_t;
+
+static auxv_t default_auxv[] = {
+	[AT_INDEX_PHDR] = {.a_type = AT_PHDR},
+	[AT_INDEX_PHENT] = {.a_type = AT_PHENT},
+	[AT_INDEX_PHNUM] = {.a_type = AT_PHNUM},
+	[AT_INDEX_PAGESZ] = {.a_type = AT_PAGESZ, .a_un.a_val = PAGE_SIZE_4K},
+	[AT_INDEX_UID] = {.a_type = AT_UID, .a_un.a_val = 0},	
+	[AT_INDEX_EUID] = {.a_type = AT_EUID, .a_un.a_val = 0},	
+	[AT_INDEX_GID] = {.a_type = AT_GID, .a_un.a_val = 0},	
+	[AT_INDEX_EGID] = {.a_type = AT_EGID, .a_un.a_val = 0},	
+	[AT_INDEX_SECURE] = {.a_type = AT_SECURE, .a_un.a_val = 0},
+	[AT_INDEX_RANDOM] = {.a_type = AT_RANDOM},
+	[AT_INDEX_CLKTCK] = {.a_type = AT_CLKTCK, .a_un.a_val = 100},
+
+	[AT_INDEX_NULL] = {.a_type = AT_NULL} // extra qword is ignored
+};
 
 typedef uint64_t	Elf64_Addr;
 typedef uint64_t	Elf64_Off;
@@ -157,7 +232,7 @@ uint8_t elf_is_elf(struct fs_handle_t* file) {
 	return check_valid(file, &header);
 }
 
-struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
+struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invoker, const char* env) {
 	Elf64_Ehdr header;
 	uint64_t stack_paddr, stack_vaddr, rsp;
 
@@ -202,7 +277,6 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 
 	pcb->rdi = header.e_entry; // rip
 	pcb->rsi = INIT_USERLAND_RFL; // rflags
-	pcb->rdx = INIT_USERLAND_RSP; // rsp
 
 	pcb->rip = (uint64_t)syscall_return;
 	pcb->cs = GDT_KERNEL_CS;
@@ -330,7 +404,36 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 		}
 	}
 
-	pcb->mem_top = memtop + PAGE_SIZE_4K;
+
+	memtop += PAGE_SIZE_4K;
+	uint64_t pheaders_base = memtop;
+
+	// map in pheaders
+	size_t pheader_total = header.e_phentsize & header.e_phnum;
+	for (size_t off = 0; off < pheader_total; off += PAGE_SIZE_4K) {
+		paddr = mm_alloc_p(PAGE_SIZE_4K);
+
+		if (!paddr) {
+			paging_free_userspace((uint64_t*)pcb->cr3);
+			kfree(pcb);
+			pcb = 0;
+			goto restore_cr3;
+		}
+
+		paging_map_proc(pheaders_base + off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		memtop += PAGE_SIZE_4K;
+	}
+
+	memtop += PAGE_SIZE_4K;
+	pcb->mem_top = memtop;
+
+	ph_off = 0;
+	// copy pheaders
+	for (Elf64_Half i = 0; i < header.e_phnum; i++) {
+		fs_seek(file, ph_off + header.e_phoff);
+		fs_read(file, (void*)(pheaders_base + ph_off), sizeof(pheader));
+		ph_off += header.e_phentsize;
+	}
 
 	// map in stack
 	for (img_off = INIT_USERLAND_RSP - INIT_STACK_SIZE; img_off < INIT_USERLAND_RSP; img_off += PAGE_SIZE_4K) {
@@ -346,6 +449,62 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid) {
 		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
 		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
 	}
+
+	// create auxv
+	uint64_t invoke_addr = INIT_USERLAND_RSP - kstrlen(invoker) - 1;
+	uint64_t env_addr = invoke_addr - kstrlen(env) - 1;
+	uint64_t random_addr = env_addr - 16;
+	auxv_t* auxv_addr = (auxv_t*)(random_addr - sizeof(default_auxv));
+
+	kstrcpy((char*)invoke_addr, invoker);
+	kstrcpy((char*)env_addr, env);
+	kmemcpy(auxv_addr, default_auxv, sizeof(default_auxv));
+
+	// leave upper bytes untouched for "randomness"
+	*(volatile uint64_t*)random_addr = time_since_init_fs(); //TODO: better randomization
+
+	auxv_addr[AT_INDEX_PHDR].a_un.a_val = (int64_t)pheaders_base;
+	auxv_addr[AT_INDEX_PHENT].a_un.a_val = header.e_phentsize;
+	auxv_addr[AT_INDEX_PHNUM].a_un.a_val = header.e_phnum;
+	auxv_addr[AT_INDEX_RANDOM].a_un.a_val = (int64_t)random_addr;
+
+	uint64_t* stack_builder = (uint64_t*)auxv_addr;
+	stack_builder--;
+	*stack_builder = 0; // env end
+	
+	char* inf_chars;
+	for (inf_chars = (char*)(env_addr + kstrlen(env)); inf_chars >= (char*)env_addr; inf_chars--) {
+		if (*inf_chars == ' ') {
+			stack_builder--;
+			*stack_builder = (uint64_t)inf_chars + 1;
+			*inf_chars = 0;
+		}
+	}
+
+	stack_builder--;
+	*stack_builder = (uint64_t)inf_chars + 1;
+
+	stack_builder--;
+	*stack_builder = 0; // env start
+	
+	uint64_t argc = 1;
+
+	for (inf_chars = (char*)(invoke_addr + kstrlen(invoker)); inf_chars >= (char*)invoke_addr; inf_chars--) {
+		if (*inf_chars == ' ') {
+			stack_builder--;
+			*stack_builder = (uint64_t)inf_chars + 1;
+			*inf_chars = 0;
+			argc++;
+		}
+	}
+
+	stack_builder--;
+	*stack_builder = (uint64_t)inf_chars + 1;
+
+	stack_builder--;
+	*stack_builder = argc;
+
+	pcb->rdx = (uint64_t)stack_builder; // rsp
 
 	// copy in executable
 	ph_off = header.e_phoff;

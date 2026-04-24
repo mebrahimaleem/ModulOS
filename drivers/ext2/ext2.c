@@ -711,7 +711,7 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 			logging_log_error("Failed to open test file");
 		}
 		else {
-			struct pcb_t* test_pcb = elf_load(test_file, process_assign_pid());
+			struct pcb_t* test_pcb = elf_load(test_file, process_assign_pid(), "(system) ModulOS", "USER=root PWD=/");
 			if (!test_pcb) {
 				logging_log_error("Failed to load test file");
 			}

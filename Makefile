@@ -19,7 +19,7 @@
 
 #export DEBUG = 1
 export DEBUG_LOGGING = 1
-export SMP_ENABLE = 1
+#export SMP_ENABLE = 1
 #export CHECK_ALLOC = 1
 
 # Global options
