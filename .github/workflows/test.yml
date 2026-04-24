@@ -18,7 +18,7 @@ jobs:
 
       - name: Build ModulOS
         run: |
-          make -j$(nproc) build
+          make build
 
       - name: Run test suite
         run: |
