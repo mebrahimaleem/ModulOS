@@ -47,6 +47,10 @@ struct tty_handle_t {
 	uint8_t* read_buffer;
 	volatile uint16_t write_index;
 	volatile uint16_t read_index;
+	enum {
+		TTY_MODE_COOKED,
+		TTY_MODE_RAW
+	} tty_mode;
 	uint8_t lock;
 };
 
@@ -98,39 +102,38 @@ struct tty_handle_t* tty_open(char* name) {
 	return 0;
 }
 
-void tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
+size_t tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
+	size_t read = 0;
 	uint8_t* write = buffer;
 
 	while (count) {
 		while (EMPTY(tty->read_index, tty->write_index)) {
-			cpu_pause();
+			cpu_pause(); //TODO futex wait
 		}
 
 		lock_acquire(&tty->lock);
+
 		while (count && !EMPTY(tty->read_index, tty->write_index)) {
 			*write = tty->read_buffer[MASK(tty->read_index)];
 
 			tty->read_index++;
-			write++;
 			count--;
+			read++;
+
+			if (*write == '\n' && tty->tty_mode == TTY_MODE_COOKED) {
+				// cooked mode must return early on newline
+				count = 0;
+			}
+
+			write++;
 
 			tty->read_index &= TTY_RING_MASK;
 		}
+
 		lock_release(&tty->lock);
 	}
-}
 
-uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
-	if (FULL(tty->read_index, tty->write_index)) {
-		return 0;
-	}
-
-	tty->read_buffer[MASK(tty->write_index)] = byte;
-
-	tty->write_index++;
-	tty->write_index &= TTY_RING_MASK;
-
-	return 1;
+	return read;
 }
 
 void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {
@@ -145,4 +148,33 @@ void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {
 				break;
 		}
 	}
+}
+
+uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
+	if (FULL(tty->read_index, tty->write_index)) {
+		return 0;
+	}
+
+	if (byte == '\r') {
+		byte = '\n';
+	}
+
+	tty->read_buffer[MASK(tty->write_index)] = byte;
+
+	tty->write_index++;
+	tty->write_index &= TTY_RING_MASK;
+
+	if (tty->tty_mode == TTY_MODE_COOKED) {
+		// echoback on cooked
+		switch (byte) {
+			case '\n':
+				tty->writer('\r');
+				__attribute__((fallthrough));
+			default:
+				tty->writer(byte);
+				break;
+		}
+	}
+
+	return 1;
 }

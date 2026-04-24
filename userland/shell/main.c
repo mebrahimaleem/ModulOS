@@ -17,23 +17,31 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 int main(int argc, char** argv) {
+	printf("%s\n", argv[0]);
 	if (argc > 1) {
-		printf("%s Shell\n", argv[1]);
+		printf("%s ", argv[1]);
+	}
+	printf("Shell\n");
+
+	FILE* f = fopen(argv[0], "r");
+
+	if (!f) {
+		perror("Failed top open file");
 	}
 
-	static char buffer[128];
+	static char buffer[4];
 
-	while (1) {
-		printf(">");
-		scanf("%127s", buffer);
-
-		if (strcmp("exit", buffer) == 0) {
-			break;
-		}
+	ssize_t read = fread(buffer, 1, sizeof(buffer), f);
+	if (read != 4) {
+		fprintf(stderr, "Failed to read file\n");
+		return EXIT_FAILURE;
 	}
+
+	printf("%3s\n", &buffer[1]);
+
+	fclose(f);
 
 	return EXIT_SUCCESS;
 }

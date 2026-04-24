@@ -527,6 +527,14 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 	return FILE_OK;
 }
 
+static uint64_t ext2_get_seek(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+
+	return inode_handle->seek_block * block_size + inode_handle->seek;
+}
+
 static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count) {
 	struct ext2_inode_t inode;
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
@@ -545,6 +553,11 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	uint64_t index;
 	uint64_t write_seek = 0;
 	size_t write_len;
+	uint64_t full_seek = ext2_get_seek(handle);
+
+	if (full_seek > size) {
+		return 0;
+	}
 
 	while (count) {
 		track.block = inode_handle->seek_block;
@@ -575,6 +588,12 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 					return read;
 				}
 
+				if (write_len + full_seek > size) {
+					// full block read, but only copy up to limit of the file
+					write_len = size - full_seek;
+					count = 0;
+				}
+
 				kmemcpy((uint8_t*)buffer + write_seek, block_buffer + inode_handle->seek, write_len);
 
 				kfree(block_buffer);
@@ -587,6 +606,7 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 		}
 
 		write_seek += write_len;
+		full_seek += write_len;
 		inode_handle->seek += write_len;
 		count -= write_len;
 		read += write_len;
@@ -598,14 +618,6 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	}
 
 	return read;
-}
-
-static uint64_t ext2_get_seek(struct file_handle_t* handle) {
-	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
-
-	return inode_handle->seek_block * block_size + inode_handle->seek;
 }
 
 static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek) {

@@ -96,8 +96,7 @@ size_t devfs_read(struct file_handle_t* handle, void* buffer, size_t count) {
 
 	switch (dev_handle->type) {
 		case DEV_TYPE_TTY:
-			tty_read(dev_handle->dev_handle.tty, buffer, count);
-			return count;
+			return tty_read(dev_handle->dev_handle.tty, buffer, count);
 	}
 }
 

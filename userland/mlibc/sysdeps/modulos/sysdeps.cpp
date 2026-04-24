@@ -15,9 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <mlibc/all-sysdeps.hpp>
 #include <syscall.h>
 #include <syscall_vectors.h>
+
+#include <mlibc/all-sysdeps.hpp>
+
+#include <errno.h>
 #include <string.h>
 
 #define stderr	2
@@ -31,6 +34,7 @@ namespace mlibc {
 void sys_libc_log(const char *message) {
 	ssize_t _ign;
 	sys_write(stderr, message, strlen(message), &_ign);
+	sys_write(stderr, "\n", 1, &_ign);
 }
 
 [[noreturn]] void sys_libc_panic() {
@@ -137,6 +141,17 @@ int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
 	*bytes_written = syscall_3((uint64_t)fd, (uint64_t)buf	, (uint64_t)count, SYSCALL_WRITE);
 
 	return 0;
+}
+
+int sys_isatty(int fd) {
+	switch (fd) {
+		case 0:
+		case 1:
+		case 2:
+			return 0; //mlibc expects 0 for tty
+		default:
+			return ENOTTY;
+	}
 }
 
 int sys_clock_get(int clock, time_t *secs, long *nanos) {

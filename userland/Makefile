@@ -20,7 +20,7 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 OBJ_DIR := $(OBJ_DIR)/userland
 
 U_CFLAGS := -g -fno-pie -static \
-						-nostdlib -nostartfiles -nodefaultlibs \
+						-nostdlib -nodefaultlibs \
 						-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables \
 						--sysroot=$(OBJ_DIR)/../userland_files/
 
@@ -36,11 +36,11 @@ build: libc $(OBJ_DIR)/../userland_files/bin/shell
 	mkdir -p $@
 
 .PHONY: libc
-libc: $(OBJ_DIR)/.mlibc-meson-setup | $(OBJ_DIR)/libc-build/
+libc: $(OBJ_DIR)/mlibc-meson-setup | $(OBJ_DIR)/libc-build/
 	ninja -C $|
-	meson install -C $|
+	meson install --only-changed -C $|
 
-$(OBJ_DIR)/.mlibc-meson-setup: | $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
+$(OBJ_DIR)/mlibc-meson-setup: | $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
 	meson setup \
 		--native-file mlibc/ci/linux-x86_64-clang.cross-file \
 		--cross-file mlibc/ci/modulos.cross-file \
@@ -54,5 +54,5 @@ $(OBJ_DIR)/.mlibc-meson-setup: | $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_f
 $(OBJ_DIR)/shell.o: shell/main.c | $(OBJ_DIR)
 	$(CC) $(U_CFLAGS) -c -o $(OBJ_DIR)/shell.o $<
 
-$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o | libc $(OBJ_DIR)/../userland_files/bin/
+$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o $(LIB)/crt1.o $(LIB)/libc.a | libc $(OBJ_DIR)/../userland_files/bin/
 	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a

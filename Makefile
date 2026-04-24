@@ -17,7 +17,7 @@
 
 # Debug options
 
-export DEBUG = 1
+#export DEBUG = 1
 export DEBUG_LOGGING = 1
 export SMP_ENABLE = 1
 #export CHECK_ALLOC = 1
@@ -133,15 +133,15 @@ $(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
 
 .PHONY: copy-doc
 copy-doc: COPYING LICENSES | $(COPY_DOC_TO)
-	cp -r $^ $|
+	cp -u -r $^ $|
 
 .PHONY: copy-runtime-drivers
 copy-runtime-drivers: $(RUNTIME_DRIVERS_TARGETS) | $(COPY_DRIVERS_TO)
-	cp -r $^ $|
+	cp -u -r $^ $|
 
 .PHONY: copy-userland
 copy-userland: $(USERLAND_TARGETS) | $(COPY_USERLAND_TO)
-	cp -r $^/* $|
+	cp -u -r $^/* $|
 
 $(OBJ_DIR)/stub.img: | $(OBJ_DIR)/
 	truncate -s 4G $@

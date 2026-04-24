@@ -77,15 +77,36 @@ DECLARE_SYSCALL(exit) {
 DECLARE_SYSCALL(open) {
 	ARGC_0;
 
-	//TODO
-	return 1;
+	int fd;
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	for (fd = 0; fd < MAX_FD; fd++) {
+		if (!pcb->fd_table[fd]) {
+			pcb->fd_table[fd] = fs_open((const char*)arg1);
+			if (!pcb->fd_table[fd]) {
+				return SYSCALL_STS_FAIL;
+			}
+
+			return (uint64_t)fd;
+		}
+	}
+
+	return SYSCALL_STS_FAIL;
 }
 
 DECLARE_SYSCALL(close) {
 	ARGC_0;
 
-	//TODO
-	return 1;
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	if (!pcb->fd_table[arg1]) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	fs_close(pcb->fd_table[arg1]);
+	pcb->fd_table[arg1] = 0;
+
+	return SYSCALL_STS_OK;
 }
 
 DECLARE_SYSCALL(read) {
