@@ -84,7 +84,11 @@ COPY_DRIVERS_TO := $(OBJ_DIR)/rootfs/lib/drivers/
 
 COPY_USERLAND_TO := $(OBJ_DIR)/rootfs/
 
-SRC := $(shell find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \))
+SRC_FIND := find . \
+			 \( -path './userland/mlibc' -o -path './build' \) -prune \
+			 -o -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \) -print
+
+SRC := $(shell $(SRC_FIND))
 
 include $(SRC_TREE_ROOT)/scripts/Makefile.kcflags
 
@@ -96,11 +100,12 @@ all: index build test-all
 
 .PHONY: index
 index: cscope.files
-	ctags --C-kinds=+pxzL -R $(SRC)
-	cscope -q -R -b -i cscope.files
+	ctags --C-kinds=+pxzL -L $<
+	cscope -b -q -i $<
 
 .PHONY: clean
 clean:
+	$(MAKE) -C userland clean
 	-rm -rd $(OBJ_DIR)/ tags cscope.*
 
 .PHONY: test-all
@@ -115,7 +120,7 @@ $(SUBDIRS):
 	$(MAKE) -C $@ build
 
 cscope.files: $(SRC)
-	find . -type f \( -name "*.c" -o -name "*.S" -o -name "*.h" \) > $@
+	$(SRC_FIND) > $@
 
 %/:
 	-mkdir -p $@

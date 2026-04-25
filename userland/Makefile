@@ -29,18 +29,23 @@ LIB := $(OBJ_DIR)/../userland_files/usr/lib
 .PHONY: all
 all: build
 
-.PHONY: build
-build: libc $(OBJ_DIR)/../userland_files/bin/shell
-
 %/:
 	mkdir -p $@
 
-.PHONY: libc
-libc: $(OBJ_DIR)/mlibc-meson-setup | $(OBJ_DIR)/libc-build/
-	ninja -C $|
-	meson install --only-changed -C $|
+.PHONY: build
+build: libc $(OBJ_DIR)/../userland_files/bin/shell
+
+.PHONY: clean
+clean:
+	-rm -rdf $(OBJ_DIR)/mlibc-meson-setup mlibc/
+
 
 $(OBJ_DIR)/mlibc-meson-setup: | $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
+	-rm -rdf mlibc/
+	git clone https://github.com/managarm/mlibc.git mlibc
+	git -C mlibc/ checkout v6.3.1
+	git -C mlibc/ apply ../mlibc-patch/mlibc-v6-3-1-port.patch
+	cp -r mlibc-patch/* mlibc/
 	meson setup \
 		--native-file mlibc/ci/linux-x86_64-clang.cross-file \
 		--cross-file mlibc/ci/modulos.cross-file \
@@ -51,8 +56,15 @@ $(OBJ_DIR)/mlibc-meson-setup: | $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_fi
 		mlibc/
 	touch $@
 
+.PHONY: libc
+libc: $(OBJ_DIR)/mlibc-meson-setup
+	ninja -C $(OBJ_DIR)/libc-build/
+	meson install --only-changed -C $(OBJ_DIR)/libc-build/
+
+$(LIB)/crt1.o $(LIB)/libc.a: libc
+
 $(OBJ_DIR)/shell.o: shell/main.c | $(OBJ_DIR)
 	$(CC) $(U_CFLAGS) -c -o $(OBJ_DIR)/shell.o $<
 
-$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o $(LIB)/crt1.o $(LIB)/libc.a | libc $(OBJ_DIR)/../userland_files/bin/
+$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o $(LIB)/crt1.o $(LIB)/libc.a | $(OBJ_DIR)/../userland_files/bin/
 	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a
