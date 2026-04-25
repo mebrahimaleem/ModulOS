@@ -22,7 +22,7 @@ ifndef DEBUG
 	CWARN := $(CWARN) -Werror
 endif
 
-LD_USR_FLAGS := -std=c23 -fno-pie -mno-mmx -mno-sse -mno-sse2 \
+LD_USR_FLAGS := -std=c23 -fno-pie -mno-mmx -mno-sse -mno-sse2 -mno-avx -mno-avx2 -mno-avx512f \
 	-fomit-frame-pointer -nodefaultlibs -nostdlib -mcmodel=kernel \
 	-ffreestanding -fno-unwind-tables -fno-exceptions -fno-rtti \
 	-fno-semantic-interposition -fvisibility=hidden \

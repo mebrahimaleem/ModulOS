@@ -9,8 +9,9 @@ qemu-system-x86_64 \
 	-s -smp 4 \
 	-serial vc \
 	-serial file:build/test-runtime/serial \
-	-d cpu_reset,int \
+	-d cpu_reset,int,guest_errors \
 	-m 16G \
+	-cpu max \
 	-monitor stdio \
 	-drive if=none,id=disk0,file=build/modulos.img,format=raw \
 	-drive if=none,id=disk1,file=build/test-runtime/disk1.img,format=raw \

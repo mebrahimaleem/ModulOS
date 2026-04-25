@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
-extern void syscall_return(uint64_t rip, uint64_t rfl, uint64_t rsp);
+extern void syscall_return(uint64_t rip, uint64_t rfl, uint64_t rsp, uint64_t rax) __attribute__((noreturn));
+
+extern void syscall_entry(void) __attribute__((noreturn));
 
 #endif /* KERNEL_CORE_SYSCALL_H */

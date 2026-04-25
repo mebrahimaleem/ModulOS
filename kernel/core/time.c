@@ -20,6 +20,7 @@
 #include <core/cpu_instr.h>
 #include <core/logging.h>
 #include <core/panic.h>
+#include <core/process.h>
 
 static struct clock_src_t* clock;
 
@@ -42,6 +43,15 @@ uint64_t time_busy_wait(uint64_t min_ns) {
 
 	return actual - start;
 }
+
+uint64_t time_sleep(uint64_t min_ms) {
+	const uint64_t start = clock->counter(clock->meta) * clock->period_fs;
+	const uint64_t stop = start + min_ms * TIME_CONV_MS_TO_FS;
+	process_sleep(stop);
+
+	return clock->counter(clock->meta) * clock->period_fs - start;
+}
+
 
 uint64_t time_since_init_ns(void) {
 	return clock->counter(clock->meta) * clock->period_fs / TIME_CONV_NS_TO_FS;

@@ -66,7 +66,6 @@ void ioapic_routing_init(uint64_t num_gsi) {
 	for (uint64_t i = 0; i < num_gsi; i++) {
 		gsi_routing[i].purpose = "Unused";
 		gsi_routing[i].type = GSI_TYPE_UNUSED;
-		legacy_routing[i] = i;
 	}
 
 	// map legacy
@@ -74,6 +73,7 @@ void ioapic_routing_init(uint64_t num_gsi) {
 		gsi_routing[i].purpose = legacy_purpose[i];
 		gsi_routing[i].type = GSI_TYPE_LEGACY;
 		gsi_routing[i].meta.isa_src = i;
+		legacy_routing[i] = i;
 	}
 
 	uint64_t handle;

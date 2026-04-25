@@ -209,7 +209,6 @@ void paging_unmap(uint64_t vaddr, enum page_size_t page_size) {
 
 	*access = 0;
 	lock_release(&paging_lock);
-	apic_tlb_shootdown(vaddr);
 }
 
 uint64_t paging_ident(uint64_t paddr) {
@@ -288,10 +287,7 @@ static void free_pages(uint64_t entry, enum page_size_t lvl) {
 
 	for (uint16_t i = 0; i < 512; i++) {
 		if (access[i] & PAGE_PRESENT) {
-			if (lvl == PAGE_4K || (access[i] & PAGE_PS)) {
-				mm_free_v(access[i] & PAGE_ADDR_MASK, PAGE_SIZE_4K);
-			}
-			else {
+			if (lvl != PAGE_4K && !(access[i] & PAGE_PS)) {
 				free_pages(access[i], lvl-1);
 			}
 		}
@@ -305,7 +301,7 @@ void paging_free_userspace(uint64_t* pml4) {
 
 	for (uint16_t i = 0; i < PML4_CONSISTENT_START; i++) {
 		if (access[i] & PAGE_PRESENT) {
-			free_pages(access[i], _PAGE_512G); // lvl being the size of each entry, not entry itself
+			free_pages(access[i], PAGE_1G);
 		}
 	}
 

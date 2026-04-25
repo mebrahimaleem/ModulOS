@@ -33,8 +33,12 @@
 #include <core/fs.h>
 #include <core/msr.h>
 #include <core/gdt.h>
+#include <core/syscall.h>
+#include <core/mm.h>
 
 #include <lib/kmemcpy.h>
+
+#include <devfs/tty.h>
 
 #ifdef MEM_TEST
 #include <mem_test/alloc_test.h>
@@ -51,6 +55,14 @@
 #include <drivers/pcie/pcie_init.h>
 #include <drivers/disk/disk.h>
 
+#ifdef SERIAL
+#include <drivers/serial/interrupts.h>
+#endif /* SERIAL */
+
+#define RFL_MASK	0xD5
+
+#define CR4_FSGSBASE		(1 << 16)
+
 struct boot_context_t boot_context;
 
 extern uint8_t ap_bootstrap_start;
@@ -64,6 +76,12 @@ extern uint64_t init_stack_paddr;
 
 extern uint64_t* init_stacks_paddr;
 extern uint64_t* init_stacks_vaddr;
+
+static inline void write_syscall_msr(void) {
+	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+	msr_write(MSR_LSTAR, (uint64_t)syscall_entry);
+	msr_write(MSR_FMASK, RFL_MASK);
+}
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
@@ -81,8 +99,11 @@ void kentry(void) {
 	paging_ensure_mapped();
 	scheduler_init();
 
+	mm_transaction_init();
 
-	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+	write_syscall_msr();
+	cpu_set_cr4(CR4_FSGSBASE);
+	cpu_init_fx();
 
 	logging_log_debug("TSS and IDT init done");
 
@@ -102,12 +123,20 @@ void kentry(void) {
 	apic_timer_calib(apic_get_bsp_id());
 	apic_nmi_enab();
 	ioapic_init();
+	apic_init_shootdowns();
 	cpu_sti();
 	logging_log_debug("APIC and IOAPIC init done");
+
+	proc_data_get()->sts |= PROC_STS_INT_READY;
+
+#ifdef SERIAL
+	serial_init_interrupts();
+#endif /* SERIAL */
 
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
+	tty_init();
 	pcie_init();
 	pcie_enumerate();
 	logging_log_debug("Early PCIE init done");
@@ -136,7 +165,9 @@ void kapentry(uint64_t arb_id) {
 	proc_data_set_id((uint8_t)arb_id);
 	proc_data_get()->arb_id = (uint8_t)arb_id;
 
-	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
+	write_syscall_msr();
+	cpu_set_cr4(CR4_FSGSBASE);
+	cpu_init_fx();
 
 	alloc_init();
 
@@ -152,6 +183,8 @@ void kapentry(uint64_t arb_id) {
 	apic_nmi_enab();
 	cpu_sti();
 	logging_log_debug("AP APIC init done");
+
+	proc_data_get()->sts |= PROC_STS_INT_READY;
 
 	logging_log_info("AP init complete");
 

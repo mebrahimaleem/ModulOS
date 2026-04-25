@@ -29,6 +29,10 @@
 #include <lib/kstrcpy.h>
 #include <lib/kstrlen.h>
 
+#include <devfs/devfs.h>
+
+//TODO: implement per file blocking
+
 static uint8_t fs_lock;
 
 struct vfs_mount_t {
@@ -40,6 +44,7 @@ struct vfs_mount_t {
 	fs_read_t read;
 	fs_get_seek_t get_seek;
 	fs_seek_t seek;
+	fs_write_t write;
 };
 
 struct fs_handle_t {
@@ -57,6 +62,18 @@ struct vfs_tree_node_t {
 };
 
 static struct vfs_tree_node_t vfs_root;
+static struct vfs_tree_node_t dev_root;
+
+static struct vfs_mount_t dev_mount = {
+	.cntx = 0,
+	.open = devfs_open,
+	.close = devfs_close,
+	.stat = devfs_stat,
+	.read = devfs_read,
+	.get_seek = devfs_get_seek,
+	.seek = devfs_seek,
+	.write = devfs_write
+};
 
 static inline char* path_next(char* path, size_t* len) {
 	*len = 0;
@@ -77,9 +94,14 @@ void fs_init(void) {
 	lock_init(&fs_lock);
 
 	vfs_root.co = 0;
-	vfs_root.sub = 0;
+	vfs_root.sub = &dev_root;
 	vfs_root.name = "";
 	vfs_root.mount = 0;
+
+	dev_root.co = 0;
+	dev_root.sub = 0;
+	dev_root.name = "dev";
+	dev_root.mount = &dev_mount;
 }
 
 enum file_status_t fs_mount(
@@ -90,7 +112,8 @@ enum file_status_t fs_mount(
 		fs_stat_t stat,
 		fs_read_t read,
 		fs_get_seek_t get_seek,
-		fs_seek_t seek
+		fs_seek_t seek,
+		fs_write_t write
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -108,6 +131,7 @@ enum file_status_t fs_mount(
 		vfs_root.mount->read = read;
 		vfs_root.mount->get_seek = get_seek;
 		vfs_root.mount->seek = seek;
+		vfs_root.mount->write = write;
 
 		return FILE_OK;
 	}
@@ -176,7 +200,7 @@ struct fs_handle_t* fs_open(const char* path) {
 	}
 
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 
 	do {
 		if (node->mount) {
@@ -188,15 +212,15 @@ struct fs_handle_t* fs_open(const char* path) {
 		path_write = path_next(path_write, &len);
 
 		for (walk = node->sub; walk; walk = walk->co) {
-			if (kstrlen(node->name) == len && kmemcmp(node->name, path_read, len) == 0) {
+			if (kstrlen(walk->name) == len && kmemcmp(walk->name, path_read, len) == 0) {
 				node = walk;
 				break;
 			}
 		}
 
-	} while (walk && node != walk);
+	} while (walk && node == walk);
 
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	if (!mount) {
 		kfree(clean_path);
@@ -214,28 +238,28 @@ struct fs_handle_t* fs_open(const char* path) {
 }
 
 void fs_close(struct fs_handle_t* handle) {
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 
 	handle->mount->close(handle->handle);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	kfree(handle);
 }
 
 enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 	return ret;
 }
 
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 	ret = handle->mount->read(handle->handle, buffer, count);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	return ret;
 }
@@ -243,9 +267,9 @@ size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 uint64_t fs_get_seek(struct fs_handle_t* handle) {
 	uint64_t seek;
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 	seek = handle->mount->get_seek(handle->handle);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	return seek;
 }
@@ -253,9 +277,19 @@ uint64_t fs_get_seek(struct fs_handle_t* handle) {
 enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	enum file_status_t sts;
 
-	lock_acquire(&fs_lock);
+	//lock_acquire(&fs_lock);
 	sts = handle->mount->seek(handle->handle, seek);
-	lock_release(&fs_lock);
+	//lock_release(&fs_lock);
 
 	return sts;
+}
+
+size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
+	size_t ret;
+
+	//lock_acquire(&fs_lock);
+	ret = handle->mount->write(handle->handle, buffer, count);
+	//lock_release(&fs_lock);
+
+	return ret;
 }

@@ -25,8 +25,13 @@
 #include <core/logging.h>
 #include <core/panic.h>
 #include <core/cpu_instr.h>
+#include <core/process.h>
+#include <core/scheduler.h>
+#include <core/time.h>
 
 #include <lib/mergesort.h>
+
+#include <apic/ipi.h>
 
 #define PAGE_4K_MASK		0xFFFFFFFFFFFFF000
 #define SIZE_GIB				(1024 * 1024 * 1024)
@@ -34,11 +39,19 @@
 #define MAX_INIT_NODES	64
 #define WITHIN_NODE(base, b, l)	(base >= b && base < b + l)
 
+#define SHOOTDOWN_DELAY_MS	5000
+
 struct mm_tree_node_t {
 	struct mm_tree_node_t* less;
 	struct mm_tree_node_t* more;
 	uint64_t base;
 	uint64_t limit;
+};
+
+struct disarm_list_t {
+	struct disarm_list_t* next;
+	uint8_t id;
+	volatile uint8_t state;
 };
 
 static struct mm_tree_node_t* p_tree;
@@ -54,6 +67,11 @@ static uint8_t n_lock;
 
 static struct mm_tree_node_t node_pool[MAX_INIT_NODES];
 static struct mm_tree_node_t* free_nodes;
+
+static struct free_transaction_list_t* volatile pending_free;
+static struct free_transaction_list_t* transaction_list;
+uint8_t pending_free_lock;
+static struct disarm_list_t* disarm_list;
 
 static struct mm_tree_node_t* alloc_node(void) {
 	struct mm_tree_node_t* next;
@@ -178,6 +196,7 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, u
 		size += PAGE_SIZE_4K - adj;
 	}
 
+	cpu_cli_if();
 	lock_acquire(lock);
 
 	node = find_base_node(base, root->more, root);
@@ -210,6 +229,7 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, u
 	//TODO: coallese
 
 	lock_release(lock);
+	cpu_sti_if();
 }
 
 static uint64_t mm_alloc_max(size_t size, uint64_t align, uint64_t max, struct mm_tree_node_t* root, uint8_t* lock) {
@@ -257,6 +277,7 @@ extern void mm_init(
 	lock_init(&p_lock);
 	lock_init(&v_lock);
 	lock_init(&n_lock);
+	lock_init(&pending_free_lock);
 
 	uint64_t blocks;
 
@@ -266,6 +287,8 @@ extern void mm_init(
 	node_pool[MAX_INIT_NODES - 1].less = 0;
 	free_nodes = &node_pool[0];
 
+	pending_free = 0;
+	disarm_list = 0;
 	
 	// find memory limit
 	uint64_t mem_limit = 0;
@@ -403,5 +426,93 @@ void mm_free_p(uint64_t base, size_t size) {
 }
 
 void mm_free_v(uint64_t base, size_t size) {
-	mm_free(base, size, v_tree, &v_lock);
+	volatile struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
+	pending->base = base;
+	pending->size = size;
+	lock_acquire(&pending_free_lock);
+	pending->next = pending_free;
+	pending_free = (struct free_transaction_list_t* volatile)pending;
+	lock_release(&pending_free_lock);
+}
+
+static void free_all_pending(void* _ign) {
+	(void)_ign;
+
+	struct free_transaction_list_t* next;
+	struct disarm_list_t* disarm;
+	uint8_t cntrl;
+
+	while (1) {
+		do {
+			time_sleep(SHOOTDOWN_DELAY_MS);
+		} while (!pending_free);
+
+		lock_acquire(&pending_free_lock);
+
+		if (!pending_free) {
+			lock_release(&pending_free_lock);
+			continue;
+		}
+
+		transaction_list = pending_free;
+		pending_free = 0;
+
+		for (disarm = disarm_list; disarm; disarm = disarm->next) {
+			disarm->state = 1;
+			apic_shootdown(disarm->id);
+		}
+
+		lock_release(&pending_free_lock);
+
+		do {
+			cpu_pause();
+
+			cntrl = 0;
+			lock_acquire(&pending_free_lock);
+			for (disarm = disarm_list; disarm; disarm = disarm->next) {
+				if (disarm->state) {
+					cntrl = 1;
+					break;
+				}
+			}
+			lock_release(&pending_free_lock);
+		} while(cntrl);
+
+		while (transaction_list) {
+			next = transaction_list->next;
+
+			mm_free(transaction_list->base, transaction_list->size, v_tree, &v_lock);
+
+			kfree(transaction_list);
+			transaction_list = next;
+		}
+	}
+}
+
+void mm_transaction_init(void) {
+	scheduler_schedule(process_from_func(free_all_pending, 0));
+}
+
+struct free_transaction_list_t* mm_get_shootdown_list(void) {
+	return transaction_list;
+}
+
+void mm_register_barrier(uint8_t id) {
+	struct disarm_list_t* l = kmalloc(sizeof(struct disarm_list_t));
+	l->id = id;
+	l->state = 0;
+
+	lock_acquire(&pending_free_lock);
+	l->next = disarm_list;
+	disarm_list = l;
+	lock_release(&pending_free_lock);
+}
+
+void mm_barrier_disarm(uint8_t id) {
+	for (struct disarm_list_t* l = disarm_list; l; l = l->next) {
+		if (id == l->id) {
+			l->state = 0;
+			break;
+		}
+	}
 }

@@ -36,6 +36,12 @@ struct mem_segment_t {
 
 struct mm_tree_node_t;
 
+struct free_transaction_list_t {
+	uint64_t base;
+	size_t size;
+	struct free_transaction_list_t* next;
+};
+
 extern void mm_init(
 		void (*first_segment)(uint64_t* handle),
 		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg));
@@ -51,6 +57,11 @@ extern uint64_t mm_alloc_vmax(size_t size, uint64_t align, uint64_t max);
 
 extern void mm_free_p(uint64_t base, size_t size);
 extern void mm_free_v(uint64_t base, size_t size);
+
+extern void mm_transaction_init(void);
+extern struct free_transaction_list_t* mm_get_shootdown_list(void);
+extern void mm_register_barrier(uint8_t id);
+extern void mm_barrier_disarm(uint8_t id);
 
 #endif /* KERNEL_CORE_MM_H */
 

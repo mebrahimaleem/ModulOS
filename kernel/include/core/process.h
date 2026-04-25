@@ -22,6 +22,9 @@
 #include <stddef.h>
 
 #include <kernel/core/exception_dispatch.h>
+#include <kernel/core/fs.h>
+
+#define MAX_FD		256
 
 struct pcb_t {
 	// order is important
@@ -52,23 +55,31 @@ struct pcb_t {
 	uint64_t pid;
 	uint32_t k_rsp_lo;
 	uint32_t k_rsp_hi;
-	uint64_t saved_usr_rsp;
 	uint64_t init_k_rsp_vaddr;
 	uint64_t init_k_rsp_paddr;
-
-	struct process_memory_region_t* mem;
+	uint64_t fsbase;
+	uint64_t mem_top;
 
 	uint64_t cr3;
 
 	struct pcb_t* next;
 
+	struct fs_handle_t* fd_table[MAX_FD];
+
+	uint8_t fxdata[512] __attribute__((aligned(16)));
+
 	enum {
 		SCHED_READY,
 		SCHED_KILL,
-		SCHED_SKIP
+		SCHED_SKIP,
+		SCHED_SLEEP
 	} sched_cntr;
 
-} __attribute__((packed));
+	union {
+		uint64_t wake_time;
+	} sleep_state;
+
+};
 
 struct preempt_frame_t {
 	uint64_t rbp;
@@ -117,5 +128,7 @@ extern void process_discard(struct pcb_t* pcb);
 extern void process_preempt_entry(struct preempt_frame_t* context) __attribute__((noreturn));
 
 extern uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr, uint64_t* stack);
+
+extern void process_sleep(uint64_t wake_time);
 
 #endif /* KERNEL_CORE_PROCESS_H */

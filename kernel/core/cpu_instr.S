@@ -15,6 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+.section .text
+
 .globl cpu_lidt
 cpu_lidt:
 lidt (%rdi)
@@ -82,4 +84,48 @@ testq %rdi, %rdi
 jz skip_cr3
 movq %rdi, %cr3
 skip_cr3:
+ret
+
+.globl cpu_hlt
+cpu_hlt:
+hlt
+ret
+
+.globl cpu_set_cr4
+cpu_set_cr4:
+movq %cr4, %rax
+orq %rdi, %rax
+movq %rax, %cr4
+ret
+
+.globl cpu_get_fsbase
+cpu_get_fsbase:
+rdfsbaseq %rax
+ret
+
+.globl cpu_set_fsbase
+cpu_set_fsbase:
+wrfsbaseq %rdi
+ret
+
+.globl cpu_save_fx
+cpu_save_fx:
+fxsave (%rdi)
+ret
+
+.globl cpu_restore_fx
+cpu_restore_fx:
+fxrstor (%rdi)
+ret
+
+.globl cpu_init_fx
+cpu_init_fx:
+movq %cr0, %rax
+andw $0xFFFB, %ax
+orw $2, %ax
+movq %rax, %cr0
+
+movq %cr4, %rax
+orq $(3 << 9), %rax
+movq %rax, %cr4
 ret

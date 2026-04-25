@@ -22,7 +22,6 @@
 
 #define AP_ENTRY_PAGE	8
 
-extern void apic_init_shootdowns(uint8_t num_apic);
 extern void apic_ipi_init(void);
 
 extern void apic_wait_for_ipi(void);
@@ -30,9 +29,9 @@ extern void apic_send_ipi_init_set(uint8_t apic_id);
 extern void apic_send_ipi_init_clear(uint8_t apic_id);
 extern void apic_send_ipi_sipi(uint8_t apic_id);
 
-extern void apic_tlb_shootdown(uint64_t vaddr);
 extern void apic_tlb_shootdown_dispatch(void);
 
-extern void apic_register_barrier(uint8_t apic_id);
+extern void apic_init_shootdowns(void);
+extern void apic_shootdown(uint8_t id);
 
 #endif /* KERNEL_APIC_IPI_H */

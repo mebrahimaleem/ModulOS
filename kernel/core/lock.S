@@ -17,21 +17,25 @@
 
 .globl lock_init
 lock_init:
-movq $0, (%rdi)
+movb $0, (%rdi)
+mfence
 ret
 
 .globl lock_acquire
 lock_acquire:
-movq $1, %rax
+movb $1, %al
+
 .loop:
 pause
-xchgb %al, (%rdi)
-testq %rax, %rax
+testb $1, (%rdi)
+jnz .loop
+
+lock xchgb %al, (%rdi)
+testb %al, %al
 jnz .loop
 ret
 
 .globl lock_release
 lock_release:
-xorq %rax, %rax
-xchgb %al, (%rdi)
+movb $0, (%rdi)
 ret

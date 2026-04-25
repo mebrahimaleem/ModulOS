@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef DRIVERS_SERIAL_SERIAL
-#define DRIVERS_SERIAL_SERIAL
+#ifndef DRIVERS_SERIAL_SERIAL_H
+#define DRIVERS_SERIAL_SERIAL_H
 
 #include <stdint.h>
 
@@ -26,4 +26,7 @@ extern void serial_init_com2(void);
 extern void serial_write_com1(uint8_t b);
 extern void serial_write_com2(uint8_t b);
 
-#endif /* DRIVERS_SERIAL_SERIAL */
+extern void serial_isr_com1(void);
+extern void serial_isr_com2(void);
+
+#endif /* DRIVERS_SERIAL_SERIAL_H */

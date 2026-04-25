@@ -527,6 +527,14 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 	return FILE_OK;
 }
 
+static uint64_t ext2_get_seek(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+
+	return inode_handle->seek_block * block_size + inode_handle->seek;
+}
+
 static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count) {
 	struct ext2_inode_t inode;
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
@@ -545,6 +553,11 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	uint64_t index;
 	uint64_t write_seek = 0;
 	size_t write_len;
+	uint64_t full_seek = ext2_get_seek(handle);
+
+	if (full_seek > size) {
+		return 0;
+	}
 
 	while (count) {
 		track.block = inode_handle->seek_block;
@@ -575,6 +588,12 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 					return read;
 				}
 
+				if (write_len + full_seek > size) {
+					// full block read, but only copy up to limit of the file
+					write_len = size - full_seek;
+					count = 0;
+				}
+
 				kmemcpy((uint8_t*)buffer + write_seek, block_buffer + inode_handle->seek, write_len);
 
 				kfree(block_buffer);
@@ -587,6 +606,7 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 		}
 
 		write_seek += write_len;
+		full_seek += write_len;
 		inode_handle->seek += write_len;
 		count -= write_len;
 		read += write_len;
@@ -600,14 +620,6 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	return read;
 }
 
-static uint64_t ext2_get_seek(struct file_handle_t* handle) {
-	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
-
-	return inode_handle->seek_block * block_size + inode_handle->seek;
-}
-
 static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
@@ -617,6 +629,13 @@ static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek)
 	inode_handle->seek = seek % block_size;
 
 	return FILE_OK;
+}
+
+static size_t ext2_write(struct file_handle_t* handle, void* buffer, size_t count) {
+	(void)handle;
+	(void)buffer;
+	(void)count;
+	return 0;
 }
 
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
@@ -673,7 +692,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_stat,
 					ext2_read,
 					ext2_get_seek,
-					ext2_seek
+					ext2_seek,
+					ext2_write
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);
@@ -698,18 +718,18 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 		}
 
 
-		struct fs_handle_t* test_file = fs_open("/test");
-		if (!test_file) {
-			logging_log_error("Failed to open test file");
+		struct fs_handle_t* shell = fs_open("/bin/shell");
+		if (!shell) {
+			logging_log_error("Failed to open shell file");
 		}
 		else {
-			struct pcb_t* test_pcb = elf_load(test_file, process_assign_pid());
-			if (!test_pcb) {
-				logging_log_error("Failed to load test file");
+			struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), "/bin/shell ModulOS", "USER=root PWD=/");
+			if (!shell_pcb) {
+				logging_log_error("Failed to load shell file");
 			}
-			fs_close(test_file);
+			fs_close(shell);
 
-			scheduler_schedule(test_pcb);
+			scheduler_schedule(shell_pcb);
 		}
 	}
 

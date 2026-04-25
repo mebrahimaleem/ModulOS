@@ -26,6 +26,8 @@
 #include <kernel/core/logging.h>
 #include <kernel/core/proc_data.h>
 
+#include <kernel/lib/kmemset.h>
+
 #include <kernel/acpi/tables.h>
 
 #ifdef SERIAL
@@ -142,6 +144,8 @@ static void next_segment(uint64_t* handle, struct mem_segment_t* seg) {
 
 
 void multiboot2_init(struct mb2_info_t* info) {
+	kmemset(&bsp_proc_data, 0, sizeof(struct proc_data_t));
+
 	bsp_proc_data_ptr = &bsp_proc_data;
 	proc_data_ptr = &bsp_proc_data_ptr;
 	proc_data_set_id(0);

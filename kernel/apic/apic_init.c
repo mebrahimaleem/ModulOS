@@ -40,6 +40,7 @@
 #include <core/alloc.h>
 
 #include <lib/kmemcpy.h>
+#include <lib/kmemset.h>
 
 #define APIC_BASE_MASK	0xFFFFFFFFFF000
 
@@ -68,7 +69,7 @@
 #define APIC_CAL_BATCH		20
 #define APIC_CAL_TOL			8000
 
-#define APIC_CLOCK_MS			50
+#define APIC_CLOCK_MS			10
 
 // pic master spurious (irq 7, int 0x27) works for apic spurious as well
 #define PIC_SPURIOUS_VEC	0x27
@@ -124,8 +125,6 @@ void apic_init(void) {
 	idt_install(timer_vector, (uint64_t)apic_isr_timer, GDT_CODE_SEL, IST_SCHED, IDT_GATE_TRP, 0);
 	idt_install(error_vector, (uint64_t)apic_isr_error, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 
-	apic_init_shootdowns(num_apic);
-
 	apic_init_ap();
 
 	// init stacks
@@ -141,6 +140,7 @@ void apic_init(void) {
 
 	for (--num_apic; num_apic; num_apic--) {
 		proc_data_ptr[num_apic] = kmalloc(sizeof(struct proc_data_t));
+		kmemset(proc_data_ptr[num_apic], 0, sizeof(struct proc_data_t));
 		init_stacks_vaddr[num_apic] = mm_alloc_v(PAGE_SIZE_4K * 5);
 
 		if (!init_stacks_vaddr[num_apic]) {
@@ -288,7 +288,7 @@ void apic_init_ap(void) {
 	apic_write_lve(APIC_REG_ERE, error_vector,
 			APIC_LVT_MT_FIXED | APIC_LVT_TRG_EDGE, 0);
 
-	apic_register_barrier(apic_id);
+	mm_register_barrier(apic_id);
 
 	// enable apic
 	apic_write_reg(APIC_REG_ESR, 0);

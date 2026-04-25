@@ -36,14 +36,12 @@
 #define F_EN		0x01
 #define F_CLTR	0x06 // clear trms & recv
 #define F_SNGL	0x00
-#define F_INT1B	0x00 //TODO: maybe increase thresh
+#define F_INT1B	0x00
 #define	DTR			0x01
 #define	RTS			0x02
 #define OUT1		0x04
 #define	OUT2		0x08
 
-
-//TODO: test ports via loopback
 
 .section .text
 
@@ -86,7 +84,7 @@ movb $(DTR + RTS + OUT1 + OUT2), %al
 lea MCR(%rdi), %rdx
 out %al, %dx
 
-mov INT_EN, %al
+movb $INT_EN, %al
 lea IER(%rdi), %rdx
 out %al, %dx
 
@@ -105,3 +103,73 @@ mov $(COM2 + TRSM), %dx
 movb %dil, %al
 out %al, %dx
 ret
+
+.globl serial_isr_com1
+serial_isr_com1:
+
+pushq %rax
+pushq %rcx
+pushq %rdx
+pushq %rsi
+pushq %rdi
+pushq %r8
+pushq %r9
+pushq %r10
+pushq %r11
+
+movq $COM1, %rdi
+
+pushq %rbp
+
+movq %rsp, %rbp
+movq %rsp, %rax
+andq $0xF, %rax
+jz dispatch_isr
+subq %rax, %rsp
+jmp dispatch_isr
+
+
+.globl serial_isr_com2
+serial_isr_com2:
+
+pushq %rax
+pushq %rcx
+pushq %rdx
+pushq %rsi
+pushq %rdi
+pushq %r8
+pushq %r9
+pushq %r10
+pushq %r11
+
+movq $COM2, %rdi
+
+pushq %rbp
+
+movq %rsp, %rbp
+movq %rsp, %rax
+andq $0xF, %rax
+jz dispatch_isr
+subq %rax, %rsp
+jmp dispatch_isr
+
+
+dispatch_isr:
+.extern serial_isr_dispatch
+call serial_isr_dispatch
+
+movq %rbp, %rsp
+
+popq %rbp
+
+popq %r11
+popq %r10
+popq %r9
+popq %r8
+popq %rdi
+popq %rsi
+popq %rdx
+popq %rcx
+popq %rax
+
+iretq

@@ -24,6 +24,7 @@
 #include <core/alloc.h>
 #include <core/proc_data.h>
 #include <core/gdt.h>
+#include <core/time.h>
 
 #include <apic/apic_regs.h>
 
@@ -31,9 +32,11 @@ static uint8_t lock_sched;
 static volatile struct pcb_t* active_queue;
 static volatile struct pcb_t* active_queue_tail;
 
-void scheduler_schedule(struct pcb_t* pcb) {
+static struct pcb_t* sleep_queue;
+
+static void _scheduler_schedule(struct pcb_t* pcb) {
 	pcb->next = 0;
-	lock_acquire(&lock_sched);
+
 	if (active_queue_tail) {
 		active_queue_tail->next = pcb;
 		active_queue_tail = active_queue_tail->next;
@@ -42,6 +45,11 @@ void scheduler_schedule(struct pcb_t* pcb) {
 		active_queue = pcb;
 		active_queue_tail = pcb;
 	}
+}
+
+void scheduler_schedule(struct pcb_t* pcb) {
+	lock_acquire(&lock_sched);
+	_scheduler_schedule(pcb);
 	lock_release(&lock_sched);
 }
 
@@ -50,48 +58,88 @@ void scheduler_init(void) {
 
 	active_queue = 0;
 	active_queue_tail = 0;
+	sleep_queue = 0;
 }
 
 void scheduler_run(void) {
 	struct proc_data_t* pd = proc_data_get();
 	struct pcb_t* current_pcb = pd->current_process;
-	switch (current_pcb->sched_cntr) {
-		case SCHED_SKIP:
-			cpu_cli();
-			apic_write_reg(APIC_REG_EOI, APIC_EOI);
-			process_resume(current_pcb);
-			break;
-		case SCHED_KILL:
-			process_discard(current_pcb);
-			break;
-		default:
-			scheduler_schedule(current_pcb);
-			break;
+	if (current_pcb) {
+		switch (current_pcb->sched_cntr) {
+			case SCHED_SKIP:
+				cpu_cli();
+				apic_write_reg(APIC_REG_EOI, APIC_EOI);
+				process_resume(current_pcb);
+				break;
+			case SCHED_KILL:
+				process_discard(current_pcb);
+				break;
+			case SCHED_SLEEP:
+				current_pcb->sched_cntr = SCHED_READY;
+
+				lock_acquire(&lock_sched);
+				struct pcb_t* i = sleep_queue, **prev = &sleep_queue;
+
+				for (; i && current_pcb->sleep_state.wake_time < i->sleep_state.wake_time; i = i->next) {
+					prev = &i->next;
+				}
+				
+				*prev = current_pcb;
+				current_pcb->next = i;
+
+				lock_release(&lock_sched);
+				break;
+			default:
+				scheduler_schedule(current_pcb);
+				break;
+		}
 	}
 
-	struct pcb_t* run = 0;
-	while (!run) {
-		cpu_pause();
-		lock_acquire(&lock_sched);
-		if (active_queue) {
-			run = (struct pcb_t*)active_queue;
-			active_queue = active_queue->next;
-			if (!active_queue) {
-				active_queue_tail = 0;
-			}
-			lock_release(&lock_sched);
-			break;
+	lock_acquire(&lock_sched);
+
+	// wakup sleeping processes
+	const uint64_t now = time_since_init_fs();
+	struct pcb_t* i, * next;
+	for (i = sleep_queue; i && i->sleep_state.wake_time <= now; i = next) {
+		next = i->next;
+		_scheduler_schedule(i);
+	}
+
+	sleep_queue = i;
+
+	struct pcb_t* run;
+	if (active_queue) {
+		// next process
+		run = (struct pcb_t*)active_queue;
+		active_queue = active_queue->next;
+		if (!active_queue) {
+			active_queue_tail = 0;
 		}
+
 		lock_release(&lock_sched);
 	}
+	else {
+		// wait for process
 
-	pd->tss->rsp0_lo = 	run->k_rsp_lo;
-	pd->tss->rsp0_hi = 	run->k_rsp_hi;
-	pd->current_process = run;
+		lock_release(&lock_sched);
 
+		pd->current_process = 0;
+
+		apic_write_reg(APIC_REG_EOI, APIC_EOI);
+		cpu_wait_loop();
+	}
+	
 	cpu_cli();
+
+	pd->tss->rsp0_lo = run->k_rsp_lo;
+	pd->tss->rsp0_hi = run->k_rsp_hi;
+	pd->kernel_rsp = (uint64_t)run->k_rsp_lo | ((uint64_t)run->k_rsp_hi << 32);
+	pd->current_process = run;
+	cpu_set_cr3(run->cr3);
+	cpu_set_fsbase(run->fsbase);
+	cpu_restore_fx(run->fxdata);
+
 	apic_write_reg(APIC_REG_EOI, APIC_EOI);
 
-	cpu_set_cr3(run->cr3);
 	process_resume(run);
 }

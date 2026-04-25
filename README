@@ -3,7 +3,8 @@ An operating system that aims to be customizable and modular to provide a fast u
 
 ## Licensing
 
-This software is provided under the GPLv3 license, found in COPYING. This software also contains third party source code with their own licenses, all found under LICENSES/
+This software is provided under the GPLv3 license, found in COPYING. This project also uses
+mlibc which has a seperate license in LICENCES/MLIBC.
 
 ## Installing
 
