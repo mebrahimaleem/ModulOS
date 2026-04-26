@@ -638,6 +638,13 @@ static size_t ext2_write(struct file_handle_t* handle, void* buffer, size_t coun
 	return 0;
 }
 
+static enum file_status_t ext2_create(struct mount_cntx_t* cntx, char* path) {
+	(void)cntx;
+	(void)path;
+
+	return FILE_NO_SUPPORT;
+}
+
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
 	struct ext2_bg_desc_t* bgdt;
@@ -693,7 +700,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_read,
 					ext2_get_seek,
 					ext2_seek,
-					ext2_write
+					ext2_write,
+					ext2_create
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);

@@ -31,8 +31,6 @@
 
 #include <devfs/devfs.h>
 
-//TODO: implement per file blocking
-
 static uint8_t fs_lock;
 
 struct vfs_mount_t {
@@ -45,6 +43,7 @@ struct vfs_mount_t {
 	fs_get_seek_t get_seek;
 	fs_seek_t seek;
 	fs_write_t write;
+	fs_create_t create;
 };
 
 struct fs_handle_t {
@@ -72,7 +71,8 @@ static struct vfs_mount_t dev_mount = {
 	.read = devfs_read,
 	.get_seek = devfs_get_seek,
 	.seek = devfs_seek,
-	.write = devfs_write
+	.write = devfs_write,
+	.create = devfs_create
 };
 
 static inline char* path_next(char* path, size_t* len) {
@@ -113,7 +113,8 @@ enum file_status_t fs_mount(
 		fs_read_t read,
 		fs_get_seek_t get_seek,
 		fs_seek_t seek,
-		fs_write_t write
+		fs_write_t write,
+		fs_create_t create
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -132,6 +133,7 @@ enum file_status_t fs_mount(
 		vfs_root.mount->get_seek = get_seek;
 		vfs_root.mount->seek = seek;
 		vfs_root.mount->write = write;
+		vfs_root.mount->create = create;
 
 		return FILE_OK;
 	}
@@ -141,7 +143,7 @@ enum file_status_t fs_mount(
 	return FILE_ERROR;
 }
 
-struct fs_handle_t* fs_open(const char* path) {
+static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void** clean_path_out) {
 	struct vfs_tree_node_t* node = &vfs_root, * walk = 0;
 	size_t len = kstrlen(path);
 	char* clean_path = kmalloc(len + 1);
@@ -200,7 +202,7 @@ struct fs_handle_t* fs_open(const char* path) {
 	}
 
 
-	//lock_acquire(&fs_lock);
+	lock_acquire(&fs_lock);
 
 	do {
 		if (node->mount) {
@@ -220,14 +222,27 @@ struct fs_handle_t* fs_open(const char* path) {
 
 	} while (walk && node == walk);
 
-	//lock_release(&fs_lock);
+	lock_release(&fs_lock);
+
+	*mount_out = mount;
+	*clean_path_out = clean_path;
+
+	return mount_path;
+}
+
+struct fs_handle_t* fs_open(const char* path) {
+	struct vfs_mount_t* mount;
+	void* clean_path;
+	char* mount_path = find_mount(path, &mount, &clean_path);
 
 	if (!mount) {
 		kfree(clean_path);
 		return 0;
 	}
 
+	lock_acquire(&fs_lock);
 	struct file_handle_t* handle = mount->open(mount->cntx, mount_path);
+	lock_release(&fs_lock);
 
 	kfree(clean_path);
 
@@ -238,28 +253,22 @@ struct fs_handle_t* fs_open(const char* path) {
 }
 
 void fs_close(struct fs_handle_t* handle) {
-	//lock_acquire(&fs_lock);
 
 	handle->mount->close(handle->handle);
-	//lock_release(&fs_lock);
 
 	kfree(handle);
 }
 
 enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
-	//lock_acquire(&fs_lock);
 
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
-	//lock_release(&fs_lock);
 	return ret;
 }
 
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	//lock_acquire(&fs_lock);
 	ret = handle->mount->read(handle->handle, buffer, count);
-	//lock_release(&fs_lock);
 
 	return ret;
 }
@@ -267,9 +276,7 @@ size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 uint64_t fs_get_seek(struct fs_handle_t* handle) {
 	uint64_t seek;
 
-	//lock_acquire(&fs_lock);
 	seek = handle->mount->get_seek(handle->handle);
-	//lock_release(&fs_lock);
 
 	return seek;
 }
@@ -277,9 +284,7 @@ uint64_t fs_get_seek(struct fs_handle_t* handle) {
 enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	enum file_status_t sts;
 
-	//lock_acquire(&fs_lock);
 	sts = handle->mount->seek(handle->handle, seek);
-	//lock_release(&fs_lock);
 
 	return sts;
 }
@@ -287,9 +292,28 @@ enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	//lock_acquire(&fs_lock);
 	ret = handle->mount->write(handle->handle, buffer, count);
-	//lock_release(&fs_lock);
 
 	return ret;
+}
+
+enum file_status_t fs_create(const char* path) {
+	enum file_status_t sts;
+
+	struct vfs_mount_t* mount;
+	void* clean_path;
+	char* mount_path = find_mount(path, &mount, &clean_path);
+
+	if (!mount) {
+		kfree(clean_path);
+		return FILE_DNE;
+	}
+
+	lock_acquire(&fs_lock);
+	sts = mount->create(mount->cntx, mount_path);
+	lock_release(&fs_lock);
+
+	kfree(clean_path);
+
+	return sts;
 }

@@ -31,5 +31,6 @@ extern size_t devfs_read(struct file_handle_t* handle, void* buffer, size_t coun
 extern uint64_t devfs_get_seek(struct file_handle_t* handle);
 extern enum file_status_t devfs_seek(struct file_handle_t* handle, uint64_t seek);
 extern size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count);
+extern enum file_status_t devfs_create(struct mount_cntx_t* cntx, char* path);
 
 #endif /* KERNEL_DEVFS_DEVFS_H */

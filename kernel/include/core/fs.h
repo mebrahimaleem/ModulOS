@@ -53,6 +53,8 @@ typedef uint64_t (*fs_get_seek_t)(struct file_handle_t*);
 typedef enum file_status_t (*fs_seek_t)(struct file_handle_t*, uint64_t);
 typedef size_t (*fs_write_t)(struct file_handle_t*, void*, size_t);
 
+typedef enum file_status_t (*fs_create_t)(struct mount_cntx_t*, char*);
+
 void fs_init(void);
 
 enum file_status_t fs_mount(
@@ -64,7 +66,8 @@ enum file_status_t fs_mount(
 		fs_read_t read,
 		fs_get_seek_t get_seek,
 		fs_seek_t seek,
-		fs_write_t write
+		fs_write_t write,
+		fs_create_t create
 		);
 
 extern struct fs_handle_t* fs_open(const char* path);
@@ -75,5 +78,7 @@ extern size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count);
 extern uint64_t fs_get_seek(struct fs_handle_t* handle);
 extern enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek);
 extern size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count);
+
+extern enum file_status_t fs_create(const char* path);
 
 #endif /* KERNEL_CORE_FS_H */

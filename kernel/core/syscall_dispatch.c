@@ -150,3 +150,9 @@ DECLARE_SYSCALL(alloc) {
 
 	return vaddr;
 }
+
+DECLARE_SYSCALL(create) {
+	ARGC_1;
+
+	return fs_create((const char*)arg1) != FILE_OK;
+}

@@ -75,6 +75,12 @@
  */
 #define SYSCALL_ALLOC				5
 
-#define SYSCALL_MAX					6
+/*
+ * rdi: path (const char*)
+ * ret: (int)
+ */
+#define SYSCALL_CREATE			6
+
+#define SYSCALL_MAX					7
 
 

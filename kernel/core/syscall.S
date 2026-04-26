@@ -66,6 +66,7 @@ sysretq
 .extern syscall_dispatch_read
 .extern syscall_dispatch_write
 .extern syscall_dispatch_alloc
+.extern syscall_dispatch_create
 
 .global syscall_handlers
 syscall_handlers:
@@ -76,3 +77,4 @@ syscall_handlers:
 .quad syscall_dispatch_read
 .quad syscall_dispatch_write
 .quad syscall_dispatch_alloc
+.quad syscall_dispatch_create

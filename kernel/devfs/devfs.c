@@ -142,3 +142,10 @@ size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count) {
 			return count;
 	}
 }
+
+enum file_status_t devfs_create(struct mount_cntx_t* cntx, char* path) {
+	(void)cntx;
+	(void)path;
+
+	return FILE_NO_SUPPORT;
+}
