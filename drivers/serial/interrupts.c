@@ -42,6 +42,9 @@
 
 #define DR_MASK	1
 
+struct signal_wait_t* com1_signal;
+struct signal_wait_t* com2_signal;
+
 void serial_init_interrupts(void) {
 	uint8_t com1_v = idt_get_vector();
 	uint8_t com2_v = idt_get_vector();
