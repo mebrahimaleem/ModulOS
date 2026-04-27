@@ -28,6 +28,7 @@
 #include <core/process.h>
 #include <core/scheduler.h>
 #include <core/time.h>
+#include <core/signal.h>
 
 #include <lib/mergesort.h>
 
@@ -72,6 +73,8 @@ static struct free_transaction_list_t* volatile pending_free;
 static struct free_transaction_list_t* transaction_list;
 uint8_t pending_free_lock;
 static struct disarm_list_t* disarm_list;
+
+static struct signal_wait_t* free_pending_wait;
 
 static struct mm_tree_node_t* alloc_node(void) {
 	struct mm_tree_node_t* next;
@@ -269,10 +272,12 @@ static uint64_t mm_alloc_max(size_t size, uint64_t align, uint64_t max, struct m
 	return ret + adj;
 }
 
-extern void mm_init(
+void mm_init(
 		void (*first_segment)(uint64_t* handle),
 		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg)) {
 	kernel_limit = (uint64_t)&_kernel_pend;
+
+	free_pending_wait = 0;
 
 	lock_init(&p_lock);
 	lock_init(&v_lock);
@@ -433,6 +438,10 @@ void mm_free_v(uint64_t base, size_t size) {
 	pending->next = pending_free;
 	pending_free = (struct free_transaction_list_t* volatile)pending;
 	lock_release(&pending_free_lock);
+
+	if (free_pending_wait) {
+		signal_awake(free_pending_wait);
+	}
 }
 
 static void free_all_pending(void* _ign) {
@@ -442,10 +451,14 @@ static void free_all_pending(void* _ign) {
 	struct disarm_list_t* disarm;
 	uint8_t cntrl;
 
+	free_pending_wait = signal_wait_alloc();
+
 	while (1) {
-		do {
-			time_sleep(SHOOTDOWN_DELAY_MS);
-		} while (!pending_free);
+		time_sleep(SHOOTDOWN_DELAY_MS);
+
+		while (!pending_free) {
+			signal_wait(free_pending_wait);
+		}
 
 		lock_acquire(&pending_free_lock);
 
@@ -465,8 +478,6 @@ static void free_all_pending(void* _ign) {
 		lock_release(&pending_free_lock);
 
 		do {
-			cpu_pause();
-
 			cntrl = 0;
 			lock_acquire(&pending_free_lock);
 			for (disarm = disarm_list; disarm; disarm = disarm->next) {
@@ -476,6 +487,10 @@ static void free_all_pending(void* _ign) {
 				}
 			}
 			lock_release(&pending_free_lock);
+
+			if (cntrl) {
+				signal_wait(free_pending_wait);
+			}
 		} while(cntrl);
 
 		while (transaction_list) {
@@ -515,4 +530,6 @@ void mm_barrier_disarm(uint8_t id) {
 			break;
 		}
 	}
+
+	signal_awake(free_pending_wait);
 }

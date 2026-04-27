@@ -55,10 +55,6 @@
 #include <drivers/pcie/pcie_init.h>
 #include <drivers/disk/disk.h>
 
-#ifdef SERIAL
-#include <drivers/serial/interrupts.h>
-#endif /* SERIAL */
-
 #define RFL_MASK	0xD5
 
 #define CR4_FSGSBASE		(1 << 16)
@@ -128,10 +124,6 @@ void kentry(void) {
 	logging_log_debug("APIC and IOAPIC init done");
 
 	proc_data_get()->sts |= PROC_STS_INT_READY;
-
-#ifdef SERIAL
-	serial_init_interrupts();
-#endif /* SERIAL */
 
 	logging_log_debug("Early PCIE init");
 	disk_init();
