@@ -23,8 +23,12 @@
 
 #include <kernel/core/exception_dispatch.h>
 #include <kernel/core/fs.h>
+#include <kernel/core/signal.h>
 
 #define MAX_FD		256
+#define MAX_META	1
+
+struct pcb_t;
 
 struct pcb_t {
 	// order is important
@@ -68,17 +72,21 @@ struct pcb_t {
 
 	uint8_t fxdata[512] __attribute__((aligned(16)));
 
+	union {
+		uint64_t wake_time;
+		void (*callback)(struct pcb_t*);
+	} sleep_state;
+
+	void* meta[MAX_META];
+
 	enum {
 		SCHED_READY,
 		SCHED_KILL,
 		SCHED_SKIP,
-		SCHED_SLEEP
+		SCHED_SLEEP,
+		SCHED_CALLBACK,
+		SCHED_SIGNAL_READY
 	} sched_cntr;
-
-	union {
-		uint64_t wake_time;
-	} sleep_state;
-
 };
 
 struct preempt_frame_t {
@@ -130,5 +138,7 @@ extern void process_preempt_entry(struct preempt_frame_t* context) __attribute__
 extern uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr, uint64_t* stack);
 
 extern void process_sleep(uint64_t wake_time);
+
+extern void process_set_callback(void (*callback)(struct pcb_t*));
 
 #endif /* KERNEL_CORE_PROCESS_H */

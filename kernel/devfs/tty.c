@@ -25,10 +25,15 @@
 #include <core/cpu_instr.h>
 #include <core/mm.h>
 #include <core/paging.h>
+#include <core/signal.h>
 
 #include <lib/kstrcmp.h>
 #include <lib/kmemcpy.h>
 #include <lib/kstrlen.h>
+
+#ifdef SERIAL
+#include <drivers/serial/interrupts.h>
+#endif /* SERIAL */
 
 #define TTY_RING_MASK	0x3FFF
 
@@ -47,6 +52,7 @@ struct tty_handle_t {
 	uint8_t* read_buffer;
 	volatile uint16_t write_index;
 	volatile uint16_t read_index;
+	struct signal_wait_t* signal;
 	enum {
 		TTY_MODE_COOKED,
 		TTY_MODE_RAW
@@ -67,13 +73,17 @@ void tty_init(void) {
 	com1.read_buffer = (uint8_t*)paging_ident(mm_alloc_p(TTY_READ_BUFFER_SIZE));
 	com1.write_index = 0;
 	com1.read_index = 0;
+	com1.signal = signal_wait_alloc();
 	lock_init(&com1.lock);
 
 	com2.writer = serial_write_com2;
 	com2.read_buffer = (uint8_t*)paging_ident(mm_alloc_p(TTY_READ_BUFFER_SIZE));
 	com2.write_index = 0;
 	com2.read_index = 0;
+	com2.signal = signal_wait_alloc();
 	lock_init(&com2.lock);
+
+	serial_init_interrupts();
 #endif /* SERIAL */
 }
 
@@ -108,7 +118,7 @@ size_t tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
 
 	while (count) {
 		while (EMPTY(tty->read_index, tty->write_index)) {
-			cpu_pause(); //TODO futex wait
+			signal_wait(tty->signal);
 		}
 
 		lock_acquire(&tty->lock);
@@ -175,6 +185,8 @@ uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
 				break;
 		}
 	}
+
+	signal_awake(tty->signal);
 
 	return 1;
 }

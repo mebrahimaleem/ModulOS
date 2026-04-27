@@ -25,6 +25,7 @@
 #include <core/proc_data.h>
 #include <core/gdt.h>
 #include <core/time.h>
+#include <core/logging.h>
 
 #include <apic/apic_regs.h>
 
@@ -89,7 +90,14 @@ void scheduler_run(void) {
 
 				lock_release(&lock_sched);
 				break;
+			case SCHED_CALLBACK:
+				current_pcb->sleep_state.callback(current_pcb);
+				break;
 			default:
+				logging_log_error("Invalid scheduler code %u", current_pcb->sched_cntr);
+				__attribute__((fallthrough));
+			case SCHED_READY:
+			case SCHED_SIGNAL_READY:
 				scheduler_schedule(current_pcb);
 				break;
 		}

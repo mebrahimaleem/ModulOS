@@ -256,3 +256,10 @@ void process_sleep(uint64_t wake_time) {
 		cpu_hlt();
 	}
 }
+
+void process_set_callback(void (*callback)(struct pcb_t*)) {
+	struct pcb_t* current = proc_data_get()->current_process;
+
+	current->sleep_state.callback = callback;
+	current->sched_cntr = SCHED_CALLBACK;
+}
