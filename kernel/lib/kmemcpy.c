@@ -23,13 +23,24 @@
 void* memcpy(void* dest, const void* src, size_t c) __attribute__((weak));
 
 void* memcpy(void* dest, const void* src, size_t c) {
-	const uint8_t* p1 = src;
-	uint8_t* p2 = dest;
-	
-	for (size_t i = 0; i < c; i++) {
-		*p2 = *p1;
-		p1++;
-		p2++;
+	const uint64_t* src64 = (const uint64_t*)src;
+	uint64_t* dest64 = (uint64_t*)dest;
+
+	while (c >= sizeof(uint64_t)) {
+		*dest64 = *src64;
+		dest64++;
+		src64++;
+		c -= sizeof(uint64_t);
+	}
+
+	const uint8_t* src8 = (const uint8_t*)src64;
+	uint8_t* dest8 = (uint8_t*)dest64;
+
+	while (c >= sizeof(uint8_t)) {
+		*dest8 = *src8;
+		dest8++;
+		src8++;
+		c -= sizeof(uint8_t);
 	}
 
 	return dest;

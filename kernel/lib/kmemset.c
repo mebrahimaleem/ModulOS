@@ -20,13 +20,27 @@
 
 #include <lib/kmemset.h>
 
+#define PAT(s) (((uint64_t)v8) << (8*s))
+
 void* memset(void* ptr, int32_t v, size_t c) __attribute__((weak));
 
 void* memset(void* ptr, int32_t v, size_t c) {
-	uint8_t* p = ptr;
+	uint8_t v8 = (uint8_t)v;
+	uint64_t v64 = PAT(0) | PAT(1) | PAT(2) | PAT(3) | PAT(4) | PAT(5) | PAT(6) | PAT(7);
+	uint64_t* ptr64 = (uint64_t*)ptr;
 
-	for (size_t i = 0; i < c; i++) {
-		p[i] = (uint8_t)v;
+	while (c >= sizeof(uint64_t)) {
+		*ptr64 = v64;
+		ptr64++;
+		c -= sizeof(uint64_t);
+	}
+
+	uint8_t* ptr8 = (uint8_t*)ptr64;
+
+	while (c >= sizeof(uint8_t)) {
+		*ptr8 = v8;
+		ptr8++;
+		c -= sizeof(uint8_t);
 	}
 
 	return ptr;
