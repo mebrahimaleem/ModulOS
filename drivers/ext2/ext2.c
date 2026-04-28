@@ -27,8 +27,8 @@
 #include <kernel/core/lock.h>
 #include <kernel/core/panic.h>
 #include <kernel/core/process.h>
-#include <kernel/core/elf.h>
 #include <kernel/core/scheduler.h>
+#include <kernel/core/kentry.h>
 
 #include <kernel/lib/kmemcmp.h>
 #include <kernel/lib/kmemcpy.h>
@@ -707,38 +707,7 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 			panic(PANIC_STATE);
 		}
 
-		struct file_info_t stat_buf;
-		enum file_status_t sts;
-
-		struct fs_handle_t* root_handle = fs_open("/");
-		if (!root_handle) {
-			logging_log_error("Failed to open root directory");
-		}
-		else {
-			if ((sts = fs_stat(root_handle, &stat_buf)) != FILE_OK) {
-				logging_log_error("Failed to stat root directory %u", (uint32_t)sts);
-			}
-			else {
-				logging_log_debug("Root directory %u (%u)", stat_buf.size, stat_buf.type);
-			}
-
-			fs_close(root_handle);
-		}
-
-
-		struct fs_handle_t* shell = fs_open("/bin/shell");
-		if (!shell) {
-			logging_log_error("Failed to open shell file");
-		}
-		else {
-			struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), "/bin/shell ModulOS", "USER=root PWD=/");
-			if (!shell_pcb) {
-				logging_log_error("Failed to load shell file");
-			}
-			fs_close(shell);
-
-			scheduler_schedule(shell_pcb);
-		}
+		scheduler_schedule(process_from_func(prepare_userland, 0));
 	}
 
 	//TODO: mount other volumes

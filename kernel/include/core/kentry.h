@@ -43,4 +43,6 @@ extern void kentry(void) __attribute__((noreturn));
 
 extern void kapentry(uint64_t arb_id) __attribute__((noreturn));
 
+extern void prepare_userland(void* cntx);
+
 #endif /* KERNEL_CORE_KENTRY_H */
