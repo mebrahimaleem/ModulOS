@@ -101,7 +101,6 @@ void kentry(void) {
 	paging_ensure_mapped();
 	scheduler_init();
 
-	mm_transaction_init();
 	init_done = 0;
 	lock_init(&prepare_userland_lock);
 
@@ -136,6 +135,7 @@ void kentry(void) {
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
+	mm_transaction_init();
 	tty_init();
 	pcie_init();
 	pcie_enumerate();

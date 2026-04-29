@@ -1,5 +1,5 @@
-/* lock.h - spinlock interface */
-/* Copyright (C) 2025-2026  Ebrahim Aleem
+/* semaphore.h - semaphore interface */
+/* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,13 +15,24 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_CORE_SEMAPHORE_H
+#define KERNEL_CORE_SEMAPHORE_H
+
 #include <stdint.h>
+#include <stddef.h>
 
-#ifndef KERNEL_CORE_LOCK_H
-#define KERNEL_CORE_LOCK_H
+#define SEMAPHORE_CAP_UNLIM		(uint64_t)(-1)
 
-extern void lock_init(uint8_t* lock);
-extern void lock_acquire(uint8_t* lock);
-extern void lock_release(uint8_t* lock);
+struct semaphore_t;
 
-#endif /* KERNEL_CORE_LOCK_H */
+extern struct semaphore_t* semaphore_alloc(size_t cap);
+extern void semaphore_free(struct semaphore_t* sem);
+
+extern void semaphore_wait(struct semaphore_t* sem);
+extern void semaphore_signal(struct semaphore_t* sem);
+
+extern void semaphore_wait_full(struct semaphore_t* sem);
+extern void semaphore_signal_full(struct semaphore_t* sem);
+
+#endif /* KERNEL_CORE_SEMAPHORE_H */
+

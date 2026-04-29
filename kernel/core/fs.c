@@ -22,6 +22,7 @@
 #include <core/alloc.h>
 #include <core/logging.h>
 #include <core/panic.h>
+#include <core/semaphore.h>
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemcpy.h>
@@ -49,11 +50,9 @@
  *
  * Internally, the vfs must guarantee locked access to the open_table via the fs_lock. The vfs must
  * also guarantee locked access to the vfs tree.
- *
- * TODO: support multiple readers on the filetree while blocking writers
  */
 
-static uint8_t fs_lock;
+static struct semaphore_t* fs_sem;
 
 struct vfs_mount_t {
 	struct mount_cntx_t* cntx;
@@ -166,7 +165,7 @@ static void lookup_close(struct vfs_open_file_t* file) {
 }
 
 void fs_init(void) {
-	lock_init(&fs_lock);
+	fs_sem = semaphore_alloc(SEMAPHORE_CAP_UNLIM);
 
 	vfs_root.co = 0;
 	vfs_root.sub = &dev_root;
@@ -280,7 +279,7 @@ static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void**
 
 	*path_write_out = path_write;
 
-	lock_acquire(&fs_lock);
+	semaphore_wait(fs_sem);
 
 	do {
 		if (node->mount) {
@@ -300,7 +299,7 @@ static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void**
 
 	} while (walk && node == walk);
 
-	lock_release(&fs_lock);
+	semaphore_signal(fs_sem);
 
 	*mount_out = mount;
 	*clean_path_out = clean_path;
@@ -319,17 +318,15 @@ struct fs_handle_t* fs_open(const char* path) {
 		return 0;
 	}
 
-	lock_acquire(&fs_lock);
 	struct file_handle_t* handle = mount->open(mount->cntx, mount_path);
-	lock_release(&fs_lock);
 
 	if (!handle) {
 		return 0;
 	}
 
-	lock_acquire(&fs_lock);
+	semaphore_wait(fs_sem);
 	struct vfs_open_file_t* open_file = lookup_register(path_write);
-	lock_release(&fs_lock);
+	semaphore_signal(fs_sem);
 
 	kfree(clean_path);
 
@@ -346,9 +343,9 @@ void fs_close(struct fs_handle_t* handle) {
 	handle->mount->close(handle->handle);
 	lock_release(&handle->shared->lock);
 
-	lock_acquire(&fs_lock);
+	semaphore_wait_full(fs_sem);
 	lookup_close(handle->shared);
-	lock_release(&fs_lock);
+	semaphore_signal_full(fs_sem);
 
 	kfree(handle);
 }
