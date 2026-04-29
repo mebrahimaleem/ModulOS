@@ -29,6 +29,7 @@
 #include <kernel/lib/kstrcpy.h>
 #include <kernel/lib/kstrcmp.h>
 #include <kernel/lib/hash.h>
+#include <kernel/lib/hash_table.h>
 
 #define MEM_TEST_SIZE	256
 
@@ -126,4 +127,9 @@ TEST("hash_byte_sum") {
 TEST("crc32_ansi") {
 	ASSERT_TRUE(crc32_ansi("Hello, World!", 13) == 0xec4ac3d0, "fails expected checksum");
 	ASSERT_FALSE(crc32_ansi("Hello, World!", 12) == 0xec4ac3d0, "fails unexpected checksum");
+}
+
+TEST("fnc64_1a") {
+	//TODO
+	TEST_FAIL();
 }

@@ -30,8 +30,6 @@
 #include <core/time.h>
 #include <core/signal.h>
 
-#include <lib/mergesort.h>
-
 #include <apic/ipi.h>
 
 #define PAGE_4K_MASK		0xFFFFFFFFFFFFF000

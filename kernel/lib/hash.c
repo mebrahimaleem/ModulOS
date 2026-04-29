@@ -20,6 +20,13 @@
 
 #include <lib/hash.h>
 
+#define CRC32_ANSI_C0	0xFFFFFFFF
+#define CRC32_ANSI_C1	0xEDB88320;
+
+
+#define FNV64_1A_C0		0xcbf29ce484222325
+#define FNV64_1A_C1		0x100000001b3
+
 uint8_t hash_byte_sum(const void* ptr, size_t c) {
 	const uint8_t* _ptr = ptr;
 	uint8_t sum = 0;
@@ -31,7 +38,7 @@ uint8_t hash_byte_sum(const void* ptr, size_t c) {
 }
 
 uint32_t crc32_ansi(const void* data, size_t length) {
-	uint32_t crc = 0xFFFFFFFF;
+	uint32_t crc = CRC32_ANSI_C0;
 	const uint8_t *p = (const uint8_t*)data;
 	uint8_t i;
 
@@ -40,7 +47,7 @@ uint32_t crc32_ansi(const void* data, size_t length) {
 
 		for (i = 0; i < 8; i++) {
 			if (crc & 1) {
-				crc = (crc >> 1) ^ 0xEDB88320;
+				crc = (crc >> 1) ^ CRC32_ANSI_C1;
 			}
 			else {
 				crc >>= 1;
@@ -48,5 +55,18 @@ uint32_t crc32_ansi(const void* data, size_t length) {
 		}
 	}
 
-	return crc ^ 0xFFFFFFFF;
+	return crc ^ CRC32_ANSI_C0;
+}
+
+uint64_t fnv64_1a(const void* data, size_t length) {
+	const uint8_t* bytes = data;
+	uint64_t fnv64 = FNV64_1A_C0;
+
+	for (size_t i = 0; i < length; i++) {
+		fnv64 ^= *bytes;
+		fnv64 *= FNV64_1A_C1;
+		bytes++;
+	}
+
+	return fnv64;
 }

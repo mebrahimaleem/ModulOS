@@ -28,8 +28,30 @@
 #include <lib/kstrcmp.h>
 #include <lib/kstrcpy.h>
 #include <lib/kstrlen.h>
+#include <lib/hash.h>
+#include <lib/hash_table.h>
 
 #include <devfs/devfs.h>
+
+#define OPEN_TABLE_BUCKETS		100
+
+/*
+ * Locking conventions:
+ *
+ * The vfs layer guarantees non concurrent access to the same file, up to absolute paths.
+ * The vfs layer does not guarnatee non concurrent access to directory creation, file creation,
+ * multiple references to the same file via hard links, or atomic operations for multiple step
+ * calls (e.g. directory listing).
+ *
+ * In other words, the vfs is only responsible for ensuring that no two access are made to the
+ * inode at the same time. It is the actual fs driver's responsibility to ensure consistent access
+ * to filesystem metadata such as inode tables and journals
+ *
+ * Internally, the vfs must guarantee locked access to the open_table via the fs_lock. The vfs must
+ * also guarantee locked access to the vfs tree.
+ *
+ * TODO: support multiple readers on the filetree while blocking writers
+ */
 
 static uint8_t fs_lock;
 
@@ -46,9 +68,17 @@ struct vfs_mount_t {
 	fs_create_t create;
 };
 
+struct vfs_open_file_t {
+	uint8_t lock;
+	const char* path;
+	uint64_t refs;
+	uint64_t key;
+};
+
 struct fs_handle_t {
 	struct vfs_mount_t* mount;
 	struct file_handle_t* handle;
+	struct vfs_open_file_t* shared;
 };
 
 struct vfs_tree_node_t {
@@ -62,6 +92,8 @@ struct vfs_tree_node_t {
 
 static struct vfs_tree_node_t vfs_root;
 static struct vfs_tree_node_t dev_root;
+
+static struct hash_table_t* open_table;
 
 static struct vfs_mount_t dev_mount = {
 	.cntx = 0,
@@ -90,6 +122,49 @@ static inline char* path_next(char* path, size_t* len) {
 	return path;
 }
 
+static struct vfs_open_file_t* lookup_register(char* path) {
+	uint64_t key = fnv64_1a(path, kstrlen(path));
+	struct vfs_open_file_t* file;
+
+	while ((file = hash_table_get(open_table, key))) {
+		if (kstrcmp(path, file->path) == 0) {
+			break;
+		}
+
+		key++;
+	}
+
+	if (!file) {
+		file = kmalloc(sizeof(struct vfs_open_file_t));
+
+		file->path = kmalloc(kstrlen(path) + 1);
+		kstrcpy((char*)file->path, path);
+
+		file->refs = 0;
+		file->key = key;
+		lock_init(&file->lock);
+
+		hash_table_insert(open_table, key, file);
+	}
+
+	file->refs++;
+
+	return file;
+}
+
+static void lookup_close(struct vfs_open_file_t* file) {
+	file->refs--;
+
+	if (file->refs) {
+		return;
+	}
+
+	kfree((char*)file->path);
+	hash_table_remove(open_table, file->key);
+
+	kfree(file);
+}
+
 void fs_init(void) {
 	lock_init(&fs_lock);
 
@@ -102,6 +177,8 @@ void fs_init(void) {
 	dev_root.sub = 0;
 	dev_root.name = "dev";
 	dev_root.mount = &dev_mount;
+
+	open_table = hash_table_alloc(OPEN_TABLE_BUCKETS);
 }
 
 enum file_status_t fs_mount(
@@ -143,13 +220,13 @@ enum file_status_t fs_mount(
 	return FILE_ERROR;
 }
 
-static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void** clean_path_out) {
+static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void** clean_path_out, char** path_write_out) {
 	struct vfs_tree_node_t* node = &vfs_root, * walk = 0;
-	size_t len = kstrlen(path);
-	char* clean_path = kmalloc(len + 1);
 	char* mount_path = (char*)"";
 	struct vfs_mount_t* mount = 0;
 
+	size_t len = kstrlen(path);
+	char* clean_path = kmalloc(len + 1);
 
 	uint64_t num_chars = 0;
 	uint64_t skip = 0;
@@ -201,6 +278,7 @@ static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void**
 		path_write++; // one to skip /
 	}
 
+	*path_write_out = path_write;
 
 	lock_acquire(&fs_lock);
 
@@ -233,7 +311,8 @@ static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void**
 struct fs_handle_t* fs_open(const char* path) {
 	struct vfs_mount_t* mount;
 	void* clean_path;
-	char* mount_path = find_mount(path, &mount, &clean_path);
+	char* path_write;
+	char* mount_path = find_mount(path, &mount, &clean_path, &path_write);
 
 	if (!mount) {
 		kfree(clean_path);
@@ -244,31 +323,51 @@ struct fs_handle_t* fs_open(const char* path) {
 	struct file_handle_t* handle = mount->open(mount->cntx, mount_path);
 	lock_release(&fs_lock);
 
+	if (!handle) {
+		return 0;
+	}
+
+	lock_acquire(&fs_lock);
+	struct vfs_open_file_t* open_file = lookup_register(path_write);
+	lock_release(&fs_lock);
+
 	kfree(clean_path);
 
 	struct fs_handle_t* fs_handle = kmalloc(sizeof(struct fs_handle_t));
 	fs_handle->handle = handle;
 	fs_handle->mount = mount;
+	fs_handle->shared = open_file;
 	return fs_handle;
 }
 
 void fs_close(struct fs_handle_t* handle) {
 
+	lock_acquire(&handle->shared->lock);
 	handle->mount->close(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	lock_acquire(&fs_lock);
+	lookup_close(handle->shared);
+	lock_release(&fs_lock);
 
 	kfree(handle);
 }
 
 enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
 
+	lock_acquire(&handle->shared->lock);
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
+	lock_release(&handle->shared->lock);
+
 	return ret;
 }
 
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
+	lock_acquire(&handle->shared->lock);
 	ret = handle->mount->read(handle->handle, buffer, count);
+	lock_release(&handle->shared->lock);
 
 	return ret;
 }
@@ -276,7 +375,9 @@ size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 uint64_t fs_get_seek(struct fs_handle_t* handle) {
 	uint64_t seek;
 
+	lock_acquire(&handle->shared->lock);
 	seek = handle->mount->get_seek(handle->handle);
+	lock_release(&handle->shared->lock);
 
 	return seek;
 }
@@ -284,7 +385,9 @@ uint64_t fs_get_seek(struct fs_handle_t* handle) {
 enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	enum file_status_t sts;
 
+	lock_release(&handle->shared->lock);
 	sts = handle->mount->seek(handle->handle, seek);
+	lock_release(&handle->shared->lock);
 
 	return sts;
 }
@@ -292,7 +395,9 @@ enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
+	lock_release(&handle->shared->lock);
 	ret = handle->mount->write(handle->handle, buffer, count);
+	lock_release(&handle->shared->lock);
 
 	return ret;
 }
@@ -302,16 +407,15 @@ enum file_status_t fs_create(const char* path) {
 
 	struct vfs_mount_t* mount;
 	void* clean_path;
-	char* mount_path = find_mount(path, &mount, &clean_path);
+	char* path_write;
+	char* mount_path = find_mount(path, &mount, &clean_path, &path_write);
 
 	if (!mount) {
 		kfree(clean_path);
 		return FILE_DNE;
 	}
 
-	lock_acquire(&fs_lock);
 	sts = mount->create(mount->cntx, mount_path);
-	lock_release(&fs_lock);
 
 	kfree(clean_path);
 

@@ -60,7 +60,7 @@ extern void _test_report(const char* report);
 	static void _test_##id(void)
 
 #define TEST_PASS() exit(EXIT_SUCCESS)
-#define TEST_FAIL(code) exit(EXIT_FAILURE)
+#define TEST_FAIL() exit(EXIT_FAILURE)
 
 #define ASSERT_TRUE(condition, report) \
 	if (!(condition)) { \
