@@ -65,13 +65,21 @@ struct vfs_mount_t {
 	fs_seek_t seek;
 	fs_write_t write;
 	fs_create_t create;
+	fs_delete_t delete;
+	fs_delete_final_t delete_final;
+	fs_open_dir_t open_dir;
+	fs_close_dir_t close_dir;
+	fs_read_dir_t read_dir;
+	fs_create_dir_t create_dir;
+	fs_delete_dir_t delete_dir;
 };
 
 struct vfs_open_file_t {
-	uint8_t lock;
 	const char* path;
 	uint64_t refs;
 	uint64_t key;
+	uint8_t lock;
+	uint8_t pending_delete;
 };
 
 struct fs_handle_t {
@@ -103,7 +111,12 @@ static struct vfs_mount_t dev_mount = {
 	.get_seek = devfs_get_seek,
 	.seek = devfs_seek,
 	.write = devfs_write,
-	.create = devfs_create
+	.create = devfs_create,
+	.delete = devfs_delete,
+	.delete_final = devfs_delete_final,
+	.open_dir = devfs_open_dir,
+	.close_dir = devfs_close_dir,
+	.read_dir = devfs_read_dir
 };
 
 static inline char* path_next(char* path, size_t* len) {
@@ -141,6 +154,7 @@ static struct vfs_open_file_t* lookup_register(char* path) {
 
 		file->refs = 0;
 		file->key = key;
+		file->pending_delete = 0;
 		lock_init(&file->lock);
 
 		hash_table_insert(open_table, key, file);
@@ -151,17 +165,18 @@ static struct vfs_open_file_t* lookup_register(char* path) {
 	return file;
 }
 
-static void lookup_close(struct vfs_open_file_t* file) {
+static uint8_t lookup_close(struct vfs_open_file_t* file) {
 	file->refs--;
 
 	if (file->refs) {
-		return;
+		return 0;
 	}
 
 	kfree((char*)file->path);
 	hash_table_remove(open_table, file->key);
 
 	kfree(file);
+	return 1;
 }
 
 void fs_init(void) {
@@ -190,7 +205,14 @@ enum file_status_t fs_mount(
 		fs_get_seek_t get_seek,
 		fs_seek_t seek,
 		fs_write_t write,
-		fs_create_t create
+		fs_create_t create,
+		fs_delete_t delete,
+		fs_delete_final_t delete_final,
+		fs_open_dir_t open_dir,
+		fs_close_dir_t close_dir,
+		fs_read_dir_t read_dir,
+		fs_create_dir_t create_dir,
+		fs_delete_dir_t delete_dir
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -210,6 +232,13 @@ enum file_status_t fs_mount(
 		vfs_root.mount->seek = seek;
 		vfs_root.mount->write = write;
 		vfs_root.mount->create = create;
+		vfs_root.mount->delete = delete;
+		vfs_root.mount->delete_final = delete_final;
+		vfs_root.mount->open_dir = open_dir;
+		vfs_root.mount->close_dir = close_dir;
+		vfs_root.mount->read_dir = read_dir;
+		vfs_root.mount->create_dir = create_dir;
+		vfs_root.mount->delete_dir = delete_dir;
 
 		return FILE_OK;
 	}
@@ -338,14 +367,17 @@ struct fs_handle_t* fs_open(const char* path) {
 }
 
 void fs_close(struct fs_handle_t* handle) {
+	semaphore_wait_full(fs_sem);
+	if (lookup_close(handle->shared)) {
+		if (handle->shared->pending_delete) {
+			handle->mount->delete_final(handle->handle);
+		}
+	}
+	semaphore_signal_full(fs_sem);
 
 	lock_acquire(&handle->shared->lock);
 	handle->mount->close(handle->handle);
 	lock_release(&handle->shared->lock);
-
-	semaphore_wait_full(fs_sem);
-	lookup_close(handle->shared);
-	semaphore_signal_full(fs_sem);
 
 	kfree(handle);
 }
@@ -399,22 +431,74 @@ size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
 	return ret;
 }
 
-enum file_status_t fs_create(const char* path) {
+enum file_status_t fs_create(struct fs_handle_t* handle, const char* name) {
 	enum file_status_t sts;
 
-	struct vfs_mount_t* mount;
-	void* clean_path;
-	char* path_write;
-	char* mount_path = find_mount(path, &mount, &clean_path, &path_write);
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->create(handle->handle, name);
+	lock_release(&handle->shared->lock);
 
-	if (!mount) {
-		kfree(clean_path);
-		return FILE_DNE;
+	return sts;
+}
+
+enum file_status_t fs_delete(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->delete(handle->handle);
+	handle->shared->pending_delete = 1;
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+struct fs_handle_t* fs_open_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->open_dir(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	if (sts != FILE_OK) {
+		return 0;
 	}
 
-	sts = mount->create(mount->cntx, mount_path);
+	return handle;
+}
 
-	kfree(clean_path);
+void fs_close_dir(struct fs_handle_t* handle) {
+	lock_acquire(&handle->shared->lock);
+	handle->mount->close_dir(handle->handle);
+	lock_release(&handle->shared->lock);
+}
+
+enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* info) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->read_dir(handle->handle, info);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_create_dir(struct fs_handle_t* handle, const char* name) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->create_dir(handle->handle, name);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_delete_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->delete_dir(handle->handle);
+	handle->shared->pending_delete = 1;
+	lock_release(&handle->shared->lock);
 
 	return sts;
 }

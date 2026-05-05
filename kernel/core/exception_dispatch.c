@@ -101,7 +101,6 @@ static inline const char* get_exception_name(uint64_t vector) {
 }
 
 void exception_dispatch(struct exception_context_t* context) {
-	//TODO: remove reduntant rsp push
 	logging_log_error("Unrecoverable exception 0x%lX %s (0x%lX) @ 0x%lX",
 			context->vector, get_exception_name(context->vector), context->code, context->rip);
 

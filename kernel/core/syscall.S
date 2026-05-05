@@ -60,14 +60,6 @@ sysretq
 
 .section .rodata
 
-.extern syscall_dispatch_exit
-.extern syscall_dispatch_open
-.extern syscall_disaptch_close
-.extern syscall_dispatch_read
-.extern syscall_dispatch_write
-.extern syscall_dispatch_alloc
-.extern syscall_dispatch_create
-
 .global syscall_handlers
 syscall_handlers:
 
@@ -78,3 +70,17 @@ syscall_handlers:
 .quad syscall_dispatch_write
 .quad syscall_dispatch_alloc
 .quad syscall_dispatch_create
+.quad syscall_dispatch_delete
+.quad syscall_dispatch_open_dir
+.quad syscall_dispatch_read_dir
+.quad syscall_dispatch_close_dir
+.quad syscall_dispatch_seek
+.quad syscall_dispatch_tell
+.quad syscall_dispatch_create_dir
+.quad syscall_dispatch_delete_dir
+.quad syscall_dispatch_epoch_time
+
+.set num_entries, . - syscall_handlers
+.if num_entries != SYSCALL_MAX * 8
+.error "Inconsistent number of registered system cals in call table"
+.endif

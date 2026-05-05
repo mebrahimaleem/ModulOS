@@ -20,12 +20,21 @@
 
 #include <mlibc/all-sysdeps.hpp>
 
-#include <errno.h>
+#include <abi-bits/seek-whence.h>
+#include <abi-bits/errno.h>
+
 #include <string.h>
 
+#define stdout	0
+#define stdin		1
 #define stderr	2
 
-#define TRAP asm volatile ("int3" : : : "memory")
+#define SECONDS_PER_NANO	0x10000000000		
+
+[[noreturn]] static inline void _trap(void) {
+	asm volatile ("int3" : : : "memory");
+	__builtin_unreachable();
+}
 
 namespace mlibc {
 
@@ -97,12 +106,16 @@ int sys_read(int fd, void *buf, size_t count, ssize_t *bytes_read) {
 }
 
 int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
-	(void)fd;
-	(void)offset;
-	(void)whence;
-	(void)new_offset;
-
-	return 0;
+	switch (whence) {
+		case SEEK_CUR:
+			offset += syscall_1(fd, 0, 0, SYSCALL_TELL);
+			__attribute__((fallthrough));
+		case SEEK_SET:
+			*new_offset = syscall_2(fd, (uint64_t)offset, 0, SYSCALL_SEEK);
+			return 0;
+		default:
+			_trap();
+	}
 }
 
 int sys_close(int fd) {
@@ -120,8 +133,7 @@ int sys_vm_map(void *hint, size_t size, int prot, int flags, int fd, off_t offse
 	(void)offset;
 	(void)window;
 
-	TRAP;
-	return 0;
+	_trap();
 }
 
 int sys_vm_unmap(void *pointer, size_t size) {
@@ -138,16 +150,16 @@ int sys_vm_unmap(void *pointer, size_t size) {
 }
 
 int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
-	*bytes_written = syscall_3((uint64_t)fd, (uint64_t)buf	, (uint64_t)count, SYSCALL_WRITE);
+	*bytes_written = syscall_3((uint64_t)fd, (uint64_t)buf, (uint64_t)count, SYSCALL_WRITE);
 
 	return 0;
 }
 
 int sys_isatty(int fd) {
 	switch (fd) {
-		case 0:
-		case 1:
-		case 2:
+		case stdout:
+		case stdin:
+		case stderr:
 			return 0; //mlibc expects 0 for tty
 		default:
 			return ENOTTY;
@@ -155,11 +167,24 @@ int sys_isatty(int fd) {
 }
 
 int sys_clock_get(int clock, time_t *secs, long *nanos) {
-	(void)clock;
-	(void)secs;
-	(void)nanos;
-	TRAP;
-	return 0;
+	uint64_t epoch_nanos = syscall_0(0, 0, 0, SYSCALL_EPOCH_TIME);
+
+	switch (clock) {
+		case CLOCK_REALTIME:
+		case CLOCK_MONOTONIC:
+		case CLOCK_MONOTONIC_RAW:
+		case CLOCK_REALTIME_COARSE:
+		case CLOCK_MONOTONIC_COARSE:
+		case CLOCK_BOOTTIME:
+		case CLOCK_REALTIME_ALARM:
+		case CLOCK_BOOTTIME_ALARM:
+		case CLOCK_TAI:
+			*secs = epoch_nanos / SECONDS_PER_NANO;
+			*nanos = epoch_nanos % SECONDS_PER_NANO;
+			return 0;
+		default:
+			return 1;
+	}
 }
 
 } //namespace mlibc

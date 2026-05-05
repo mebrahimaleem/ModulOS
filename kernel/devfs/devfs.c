@@ -143,9 +143,45 @@ size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count) {
 	}
 }
 
-enum file_status_t devfs_create(struct mount_cntx_t* cntx, char* path) {
-	(void)cntx;
-	(void)path;
+enum file_status_t devfs_create(struct file_handle_t* handle, const char* name) {
+	(void)handle;
+	(void)name;
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_delete(struct file_handle_t* handle) {
+	(void)handle;
+	return FILE_NO_SUPPORT;
+}
+
+void devfs_delete_final(struct file_handle_t* handle) {
+	(void)handle;
+}
+
+enum file_status_t devfs_open_dir(struct file_handle_t* handle) {
+	(void)handle;
+	return FILE_NO_SUPPORT;
+}
+
+void devfs_close_dir(struct file_handle_t* handle) {
+	(void)handle;
+}
+
+enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
+	(void)handle;
+	(void)info;
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_create_dir(struct file_handle_t* handle, const char* name) {
+	(void)handle;
+	(void)name;
+
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_delete_dir(struct file_handle_t* handle) {
+	(void)handle;
 
 	return FILE_NO_SUPPORT;
 }

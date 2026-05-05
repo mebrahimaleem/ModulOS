@@ -56,8 +56,6 @@
 #define EXT2_S_IFREG	0x8000
 #define EXT2_S_IFDIR	0x4000
 
-#define DIRLS_SET			0x8000000000000000
-
 struct ext2_superblock_t {
 	uint32_t s_inodes_count;
 	uint32_t s_blocks_count;
@@ -169,6 +167,8 @@ struct ext2_t {
 	struct ext2_superblock_t* superblock;
 	struct ext2_bg_desc_t* bgdt;
 	struct disk_t* disk;
+	uint64_t block_size;
+	uint8_t lock;
 };
 
 struct ext2_inode_handle_t {
@@ -188,7 +188,7 @@ struct ext2_block_track_t {
 static uint8_t label_rootfs[16] = {'r', 'o', 'o', 't', 'f', 's', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static void* read_block(uint64_t block, struct ext2_t* ext2) {
-	const uint64_t block_size = 1024u << ext2->superblock->s_log_block_size;
+	const uint64_t block_size = ext2->block_size;
 
 	void* buffer = kmalloc(block_size);
 
@@ -211,7 +211,7 @@ static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct 
 	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
 	const struct ext2_bg_desc_t* bgdt = inode_handle->ext2->bgdt;
 
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t block_size = inode_handle->ext2->block_size;
 	const uint64_t block_group = (inode_handle->inode_index - 1) / superblock->s_inodes_per_group;
 	const uint64_t lcl_inode_idx = (inode_handle->inode_index - 1) % superblock->s_inodes_per_group;
 	const uint64_t lcl_inode_off = lcl_inode_idx * superblock->s_inode_size;
@@ -251,7 +251,7 @@ static uint8_t get_block_index(struct ext2_block_track_t* bt, uint64_t* index) {
 
 	block -= DIRECT_BLOCKS;
 
-	const uint64_t block_size = 1024u << ext2->superblock->s_log_block_size;
+	const uint64_t block_size = ext2->block_size;
 	const uint64_t indir1 = block_size / sizeof(uint32_t);
 
 	uint32_t* buffer;
@@ -415,8 +415,7 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
 	track.handle->seek = 0;
 	track.handle->seek_block = 0;
 
-	const struct ext2_superblock_t* superblock = track.handle->ext2->superblock;
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t block_size = track.handle->ext2->block_size;
 	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
 	void* buffer;
 
@@ -529,8 +528,7 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 
 static uint64_t ext2_get_seek(struct file_handle_t* handle) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t block_size = inode_handle->ext2->block_size;
 
 	return inode_handle->seek_block * block_size + inode_handle->seek;
 }
@@ -546,8 +544,7 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	}
 
 	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
-	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t block_size = inode_handle->ext2->block_size;
 
 	size_t read = 0;
 	uint64_t index;
@@ -622,8 +619,7 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 
 static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
-	const uint64_t block_size = 1024u << superblock->s_log_block_size;
+	const uint64_t block_size = inode_handle->ext2->block_size;
 
 	inode_handle->seek_block = seek / block_size;
 	inode_handle->seek = seek % block_size;
@@ -638,9 +634,57 @@ static size_t ext2_write(struct file_handle_t* handle, void* buffer, size_t coun
 	return 0;
 }
 
-static enum file_status_t ext2_create(struct mount_cntx_t* cntx, char* path) {
-	(void)cntx;
-	(void)path;
+static enum file_status_t ext2_create(struct file_handle_t* handle, const char* name) {
+	(void)handle;
+	(void)name;
+
+	enum file_status_t sts;
+
+	struct file_info_t info;
+	if ((sts = ext2_stat(handle, &info)) != FILE_OK) {
+		return sts;
+	}
+
+	if (info.type != FILE_TYPE_DIR) {
+		return FILE_NO_SUPPORT;
+	}
+
+	return FILE_NO_SUPPORT;
+}
+
+static enum file_status_t ext2_delete(struct file_handle_t* handle) {
+	(void)handle;
+	return FILE_NO_SUPPORT;
+}
+
+static void ext2_delete_final(struct file_handle_t* handle) {
+	(void)handle;
+}
+
+static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
+	(void)handle;
+	return FILE_NO_SUPPORT;
+}
+
+static void ext2_close_dir(struct file_handle_t* handle) {
+	(void)handle;
+}
+
+static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
+	(void)handle;
+	(void)info;
+	return FILE_NO_SUPPORT;
+}
+
+static enum file_status_t ext2_create_dir(struct file_handle_t* handle, const char* name) {
+	(void)handle;
+	(void)name;
+
+	return FILE_NO_SUPPORT;
+}
+
+static enum file_status_t ext2_delete_dir(struct file_handle_t* handle) {
+	(void)handle;
 
 	return FILE_NO_SUPPORT;
 }
@@ -685,6 +729,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 	ext2->superblock = superblock;
 	ext2->bgdt = bgdt;
 	ext2->disk = disk;
+	ext2->block_size = 1024u << superblock->s_log_block_size;
+	lock_init(&ext2->lock);
 
 	logging_log_debug("ext2 blocks: 0x%x x 0x%x (0x%lX)",
 			1024u << superblock->s_log_block_size, superblock->s_blocks_count,
@@ -701,7 +747,14 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_get_seek,
 					ext2_seek,
 					ext2_write,
-					ext2_create
+					ext2_create,
+					ext2_delete,
+					ext2_delete_final,
+					ext2_open_dir,
+					ext2_close_dir,
+					ext2_read_dir,
+					ext2_create_dir,
+					ext2_delete_dir
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);

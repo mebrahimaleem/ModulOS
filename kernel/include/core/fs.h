@@ -44,6 +44,10 @@ struct file_info_t {
 	uint64_t size;
 };
 
+struct dir_info_t {
+	const char* name;
+};
+
 typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, char*);
 typedef void (*fs_close_t)(struct file_handle_t*);
 
@@ -52,8 +56,17 @@ typedef size_t (*fs_read_t)(struct file_handle_t*, void*, size_t);
 typedef uint64_t (*fs_get_seek_t)(struct file_handle_t*);
 typedef enum file_status_t (*fs_seek_t)(struct file_handle_t*, uint64_t);
 typedef size_t (*fs_write_t)(struct file_handle_t*, void*, size_t);
+typedef enum file_status_t (*fs_create_t)(struct file_handle_t*, const char*);
+typedef enum file_status_t (*fs_delete_t)(struct file_handle_t*);
+typedef void (*fs_delete_final_t)(struct file_handle_t*);
 
-typedef enum file_status_t (*fs_create_t)(struct mount_cntx_t*, char*);
+typedef enum file_status_t (*fs_open_dir_t)(struct file_handle_t*);
+typedef void (*fs_close_dir_t)(struct file_handle_t*);
+
+typedef enum file_status_t (*fs_read_dir_t)(struct file_handle_t*, struct dir_info_t*);
+
+typedef enum file_status_t (*fs_create_dir_t)(struct file_handle_t*, const char*);
+typedef enum file_status_t (*fs_delete_dir_t)(struct file_handle_t*);
 
 void fs_init(void);
 
@@ -67,7 +80,14 @@ enum file_status_t fs_mount(
 		fs_get_seek_t get_seek,
 		fs_seek_t seek,
 		fs_write_t write,
-		fs_create_t create
+		fs_create_t create,
+		fs_delete_t delete,
+		fs_delete_final_t delete_final,
+		fs_open_dir_t open_dir,
+		fs_close_dir_t close_dir,
+		fs_read_dir_t read_dir,
+		fs_create_dir_t create_dir,
+		fs_delete_dir_t delete_dir
 		);
 
 extern struct fs_handle_t* fs_open(const char* path);
@@ -78,7 +98,15 @@ extern size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count);
 extern uint64_t fs_get_seek(struct fs_handle_t* handle);
 extern enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek);
 extern size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count);
+extern enum file_status_t fs_create(struct fs_handle_t* handle, const char* name);
+extern enum file_status_t fs_delete(struct fs_handle_t* handle);
 
-extern enum file_status_t fs_create(const char* path);
+extern struct fs_handle_t* fs_open_dir(struct fs_handle_t* handle);
+extern void fs_close_dir(struct fs_handle_t* handle);
+
+extern enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* info);
+
+extern enum file_status_t fs_create_dir(struct fs_handle_t* handle, const char* name);
+extern enum file_status_t fs_delete_dir(struct fs_handle_t* handle);
 
 #endif /* KERNEL_CORE_FS_H */

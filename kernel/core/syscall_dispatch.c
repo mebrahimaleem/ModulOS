@@ -27,6 +27,7 @@
 #include <core/paging.h>
 #include <core/proc_data.h>
 #include <core/process.h>
+#include <core/time.h>
 
 #include <lib/kmemset.h>
 
@@ -75,7 +76,7 @@ DECLARE_SYSCALL(exit) {
 }
 
 DECLARE_SYSCALL(open) {
-	ARGC_0;
+	ARGC_1;
 
 	int fd;
 	struct pcb_t* pcb = proc_data_get()->current_process;
@@ -95,15 +96,16 @@ DECLARE_SYSCALL(open) {
 }
 
 DECLARE_SYSCALL(close) {
-	ARGC_0;
+	ARGC_1;
 
 	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
 
-	if (!pcb->fd_table[arg1]) {
+	if (!handle) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	fs_close(pcb->fd_table[arg1]);
+	fs_close(handle);
 	pcb->fd_table[arg1] = 0;
 
 	return SYSCALL_STS_OK;
@@ -113,14 +115,26 @@ DECLARE_SYSCALL(read) {
 	ARGC_3;
 
 	struct pcb_t* pcb = proc_data_get()->current_process;
-	return (uint64_t)fs_read(pcb->fd_table[arg1], (void*)arg2, (size_t)arg3);
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_read(handle, (void*)arg2, (size_t)arg3);
 }
 
 DECLARE_SYSCALL(write) {
 	ARGC_3;
 	
 	struct pcb_t* pcb = proc_data_get()->current_process;
-	return (uint64_t)fs_write(pcb->fd_table[arg1], (void*)arg2, (size_t)arg3);
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_write(handle, (void*)arg2, (size_t)arg3);
 }
 
 DECLARE_SYSCALL(alloc) {
@@ -152,7 +166,127 @@ DECLARE_SYSCALL(alloc) {
 }
 
 DECLARE_SYSCALL(create) {
+	ARGC_2;
+	
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_create(handle, (const char*)arg2) == FILE_OK;
+}
+
+DECLARE_SYSCALL(delete) {
 	ARGC_1;
 
-	return fs_create((const char*)arg1) != FILE_OK;
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_delete(handle) == FILE_OK;
+}
+
+DECLARE_SYSCALL(open_dir) {
+	ARGC_1;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return (uint64_t)fs_open_dir(handle);
+}
+
+DECLARE_SYSCALL(read_dir) {
+	ARGC_2;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_read_dir(handle, (struct dir_info_t*)arg2) == FILE_OK;
+}
+
+DECLARE_SYSCALL(close_dir) {
+	ARGC_1;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	fs_close_dir(handle);
+
+	return SYSCALL_STS_OK;
+}
+
+DECLARE_SYSCALL(seek) {
+	ARGC_2;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	fs_seek(handle, (uint64_t)arg2);
+	return fs_get_seek(handle);
+}
+
+DECLARE_SYSCALL(tell) {
+	ARGC_1;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_get_seek(handle);
+}
+
+DECLARE_SYSCALL(create_dir) {
+	ARGC_2;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_create_dir(handle, (const char*)arg2) == FILE_OK;
+}
+
+DECLARE_SYSCALL(delete_dir) {
+	ARGC_1;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_delete_dir(handle) == FILE_OK;
+}
+
+DECLARE_SYSCALL(epoch_time) {
+	ARGC_0;
+
+	return time_since_init_ns();
 }

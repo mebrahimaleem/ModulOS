@@ -76,11 +76,68 @@
 #define SYSCALL_ALLOC				5
 
 /*
- * rdi: path (const char*)
- * ret: (int)
+ * rdi: handle (int)
+ * rsi: name (const char*)
+ * ret: success (int)
  */
 #define SYSCALL_CREATE			6
 
-#define SYSCALL_MAX					7
+/*
+ * rdi: handle (int)
+ * ret: success (int)
+ */
+#define SYSCALL_DELETE			7
+
+/*
+ * rdi: handle (int)
+ * ret handle (void*)
+ */
+#define SYSCALL_OPEN_DIR		8
+
+/*
+ * rdi: handle (void*)
+ * rsi: info buffer (void*)
+ * ret: success (int)
+ */
+#define SYSCALL_READ_DIR		9
+
+/*
+ * rdi: handle (void*)
+ * ret: (void)
+ */
+#define SYSCALL_CLOSE_DIR		10
+
+/*
+ * rdi: handle (int)
+ * rsi: seek (long int)
+ * ret: new seek (long int)
+ */
+#define SYSCALL_SEEK				11
+
+/*
+ * rdi: handle (int)
+ * ret: seek (long int)
+ */
+#define SYSCALL_TELL				12
+
+/*
+ * rdi: handle (int)
+ * rsi: name (const char*)
+ * ret: success (int)
+ */
+#define SYSCALL_CREATE_DIR	13
+
+/*
+ * rdi: handle (int)
+ * ret: success (int)
+ */
+#define SYSCALL_DELETE_DIR	14
+
+/*
+ * ret: time since epoch in nanos (long int)
+ */
+#define SYSCALL_EPOCH_TIME		15
+
+#define SYSCALL_MAX					16
 
 

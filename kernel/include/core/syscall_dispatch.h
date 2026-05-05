@@ -49,5 +49,14 @@ extern DECLARE_SYSCALL(read);
 extern DECLARE_SYSCALL(write);
 extern DECLARE_SYSCALL(alloc);
 extern DECLARE_SYSCALL(create);
+extern DECLARE_SYSCALL(delete);
+extern DECLARE_SYSCALL(open_dir);
+extern DECLARE_SYSCALL(read_dir);
+extern DECLARE_SYSCALL(close_dir);
+extern DECLARE_SYSCALL(seek);
+extern DECLARE_SYSCALL(tell);
+extern DECLARE_SYSCALL(create_dir);
+extern DECLARE_SYSCALL(delete_dir);
+extern DECLARE_SYSCALL(epoch_time);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

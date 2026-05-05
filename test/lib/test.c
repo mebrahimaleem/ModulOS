@@ -130,6 +130,6 @@ TEST("crc32_ansi") {
 }
 
 TEST("fnc64_1a") {
-	//TODO
-	TEST_FAIL();
+	ASSERT_TRUE(fnv64_1a("Hello, World!", 13) == 0x6ef05bd7cc857c54, "fails expected checksum");
+	ASSERT_FALSE(fnv64_1a("Hello, World!", 12) == 0x6ef05bd7cc857c54, "fails expected checksum");
 }
