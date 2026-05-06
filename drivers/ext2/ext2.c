@@ -266,15 +266,13 @@ static uint8_t set_inode(const struct ext2_inode_handle_t* inode_handle, struct 
 
 	if (!buffer) {
 		logging_log_error("Failed to read inode %lu", inode_handle->inode_index);
-		kfree(buffer);
 		return 1;
 	}
 
 	*(struct ext2_inode_t*)((uint64_t)buffer + inode_off) = *inode;
 
-	if (!write_block(inode_table_block, inode_handle->ext2, buffer)) {
+	if (!(buffer = write_block(inode_table_block, inode_handle->ext2, buffer))) {
 		logging_log_error("Failed to write inode %lu", inode_handle->inode_index);
-		kfree(buffer);
 		return 1;
 	}
 
@@ -463,7 +461,9 @@ static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 
 	struct file_info_t info;
-	ext2_stat(handle, &info);
+	if (ext2_stat(handle, &info) != FILE_OK) {
+		return FILE_ERROR;
+	}
 
 	if (info.type != FILE_TYPE_DIR) {
 		return FILE_NOT_DIR;

@@ -49,7 +49,7 @@ struct signal_wait_t* signal_wait_alloc(void) {
 }
 
 void signal_wait(struct signal_wait_t* wait) {
-	volatile struct pcb_t* current = proc_data_get()->current_process;
+	struct pcb_t* current = proc_data_get()->current_process;
 
 	current->meta[0] = wait;
 	process_set_callback(signal_wait_callback);

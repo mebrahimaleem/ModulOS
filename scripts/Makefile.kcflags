@@ -14,12 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
-	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
-	-Wstrict-prototypes
+CWARN := -Weverything
 
 ifndef DEBUG
-	CWARN := $(CWARN) -Werror
+	CWARN := $(CWARN) -Werror -Wno-unsafe-buffer-usage -Wno-reserved-identifier -Wno-unused-macros \
+					 -Wno-declaration-after-statement -Wno-padded -Wno-bad-function-cast -Wno-pre-c11-compat \
+					 -Wno-switch-default -Wno-cast-align -Wno-pre-c23-compat
 endif
 
 LD_USR_FLAGS := -std=c23 -fno-pie -mno-mmx -mno-sse -mno-sse2 -mno-avx -mno-avx2 -mno-avx512f \

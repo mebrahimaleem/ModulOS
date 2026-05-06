@@ -109,7 +109,7 @@
 #define AT_EXECFN 			31
 #define AT_SYSINFO_EHDR 33
 
-enum {
+enum at_index_t {
 	AT_INDEX_PHDR,
 	AT_INDEX_PHENT,
 	AT_INDEX_PHNUM,
@@ -123,7 +123,7 @@ enum {
 	AT_INDEX_CLKTCK,
 
 	AT_INDEX_NULL
-} at_index_t;
+};
 
 typedef struct {
 	int a_type;

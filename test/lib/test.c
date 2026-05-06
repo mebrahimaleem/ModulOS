@@ -33,7 +33,7 @@
 
 #define MEM_TEST_SIZE	256
 
-TEST_NAME("libary test suite")
+TEST_NAME("libary test suite");
 
 TEST("kmemset") {
 	char* actual = malloc(MEM_TEST_SIZE);

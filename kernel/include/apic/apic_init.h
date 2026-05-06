@@ -20,6 +20,20 @@
 
 #include <stdint.h>
 
+#include <kernel/core/gdt.h>
+
+extern uint64_t apic_base;
+extern uint8_t bsp_apic_id;
+
+extern struct gdt_ptr_64_t** ap_gdt_ptr_64;
+
+extern struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
+
+extern uint64_t* init_stacks_paddr;
+extern uint64_t* init_stacks_vaddr;
+
+extern uint8_t* ap_init_locks;
+
 extern void apic_init(void);
 
 extern void apic_init_ap(void);

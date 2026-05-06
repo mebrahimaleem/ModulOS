@@ -99,8 +99,8 @@ extern uint8_t kernel_pml4;
 
 uint64_t* init_stacks_paddr;
 uint64_t* init_stacks_vaddr;
-volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
-volatile struct gdt_ptr_64_t** ap_gdt_ptr_64;
+struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
+struct gdt_ptr_64_t** ap_gdt_ptr_64;
 uint8_t* ap_init_locks;
 
 void apic_init(void) {

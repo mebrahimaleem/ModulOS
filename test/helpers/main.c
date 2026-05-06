@@ -101,7 +101,7 @@ int main(void) {
 		}
 		else {
 			test->test();
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 	}
 

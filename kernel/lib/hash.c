@@ -21,7 +21,7 @@
 #include <lib/hash.h>
 
 #define CRC32_ANSI_C0	0xFFFFFFFF
-#define CRC32_ANSI_C1	0xEDB88320;
+#define CRC32_ANSI_C1	0xEDB88320
 
 
 #define FNV64_1A_C0		0xcbf29ce484222325

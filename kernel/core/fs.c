@@ -76,7 +76,7 @@ struct vfs_mount_t {
 };
 
 struct vfs_open_file_t {
-	const char* path;
+	char* path;
 	uint64_t refs;
 	uint64_t key;
 	uint8_t lock;
@@ -158,7 +158,7 @@ static struct vfs_open_file_t* lookup_register(char* path) {
 		file = kmalloc(sizeof(struct vfs_open_file_t));
 
 		file->path = kmalloc(kstrlen(path) + 1);
-		kstrcpy((char*)file->path, path);
+		kstrcpy(file->path, path);
 
 		file->refs = 0;
 		file->key = key;
@@ -180,11 +180,13 @@ static uint8_t lookup_close(struct vfs_open_file_t* file) {
 		return 0;
 	}
 
-	kfree((char*)file->path);
+	kfree(file->path);
 	hash_table_remove(open_table, file->key);
 
+	uint8_t pending_delete = file->pending_delete;
+
 	kfree(file);
-	return 1;
+	return pending_delete;
 }
 
 void fs_init(void) {
@@ -380,9 +382,7 @@ struct fs_handle_t* fs_open(const char* path, uint8_t mode) {
 void fs_close(struct fs_handle_t* handle) {
 	semaphore_wait_full(fs_sem);
 	if (lookup_close(handle->shared)) {
-		if (handle->shared->pending_delete) {
-			handle->mount->delete_final(handle->handle);
-		}
+		handle->mount->delete_final(handle->handle);
 	}
 	semaphore_signal_full(fs_sem);
 

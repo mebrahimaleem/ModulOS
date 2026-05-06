@@ -67,7 +67,7 @@ struct boot_context_t boot_context;
 extern uint8_t ap_bootstrap_start;
 extern uint64_t* init_stacks;
 extern uint8_t ap_bootstrap_end;
-extern volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
+extern struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
 extern uint8_t* ap_init_locks;
 
 extern uint64_t init_stack_vaddr;

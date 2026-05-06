@@ -54,6 +54,6 @@ struct tss_t {
 	uint16_t iopb;
 } __attribute__((packed));
 
-extern void tss_init(volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES]);
+extern void tss_init(struct gdt_t(* gdt)[GDT_NUM_ENTRIES]);
 
 #endif /* KERNEL_CORE_TSS_H */

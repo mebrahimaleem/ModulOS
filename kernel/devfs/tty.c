@@ -50,8 +50,8 @@ typedef void (*tty_write_t)(uint8_t byte);
 struct tty_handle_t {
 	tty_write_t writer;
 	uint8_t* read_buffer;
-	volatile uint16_t write_index;
-	volatile uint16_t read_index;
+	uint16_t write_index;
+	uint16_t read_index;
 	struct signal_wait_t* signal;
 	enum {
 		TTY_MODE_COOKED,

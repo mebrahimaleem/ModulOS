@@ -40,12 +40,12 @@ struct idt_ptr_t {
 	uint64_t base;
 } __attribute__((packed));
 
-static volatile struct idt_entry_t idt[IDT_MAX_ENTRY] __attribute__((aligned(64)));
-static volatile struct idt_ptr_t idt_ptr;
+static struct idt_entry_t idt[IDT_MAX_ENTRY] __attribute__((aligned(64)));
+static struct idt_ptr_t idt_ptr;
 static uint8_t next_vector;
 
 void idt_init(void) {
-	kmemset((void*)&idt[0], 0, sizeof(idt));
+	kmemset(&idt[0], 0, sizeof(idt));
 
 	idt_install(0x00, (uint64_t)isr_00, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);
 	idt_install(0x01, (uint64_t)isr_01, GDT_CODE_SEL, 0, IDT_GATE_TRP, 0);

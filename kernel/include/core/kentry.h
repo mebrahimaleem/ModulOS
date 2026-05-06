@@ -31,7 +31,7 @@
 
 struct boot_context_t {
 	struct acpi_rsdp_t rsdp;
-	volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
+	struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
 #ifdef GRAPHICSBASE
 	struct framebuffer_t framebuffer;
 #endif /* GRAPHICSBASE */

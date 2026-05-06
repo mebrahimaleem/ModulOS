@@ -26,7 +26,7 @@ static void (*loggers[MAX_LOGGER_OUT])(enum log_severity_t, const char* format, 
 static uint64_t last_logger;
 
 static void log(enum log_severity_t severity, const char* format, va_list args) {
-	for (uint64_t i = 0 ; i < last_logger; i++) {
+	for (uint64_t i = 0 ; i < last_logger && i < MAX_LOGGER_OUT; i++) {
 		loggers[i](severity, format, args);
 	}
 }
@@ -36,7 +36,7 @@ void logging_init(void) {
 }
 
 void logging_register(void (*logger)(enum log_severity_t, const char* format, va_list args)) {
-	loggers[last_logger++] = logger;
+	loggers[(last_logger++) % MAX_LOGGER_OUT] = logger;
 }
 
 void _logging_log_debug(const char* format, ...) {

@@ -29,7 +29,7 @@ static void nested_exception(void) {
 	ASSERT_NO_EXCEPTION(will_throw, "nested exception caught");
 }
 
-TEST_NAME("testsuite validation")
+TEST_NAME("testsuite validation");
 
 TEST("Implicit pass") {}
 

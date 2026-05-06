@@ -25,7 +25,7 @@ static uint32_t convert_color(struct framebuffer_t* framebuffer, uint8_t r, uint
 	switch (framebuffer->mode) {
 		case VIDEO_RGB_XRGB8888:
 			return ((uint32_t)r << 16) + ((uint32_t)g << 8) + (uint32_t)b;
-		default:
+		case VIDEO_NONE:
 			return 0;
 	}
 }
@@ -34,8 +34,8 @@ void framebuffer_fillrect(
 		struct framebuffer_t* framebuffer, uint32_t startx, uint32_t starty, uint32_t width,
 		uint32_t height, uint8_t r, uint8_t g, uint8_t b) {
 
-	uint8_t* row =
-		(uint8_t*)(framebuffer->addr + starty * framebuffer->pitch + startx * BYTES_PER_PIXEL);
+	volatile uint8_t* row =
+		(volatile uint8_t*)(framebuffer->addr + starty * framebuffer->pitch + startx * BYTES_PER_PIXEL);
 	volatile uint32_t* loc;
 	uint32_t color = convert_color(framebuffer, r, g, b);
 
