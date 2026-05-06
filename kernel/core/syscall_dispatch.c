@@ -76,14 +76,14 @@ DECLARE_SYSCALL(exit) {
 }
 
 DECLARE_SYSCALL(open) {
-	ARGC_1;
+	ARGC_2;
 
 	int fd;
 	struct pcb_t* pcb = proc_data_get()->current_process;
 
 	for (fd = 0; fd < MAX_FD; fd++) {
 		if (!pcb->fd_table[fd]) {
-			pcb->fd_table[fd] = fs_open((const char*)arg1);
+			pcb->fd_table[fd] = fs_open((const char*)arg1, (uint8_t)arg2);
 			if (!pcb->fd_table[fd]) {
 				return SYSCALL_STS_FAIL;
 			}
@@ -289,4 +289,17 @@ DECLARE_SYSCALL(epoch_time) {
 	ARGC_0;
 
 	return time_since_init_ns();
+}
+
+DECLARE_SYSCALL(is_a_tty) {
+	ARGC_1;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = pcb->fd_table[arg1];
+
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return fs_is_interactive(handle);
 }

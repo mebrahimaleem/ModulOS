@@ -539,9 +539,9 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 
 	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
 
-	pcb->fd_table[0] = fs_open("/dev/ttyS0");
-	pcb->fd_table[1] = fs_open("/dev/ttyS0");
-	pcb->fd_table[2] = fs_open("/dev/ttyS0");
+	pcb->fd_table[0] = fs_open("/dev/ttyS0", FILE_MODE_READ);
+	pcb->fd_table[1] = fs_open("/dev/ttyS0", FILE_MODE_WRITE);
+	pcb->fd_table[2] = fs_open("/dev/ttyS0", FILE_MODE_WRITE);
 
 restore_cr3:
 

@@ -21,6 +21,13 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define FILE_MODE_READ		0x1
+#define FILE_MODE_WRITE		0x2
+
+#define FILE_INFO_UNK			0
+#define FILE_INFO_REG			1
+#define FILE_INFO_DIR			2
+
 struct mount_cntx_t;
 
 struct file_handle_t;
@@ -32,7 +39,9 @@ enum file_status_t {
 	FILE_ERROR,
 	FILE_DNE,
 	FILE_BUSY,
-	FILE_NO_SUPPORT
+	FILE_NO_SUPPORT,
+	FILE_BAD_MODE,
+	FILE_NOT_DIR,
 };
 
 struct file_info_t {
@@ -45,7 +54,11 @@ struct file_info_t {
 };
 
 struct dir_info_t {
-	const char* name;
+	uint64_t inode_num;
+	uint64_t seek_pos;
+	uint16_t rec_len;
+	uint8_t type;
+	char name[256];
 };
 
 typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, char*);
@@ -67,6 +80,8 @@ typedef enum file_status_t (*fs_read_dir_t)(struct file_handle_t*, struct dir_in
 
 typedef enum file_status_t (*fs_create_dir_t)(struct file_handle_t*, const char*);
 typedef enum file_status_t (*fs_delete_dir_t)(struct file_handle_t*);
+
+typedef uint8_t (*fs_is_interactive_t)(struct file_handle_t*);
 
 void fs_init(void);
 
@@ -90,7 +105,7 @@ enum file_status_t fs_mount(
 		fs_delete_dir_t delete_dir
 		);
 
-extern struct fs_handle_t* fs_open(const char* path);
+extern struct fs_handle_t* fs_open(const char* path, uint8_t mode);
 extern void fs_close(struct fs_handle_t* handle);
 
 extern enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
@@ -108,5 +123,7 @@ extern enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_inf
 
 extern enum file_status_t fs_create_dir(struct fs_handle_t* handle, const char* name);
 extern enum file_status_t fs_delete_dir(struct fs_handle_t* handle);
+
+extern uint8_t fs_is_interactive(struct fs_handle_t* handle);
 
 #endif /* KERNEL_CORE_FS_H */

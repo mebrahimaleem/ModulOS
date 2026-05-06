@@ -33,6 +33,7 @@
 #include <kernel/lib/kmemcmp.h>
 #include <kernel/lib/kmemcpy.h>
 #include <kernel/lib/kmemset.h>
+#include <kernel/lib/kstrlen.h>
 
 #define SUPERBLOCK_LBA			2
 #define SUPERBLOCK_SECTORS	2
@@ -42,19 +43,17 @@
 #define INDIR_2						13
 #define INDIR_3						14
 
-#define BLOCK_OK		0
-#define BLOCK_RETRY	1
-#define BLOCK_LAST	2
-#define BLOCK_ERROR	3
-
-#define EXT2_FT_DIR	2
-
 #define EXT2_SUPER_MAGIC	0xEF53
 
 #define EXT2_ROOT_INO			2
 
 #define EXT2_S_IFREG	0x8000
 #define EXT2_S_IFDIR	0x4000
+
+#define EXT2_FT_REG_FILE	1
+#define EXT2_FT_DIR				2
+
+#define MODE_DIR			0x1
 
 struct ext2_superblock_t {
 	uint32_t s_inodes_count;
@@ -176,13 +175,13 @@ struct ext2_inode_handle_t {
 	uint64_t inode_index;
 	uint64_t seek;
 	uint64_t seek_block;
+	uint8_t ext2_mode;
 };
 
-struct ext2_block_track_t {
-	struct ext2_inode_handle_t* handle;
-	struct ext2_inode_t* inode;
-	uint64_t off;
-	uint64_t block;
+enum ext2_block_state_t {
+	BLOCK_OK,
+	BLOCK_SPARSE,
+	BLOCK_ERROR
 };
 
 static uint8_t label_rootfs[16] = {'r', 'o', 'o', 't', 'f', 's', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -200,6 +199,24 @@ static void* read_block(uint64_t block, struct ext2_t* ext2) {
 
 	if (disk_read(ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
 		logging_log_error("Failed to read");
+		kfree(buffer);
+		return 0;
+	}
+
+	return buffer;
+}
+
+static void* write_block(uint64_t block, struct ext2_t* ext2, void* buffer) {
+	const uint64_t block_size = ext2->block_size;
+
+	const uint64_t lba = ext2->start_lba + block * block_size / SECTOR_SIZE;
+
+	if (lba > ext2->end_lba) {
+		logging_log_error("Attempt to write beyond ext2 end lba (0x%x > 0x%x)", lba, ext2->end_lba);
+	}
+
+	if (disk_write(ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
+		logging_log_error("Failed to write");
 		kfree(buffer);
 		return 0;
 	}
@@ -232,94 +249,115 @@ static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct 
 	return 0;
 }
 
-static uint8_t get_block_index(struct ext2_block_track_t* bt, uint64_t* index) {
-	uint64_t block = bt->block;
-	struct ext2_inode_t* inode = bt->inode;
-	struct ext2_t* ext2 = bt->handle->ext2;
+__attribute__((unused)) //TODO: remove
+static uint8_t set_inode(const struct ext2_inode_handle_t* inode_handle, struct ext2_inode_t* inode) {
+	const struct ext2_superblock_t* superblock = inode_handle->ext2->superblock;
+	const struct ext2_bg_desc_t* bgdt = inode_handle->ext2->bgdt;
 
+	const uint64_t block_size = inode_handle->ext2->block_size;
+	const uint64_t block_group = (inode_handle->inode_index - 1) / superblock->s_inodes_per_group;
+	const uint64_t lcl_inode_idx = (inode_handle->inode_index - 1) % superblock->s_inodes_per_group;
+	const uint64_t lcl_inode_off = lcl_inode_idx * superblock->s_inode_size;
+	const uint64_t lcl_inode_blk = lcl_inode_off / block_size;
+	const uint64_t inode_off = lcl_inode_off % block_size;
 
-	if (block < DIRECT_BLOCKS) {
-		*index = inode->i_block[block];
+	const uint64_t inode_table_block = bgdt[block_group].bg_inode_table + lcl_inode_blk;
+	void* buffer = read_block(inode_table_block, inode_handle->ext2);
 
-		if (!*index) {
-			bt->block += 1;
-			return BLOCK_RETRY;
+	if (!buffer) {
+		logging_log_error("Failed to read inode %lu", inode_handle->inode_index);
+		kfree(buffer);
+		return 1;
+	}
+
+	*(struct ext2_inode_t*)((uint64_t)buffer + inode_off) = *inode;
+
+	if (!write_block(inode_table_block, inode_handle->ext2, buffer)) {
+		logging_log_error("Failed to write inode %lu", inode_handle->inode_index);
+		kfree(buffer);
+		return 1;
+	}
+
+	kfree(buffer);
+	return 0;
+}
+
+static enum ext2_block_state_t get_block(struct ext2_t* ext2,
+																	struct ext2_inode_t* inode,
+																	uint64_t index,
+																	uint64_t* block) {
+	if (index < DIRECT_BLOCKS) {
+		*block = inode->i_block[index];
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
-
 		return BLOCK_OK;
 	}
 
-	block -= DIRECT_BLOCKS;
+	index -= DIRECT_BLOCKS;
 
+	uint32_t* buffer;
 	const uint64_t block_size = ext2->block_size;
 	const uint64_t indir1 = block_size / sizeof(uint32_t);
 
-	uint32_t* buffer;
+	if (index < indir1) {
+		*block = inode->i_block[INDIR_1];
 
-	if (block < indir1) {
-		*index = inode->i_block[INDIR_1];
-
-		if (!*index) {
-			bt->block += indir1;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
-		buffer = read_block(*index, ext2);
+		buffer = read_block(*block, ext2);
 
 		if (!buffer) {
 			return BLOCK_ERROR;
 		}
 
-		*index = buffer[block];
+		*block = buffer[index];
 		kfree(buffer);
 
-		if (!*index) {
-			bt->block += 1;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
 		return BLOCK_OK;
 	}
 
-	block -= indir1;
+	index -= indir1;
 
 	const uint64_t indir2 = indir1 * indir1;
 
+	if (index < indir2) {
+		*block = inode->i_block[INDIR_2];
 
-	if (block < indir2) {
-		*index = inode->i_block[INDIR_2];
-
-		if (!*index) {
-			bt->block += indir2;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
-		buffer = read_block(*index, ext2);
+		buffer = read_block(*block, ext2);
 
 		if (!buffer) {
 			return BLOCK_ERROR;
 		}
 
-		*index = buffer[block / indir1];
+		*block = buffer[index / indir1];
 		kfree(buffer);
 
-		if (!*index) {
-			bt->block += indir1;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
-		buffer = read_block(*index, ext2);
+		buffer = read_block(*block, ext2);
 
 		if (!buffer) {
 			return BLOCK_ERROR;
 		}
 
-		*index = buffer[block % indir1];
+		*block = buffer[index % indir1];
 		kfree(buffer);
 
-		if (!*index) {
-			bt->block += 1;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
 		return BLOCK_OK;
@@ -329,60 +367,56 @@ static uint8_t get_block_index(struct ext2_block_track_t* bt, uint64_t* index) {
 
 	const uint64_t indir3 = indir2 * indir1;
 
-	if (block < indir3) {
-		*index = inode->i_block[INDIR_3];
+	if (index < indir3) {
+		*block = inode->i_block[INDIR_3];
 
-		if (!*index) {
-			bt->block += indir3;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
-		buffer = read_block(*index, ext2);
+		buffer = read_block(*block, ext2);
 
 		if (!buffer) {
 			return BLOCK_ERROR;
 		}
 
-		*index = buffer[block / indir2];
+		*block = buffer[index / indir2];
 		kfree(buffer);
 
-		if (!*index) {
-			bt->block += indir2;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
-		buffer = read_block(*index, ext2);
+		buffer = read_block(*block, ext2);
 
 		if (!buffer) {
 			return BLOCK_ERROR;
 		}
 
-		*index = buffer[(block % indir2) / indir1];
+		*block = buffer[(index % indir2) / indir1];
 		kfree(buffer);
 
-		if (!*index) {
-			bt->block += indir1;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
-		buffer = read_block(*index, ext2);
+		buffer = read_block(*block, ext2);
 
 		if (!buffer) {
 			return BLOCK_ERROR;
 		}
 
-		*index = buffer[block % indir1];
+		*block = buffer[index % indir1];
 		kfree(buffer);
 
-		if (!*index) {
-			bt->block += 1;
-			return BLOCK_RETRY;
+		if (!*block) {
+			return BLOCK_SPARSE;
 		}
 
 		return BLOCK_OK;
 	}
 
-	return BLOCK_LAST;
+	return BLOCK_ERROR;
 }
 
 static inline size_t path_entry_len(char* path) {
@@ -395,112 +429,11 @@ static inline size_t path_entry_len(char* path) {
 	return len;
 }
 
+static uint64_t ext2_get_seek(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	const uint64_t block_size = inode_handle->ext2->block_size;
 
-static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
-	struct ext2_inode_t inode;
-	size_t path_len;
-	struct ext2_block_track_t track;
-	uint64_t block_index;
-	uint8_t cntrl = 0;
-
-
-	track.handle = kmalloc(sizeof(struct ext2_inode_handle_t));
-
-	if (!track.handle) {
-		return 0;
-	}
-
-	track.handle->ext2 = (struct ext2_t*)cntx;
-	track.handle->inode_index = EXT2_ROOT_INO;
-	track.handle->seek = 0;
-	track.handle->seek_block = 0;
-
-	const uint64_t block_size = track.handle->ext2->block_size;
-	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
-	void* buffer;
-
-	while (*path && cntrl != 2) {
-		path_len = path_entry_len(path);
-
-		if (get_inode(track.handle, &inode)) {
-			return 0;
-		}
-
-		track.inode = &inode;
-		track.block = 0;
-		track.off = 0;
-
-		cntrl = 1;
-		while (cntrl == 1) {
-			if (track.block * block_size > size) {
-				cntrl = 2;
-				break;
-			}
-
-			if (track.off >= block_size) {
-				track.block++;
-				track.off = 0;
-			}
-
-			switch (get_block_index(&track, &block_index)) {
-				case BLOCK_OK:
-					buffer = read_block(block_index, track.handle->ext2);
-					if (!buffer) {
-						kfree(track.handle);
-						return 0;
-					}
-
-					struct ext2_ll_dir_entry_t* entry = (struct ext2_ll_dir_entry_t*)((uint64_t)buffer + track.off);
-
-					if (entry->inode != 0) {
-						if (entry->name_len == path_len && !kmemcmp(entry->name, path, path_len)) {
-							path += path_len;
-
-							// handle non EOS
-							if (*path == '/') {
-								path++;
-							}
-
-							track.handle->inode_index = entry->inode;
-
-							if (*path && entry->file_type != EXT2_FT_DIR) {
-								cntrl = 2; // file not found
-							}
-							else {
-								cntrl = 0;
-							}
-
-							kfree(buffer);
-							break;
-						}
-					}
-
-					track.off += entry->rec_len;
-					kfree(buffer);
-					__attribute__((fallthrough));
-				case BLOCK_RETRY:
-					continue;
-				case BLOCK_LAST:
-					cntrl = 2; // file not found
-					break;
-				case BLOCK_ERROR:
-				default:
-					kfree(track.handle);
-					return 0;
-			}
-		}
-	}
-
-	if (*path || cntrl == 2) {
-		kfree(track.handle); // file not found
-		return 0;
-	}
-
-	return (struct file_handle_t*)track.handle;
-}
-
-static void ext2_close(struct file_handle_t* handle) {
-	kfree(handle);
+	return inode_handle->seek_block * block_size + inode_handle->seek;
 }
 
 static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_info_t* info) {
@@ -526,18 +459,164 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 	return FILE_OK;
 }
 
-static uint64_t ext2_get_seek(struct file_handle_t* handle) {
+static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	const uint64_t block_size = inode_handle->ext2->block_size;
 
-	return inode_handle->seek_block * block_size + inode_handle->seek;
+	struct file_info_t info;
+	ext2_stat(handle, &info);
+
+	if (info.type != FILE_TYPE_DIR) {
+		return FILE_NOT_DIR;
+	}
+
+	inode_handle->seek = 0;
+	inode_handle->seek_block = 0;
+	inode_handle->ext2_mode |= MODE_DIR;
+	return FILE_OK;
+}
+
+
+static void ext2_close_dir(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+
+	inode_handle->seek = 0;
+	inode_handle->seek_block = 0;
+	inode_handle->ext2_mode &= ~MODE_DIR;
+}
+
+static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	struct ext2_inode_t inode;
+
+	if (!(inode_handle->ext2_mode & MODE_DIR)) {
+		return FILE_BAD_MODE;
+	}
+
+	if (get_inode(inode_handle, &inode)) {
+		return FILE_ERROR;
+	}
+
+	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	uint64_t block;
+
+	while (1) {
+		info->seek_pos = ext2_get_seek(handle);
+
+		if (info->seek_pos >= size) {
+			return FILE_DNE;
+		}
+
+		switch (get_block(inode_handle->ext2, &inode, inode_handle->seek_block, &block)) {
+			case BLOCK_OK:
+				void* buffer = read_block(block, inode_handle->ext2);
+
+				if (!buffer) {
+					return FILE_ERROR;
+				}
+
+				struct ext2_ll_dir_entry_t* entry = (struct ext2_ll_dir_entry_t*)((uint64_t)buffer + inode_handle->seek);
+
+				inode_handle->seek += entry->rec_len;
+				if (inode_handle->seek >= inode_handle->ext2->block_size) {
+					inode_handle->seek_block++;
+					inode_handle->seek = 0;
+				}
+
+				if (entry->inode != 0) {
+					info->inode_num = entry->inode;
+					info->rec_len = entry->rec_len;
+
+					switch (entry->file_type) {
+						case EXT2_FT_REG_FILE:
+							info->type = FILE_INFO_REG;
+							break;
+						case EXT2_FT_DIR:
+							info->type = FILE_INFO_DIR;
+							break;
+						default:
+							info->type = FILE_INFO_UNK;
+							break;
+					}
+
+					kmemcpy(info->name, entry->name, entry->name_len);
+					info->name[entry->name_len] = 0;
+
+					kfree(buffer);
+					return FILE_OK;
+				}
+
+				kfree(buffer);
+				continue;
+			case BLOCK_SPARSE:
+				inode_handle->seek_block++;
+				inode_handle->seek = 0;
+				continue;
+			case BLOCK_ERROR:
+				return FILE_ERROR;
+		}
+	}
+}
+
+static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
+	size_t path_len;
+	uint8_t cntrl = 0;
+
+	struct ext2_inode_handle_t* handle = kmalloc(sizeof(struct ext2_inode_handle_t));
+	handle->ext2 = (struct ext2_t*)cntx;
+	handle->inode_index = EXT2_ROOT_INO;
+	handle->ext2_mode = 0;
+
+	struct dir_info_t info;
+
+	while (*path) {
+		if (ext2_open_dir((struct file_handle_t*)handle) != FILE_OK) {
+			break;
+		}
+
+		path_len = path_entry_len(path);
+
+		cntrl = 1;
+		while (ext2_read_dir((struct file_handle_t*)handle, &info) == FILE_OK) {
+			if (path_len == kstrlen(info.name) && kmemcmp(path, info.name, path_len) == 0) {
+				cntrl = 0;
+				ext2_close_dir((struct file_handle_t*)handle);
+				handle->inode_index = info.inode_num;
+				break;
+			}
+		}
+
+		if (cntrl) {
+			break; // file not found
+		}
+
+		path += path_len;
+
+		// handle non EOS
+		if (*path == '/') {
+			path++;
+		}
+	}
+
+	ext2_close_dir((struct file_handle_t*)handle);
+
+	if (*path) {
+		// file not found
+		kfree(handle);
+		return 0;
+	}
+
+	return (struct file_handle_t*)handle;
+}
+
+static void ext2_close(struct file_handle_t* handle) {
+	kfree(handle);
 }
 
 static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count) {
 	struct ext2_inode_t inode;
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	struct ext2_block_track_t track;
 	uint8_t* block_buffer = 0;
+	uint64_t block;
 
 	if (!inode_handle || get_inode(inode_handle, &inode)) {
 		return 0;
@@ -547,21 +626,13 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 	const uint64_t block_size = inode_handle->ext2->block_size;
 
 	size_t read = 0;
-	uint64_t index;
 	uint64_t write_seek = 0;
 	size_t write_len;
 	uint64_t full_seek = ext2_get_seek(handle);
 
-	if (full_seek > size) {
-		return 0;
-	}
 
 	while (count) {
-		track.block = inode_handle->seek_block;
-		track.inode = &inode;
-		track.handle = inode_handle;
-
-		if (track.block * block_size > size) {
+		if (full_seek > size) {
 			break;
 		}
 
@@ -577,9 +648,9 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 			write_len = block_size - inode_handle->seek;
 		}
 
-		switch (get_block_index(&track, &index)) {
+		switch (get_block(inode_handle->ext2, &inode, inode_handle->seek_block, &block)) {
 			case BLOCK_OK:
-				block_buffer = read_block(index, inode_handle->ext2);
+				block_buffer = read_block(block, inode_handle->ext2);
 
 				if (!block_buffer) {
 					return read;
@@ -595,10 +666,10 @@ static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count
 
 				kfree(block_buffer);
 				break;
-			case BLOCK_RETRY:
+			case BLOCK_SPARSE:
 				kmemset((uint8_t*)buffer + write_seek, 0, write_len);
 				break;
-			default:
+			case BLOCK_ERROR:
 				return read;
 		}
 
@@ -659,21 +730,6 @@ static enum file_status_t ext2_delete(struct file_handle_t* handle) {
 
 static void ext2_delete_final(struct file_handle_t* handle) {
 	(void)handle;
-}
-
-static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
-	(void)handle;
-	return FILE_NO_SUPPORT;
-}
-
-static void ext2_close_dir(struct file_handle_t* handle) {
-	(void)handle;
-}
-
-static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
-	(void)handle;
-	(void)info;
-	return FILE_NO_SUPPORT;
 }
 
 static enum file_status_t ext2_create_dir(struct file_handle_t* handle, const char* name) {

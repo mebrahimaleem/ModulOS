@@ -87,10 +87,9 @@ int sys_anon_free(void *pointer, size_t size) {
 }
 
 int sys_open(const char *pathname, int flags, mode_t mode, int *fd) {
-	(void)flags;
 	(void)mode;
 
-	int f = syscall_1((uint64_t)pathname, 0, 0, SYSCALL_OPEN);
+	int f = syscall_1((uint64_t)pathname, flags, 0, SYSCALL_OPEN);
 	if (!f) {
 		return 1;
 	}
@@ -156,14 +155,11 @@ int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
 }
 
 int sys_isatty(int fd) {
-	switch (fd) {
-		case stdout:
-		case stdin:
-		case stderr:
-			return 0; //mlibc expects 0 for tty
-		default:
-			return ENOTTY;
+	if (syscall_1(fd, 0, 0, SYSCALL_IS_A_TTY)) {
+		return 0; //mlibc expects 0 for tty
 	}
+
+	return ENOTTY;
 }
 
 int sys_clock_get(int clock, time_t *secs, long *nanos) {

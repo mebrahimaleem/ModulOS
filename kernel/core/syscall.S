@@ -79,6 +79,7 @@ syscall_handlers:
 .quad syscall_dispatch_create_dir
 .quad syscall_dispatch_delete_dir
 .quad syscall_dispatch_epoch_time
+.quad syscall_dispatch_is_a_tty
 
 .set num_entries, . - syscall_handlers
 .if num_entries != SYSCALL_MAX * 8

@@ -203,7 +203,7 @@ void prepare_userland(void* cntx) {
 	init_done = 1;
 	lock_release(&prepare_userland_lock);
 
-	struct fs_handle_t* shell = fs_open("/bin/shell");
+	struct fs_handle_t* shell = fs_open("/bin/shell", FILE_MODE_READ);
 	if (!shell) {
 		logging_log_error("Failed to open shell file");
 	}

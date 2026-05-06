@@ -58,5 +58,6 @@ extern DECLARE_SYSCALL(tell);
 extern DECLARE_SYSCALL(create_dir);
 extern DECLARE_SYSCALL(delete_dir);
 extern DECLARE_SYSCALL(epoch_time);
+extern DECLARE_SYSCALL(is_a_tty);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

@@ -128,9 +128,9 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 
 	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
 
-	pcb->fd_table[0] = fs_open("/dev/ttyS0");
-	pcb->fd_table[1] = fs_open("/dev/ttyS0");
-	pcb->fd_table[2] = fs_open("/dev/ttyS0");
+	pcb->fd_table[0] = fs_open("/dev/ttyS0", FILE_MODE_READ);
+	pcb->fd_table[1] = fs_open("/dev/ttyS0", FILE_MODE_WRITE);
+	pcb->fd_table[2] = fs_open("/dev/ttyS0", FILE_MODE_WRITE);
 
 	return pcb;
 }

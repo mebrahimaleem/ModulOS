@@ -43,6 +43,7 @@
 
 /*
  * rdi: path (const char*)
+ * rsi: mode (uint8_t)
  * ret: handle (int)
  */
 #define SYSCALL_OPEN				1
@@ -136,8 +137,14 @@
 /*
  * ret: time since epoch in nanos (long int)
  */
-#define SYSCALL_EPOCH_TIME		15
+#define SYSCALL_EPOCH_TIME	15
 
-#define SYSCALL_MAX					16
+/*
+ * rdi: handle (int)
+ * ret: 1 on tty. 0 otherwise
+ */
+#define SYSCALL_IS_A_TTY		16
+
+#define SYSCALL_MAX					17
 
 

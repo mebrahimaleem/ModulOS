@@ -72,6 +72,7 @@ struct vfs_mount_t {
 	fs_read_dir_t read_dir;
 	fs_create_dir_t create_dir;
 	fs_delete_dir_t delete_dir;
+	fs_is_interactive_t is_interactive;
 };
 
 struct vfs_open_file_t {
@@ -86,6 +87,7 @@ struct fs_handle_t {
 	struct vfs_mount_t* mount;
 	struct file_handle_t* handle;
 	struct vfs_open_file_t* shared;
+	uint8_t mode;
 };
 
 struct vfs_tree_node_t {
@@ -116,8 +118,14 @@ static struct vfs_mount_t dev_mount = {
 	.delete_final = devfs_delete_final,
 	.open_dir = devfs_open_dir,
 	.close_dir = devfs_close_dir,
-	.read_dir = devfs_read_dir
+	.read_dir = devfs_read_dir,
+	.is_interactive = devfs_is_interactive
 };
+
+static uint8_t fs_not_interactive(struct file_handle_t* handle) {
+	(void)handle;
+	return 0;
+}
 
 static inline char* path_next(char* path, size_t* len) {
 	*len = 0;
@@ -240,6 +248,8 @@ enum file_status_t fs_mount(
 		vfs_root.mount->create_dir = create_dir;
 		vfs_root.mount->delete_dir = delete_dir;
 
+		vfs_root.mount->is_interactive = fs_not_interactive;
+
 		return FILE_OK;
 	}
 
@@ -336,7 +346,7 @@ static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void**
 	return mount_path;
 }
 
-struct fs_handle_t* fs_open(const char* path) {
+struct fs_handle_t* fs_open(const char* path, uint8_t mode) {
 	struct vfs_mount_t* mount;
 	void* clean_path;
 	char* path_write;
@@ -363,6 +373,7 @@ struct fs_handle_t* fs_open(const char* path) {
 	fs_handle->handle = handle;
 	fs_handle->mount = mount;
 	fs_handle->shared = open_file;
+	fs_handle->mode = mode;
 	return fs_handle;
 }
 
@@ -394,6 +405,10 @@ enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info)
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
+	if (!(handle->mode & FILE_MODE_READ)) {
+		return 0;
+	}
+
 	lock_acquire(&handle->shared->lock);
 	ret = handle->mount->read(handle->handle, buffer, count);
 	lock_release(&handle->shared->lock);
@@ -423,6 +438,10 @@ enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 
 size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
+
+	if (!(handle->mode & FILE_MODE_WRITE)) {
+		return 0;
+	}
 
 	lock_release(&handle->shared->lock);
 	ret = handle->mount->write(handle->handle, buffer, count);
@@ -501,4 +520,8 @@ enum file_status_t fs_delete_dir(struct fs_handle_t* handle) {
 	lock_release(&handle->shared->lock);
 
 	return sts;
+}
+
+uint8_t fs_is_interactive(struct fs_handle_t* handle) {
+	return handle->mount->is_interactive(handle->handle);
 }

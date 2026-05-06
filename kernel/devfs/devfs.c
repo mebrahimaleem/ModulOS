@@ -27,12 +27,12 @@
 #include <lib/kmemcmp.h>
 
 struct dev_handle_t {
-	enum {
-		DEV_TYPE_TTY
-	} type;
 	union {
 		struct tty_handle_t* tty;
 	} dev_handle;
+	enum {
+		DEV_TYPE_TTY
+	} type;
 };
 
 struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, char* path) {
@@ -184,4 +184,17 @@ enum file_status_t devfs_delete_dir(struct file_handle_t* handle) {
 	(void)handle;
 
 	return FILE_NO_SUPPORT;
+}
+
+uint8_t devfs_is_interactive(struct file_handle_t* handle) {
+	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
+
+	if (!dev_handle) {
+		return FILE_ERROR;
+	}
+
+	switch (dev_handle->type) {
+		case DEV_TYPE_TTY:
+			return 1;
+	}
 }

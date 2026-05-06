@@ -43,4 +43,6 @@ extern enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct di
 extern enum file_status_t devfs_create_dir(struct file_handle_t* handle, const char* name);
 extern enum file_status_t devfs_delete_dir(struct file_handle_t* handle);
 
+extern uint8_t devfs_is_interactive(struct file_handle_t* handle);
+
 #endif /* KERNEL_DEVFS_DEVFS_H */
