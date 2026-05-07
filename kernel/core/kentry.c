@@ -194,6 +194,10 @@ void kapentry(uint64_t arb_id) {
 void prepare_userland(void* cntx) {
 	(void)cntx;
 
+	struct fs_handle_t* f = fs_open("/", FILE_MODE_READ | FILE_MODE_WRITE);
+	fs_create(f, "test.txt");
+	fs_close(f);
+
 	lock_acquire(&prepare_userland_lock);
 	if (init_done) {
 		logging_log_error("Multiple calls to prepare userland");

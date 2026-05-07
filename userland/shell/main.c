@@ -24,5 +24,9 @@ int main(int argc, char** argv) {
 
 	printf("Shell\n");
 
+	FILE* f = fopen("/test.txt", "w");
+	fprintf(f, "Hello, World\n");
+	fclose(f);
+
 	return EXIT_SUCCESS;
 }
