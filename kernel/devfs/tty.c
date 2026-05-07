@@ -97,7 +97,7 @@ struct tty_handle_t* tty_com2(void) {
 }
 #endif /* SERIAL */
 
-struct tty_handle_t* tty_open(char* name) {
+struct tty_handle_t* tty_open(const char* name) {
 #ifdef SERIAL
 	if (!kstrcmp(name, "S0")) {
 		// COM1

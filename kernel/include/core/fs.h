@@ -61,7 +61,7 @@ struct dir_info_t {
 	char name[256];
 };
 
-typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, char*);
+typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, const char*);
 typedef void (*fs_close_t)(struct file_handle_t*);
 
 typedef enum file_status_t (*fs_stat_t)(struct file_handle_t*, struct file_info_t*);

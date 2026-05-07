@@ -23,7 +23,7 @@
 
 #include <kernel/core/fs.h>
 
-extern struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, char* path);
+extern struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path);
 extern void devfs_close(struct file_handle_t* handle);
 
 extern enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_info_t* info);

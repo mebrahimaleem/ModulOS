@@ -35,7 +35,7 @@ struct dev_handle_t {
 	} type;
 };
 
-struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, char* path) {
+struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path) {
 	(void)cntx;
 	struct dev_handle_t* dev_handle;
 

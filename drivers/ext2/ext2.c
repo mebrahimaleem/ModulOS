@@ -209,24 +209,32 @@ static void* read_block(uint64_t block, struct ext2_t* ext2) {
 	return buffer;
 }
 
-static void* write_block(uint64_t block, struct ext2_t* ext2, void* buffer) {
+static void* write_block_free(uint64_t block, struct ext2_t* ext2, void* buffer, uint8_t free) {
 	const uint64_t block_size = ext2->block_size;
 
 	const uint64_t lba = ext2->start_lba + block * block_size / SECTOR_SIZE;
 
 	if (lba > ext2->end_lba) {
 		logging_log_error("Attempt to write beyond ext2 end lba (0x%x > 0x%x)", lba, ext2->end_lba);
-		kfree(buffer);
+		if (free) {
+			kfree(buffer);
+		}
 		return 0;
 	}
 
 	if (disk_write(ext2->disk, buffer, lba, (uint16_t)(block_size / SECTOR_SIZE)) != DISK_OK) {
 		logging_log_error("Failed to write");
-		kfree(buffer);
+		if (free) {
+			kfree(buffer);
+		}
 		return 0;
 	}
 
 	return buffer;
+}
+
+static inline void* write_block(uint64_t block, struct ext2_t* ext2, void* buffer) {
+	return write_block_free(block, ext2, buffer, 1);
 }
 
 static uint8_t get_inode(const struct ext2_inode_handle_t* inode_handle, struct ext2_inode_t* inode) {
@@ -402,7 +410,7 @@ static uint32_t alloc_and_zero_block(struct ext2_t* ext2, void* zeros, uint64_t 
 	uint32_t block = alloc_block(ext2, group);
 
 	if (block) {
-		write_block(block, ext2, zeros);
+		write_block_free(block, ext2, zeros, 0);
 	}
 
 	return block;
@@ -801,7 +809,7 @@ static enum ext2_block_state_t get_block(struct ext2_t* ext2,
 	return BLOCK_ERROR;
 }
 
-static inline size_t path_entry_len(char* path) {
+static inline size_t path_entry_len(const char* path) {
 	size_t len = 0;
 
 	for (; *path && *path != '/'; path++) {
@@ -948,7 +956,7 @@ static struct ext2_inode_handle_t* ext2_duplicate(struct ext2_inode_handle_t* ha
 	return dup;
 }
 
-static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, char* path) {
+static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* path) {
 	size_t path_len;
 	uint8_t cntrl = 0;
 

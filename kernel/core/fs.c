@@ -260,9 +260,9 @@ enum file_status_t fs_mount(
 	return FILE_ERROR;
 }
 
-static char* find_mount(const char* path, struct vfs_mount_t** mount_out, void** clean_path_out, char** path_write_out) {
+static const char* find_mount(const char* path, struct vfs_mount_t** mount_out, void** clean_path_out, char** path_write_out) {
 	struct vfs_tree_node_t* node = &vfs_root, * walk = 0;
-	char* mount_path = (char*)"";
+	const char* mount_path = "";
 	struct vfs_mount_t* mount = 0;
 
 	size_t len = kstrlen(path);
@@ -352,7 +352,7 @@ struct fs_handle_t* fs_open(const char* path, uint8_t mode) {
 	struct vfs_mount_t* mount;
 	void* clean_path;
 	char* path_write;
-	char* mount_path = find_mount(path, &mount, &clean_path, &path_write);
+	const char* mount_path = find_mount(path, &mount, &clean_path, &path_write);
 
 	if (!mount) {
 		kfree(clean_path);
