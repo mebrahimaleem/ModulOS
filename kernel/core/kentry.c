@@ -85,6 +85,21 @@ static inline void write_syscall_msr(void) {
 	msr_write(MSR_FMASK, RFL_MASK);
 }
 
+#ifdef DEBUG_LOGGING
+#define LOG_DELAY_MS	5000
+
+__attribute__((noreturn)) static void periodic_logging(void* _ign) {
+	(void)_ign;
+
+	while (1) {
+		mm_log_usage();
+		alloc_log_usage();
+
+		time_sleep(LOG_DELAY_MS);
+	}
+}
+#endif /* DEBUG_LOGGING */
+
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
 
@@ -135,7 +150,6 @@ void kentry(void) {
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
-	mm_transaction_init();
 	tty_init();
 	pcie_init();
 	pcie_enumerate();
@@ -154,6 +168,13 @@ void kentry(void) {
 #endif /* SMP_ENABLE */
 
 	logging_log_info("AP bootstrap sequence done");
+
+	mm_transaction_init();
+	process_init_reaper();
+
+#ifdef DEBUG_LOGGING
+	scheduler_schedule(process_from_func(periodic_logging, 0));
+#endif /* DEBUG_LOGGING */
 
 	process_kill_current();
 }

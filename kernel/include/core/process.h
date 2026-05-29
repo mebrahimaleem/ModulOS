@@ -145,4 +145,10 @@ extern void process_sleep(uint64_t wake_time);
 
 extern void process_set_callback(void (*callback)(struct pcb_t*));
 
+extern uint64_t process_fork(uint64_t r11, uint64_t rcx, uint64_t rbp);
+
+extern void process_fork_internal(struct pcb_t* pcb);
+
+extern void process_init_reaper(void);
+
 #endif /* KERNEL_CORE_PROCESS_H */

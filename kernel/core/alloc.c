@@ -73,6 +73,14 @@ _Static_assert(sizeof(struct alloc_arena_t) % ALLOC_ALIGN == 0, "Bad arena metad
 static struct alloc_arena_t* arena_head;
 static uint8_t alloc_lock;
 
+#ifdef DEBUG_LOGGING
+static uint64_t num_arena;
+static uint64_t bytes_allocated;
+
+static uint64_t prev_num_arena;
+static uint64_t prev_bytes_allocated;
+#endif /* DEBUG_LOGGING */
+
 static inline struct alloc_header_t* get_next(struct alloc_header_t* header) {
 	return IS_LAST(header->size) ? 0 : (struct alloc_header_t*)((uint64_t)header + GET_SIZE(header->size));
 }
@@ -97,6 +105,14 @@ void alloc_init() {
 	lock_init(&alloc_lock);
 
 	arena_head = 0;
+
+#ifdef DEBUG_LOGGING
+	num_arena = 0;
+	bytes_allocated = 0;
+
+	prev_num_arena = 0;
+	prev_bytes_allocated = 0;
+#endif /* DEBUG_LOGGING */
 }
 
 static void patch_list(struct alloc_arena_t* arena, struct alloc_header_t* header) {
@@ -163,6 +179,10 @@ static void* alloc(struct alloc_arena_t* arena, struct alloc_header_t* header, s
 
 	header->next_free.arena = arena;
 
+#ifdef DEBUG_LOGGING
+	bytes_allocated += size;
+#endif /* DEBUG_LOGGING */
+
 	return (void*)((uint64_t)header + sizeof(struct alloc_header_t));
 }
 
@@ -216,6 +236,10 @@ next_arena:
 		return 0;
 	}
 
+#ifdef DEBUG_LOGGING
+	num_arena++;
+#endif /* DEBUG_LOGGING */
+
 	arena_base = paging_ident(arena_base);
 
 	i = (struct alloc_arena_t*)arena_base;
@@ -262,6 +286,10 @@ void kfree(void* ptr) {
 
 	header->size = GET_SIZE(header->size) | TYPE_HEADER_FREE | (header->size & MASK_HEADER_LAST);
 
+#ifdef DEBUG_LOGGING
+	bytes_allocated -= GET_SIZE(header->size) - sizeof(struct alloc_header_t);
+#endif /* DEBUG_LOGGING */
+
 	next = get_next(header);
 
 	// coallecse with prev
@@ -273,6 +301,10 @@ void kfree(void* ptr) {
 		if (next) {
 			next->prev = header;
 		}
+
+#ifdef DEBUG_LOGGING
+		bytes_allocated -= sizeof(struct alloc_header_t);
+#endif /* DEBUG_LOGGING */
 	}
 	else {
 		// insert into free list's begining
@@ -297,6 +329,10 @@ void kfree(void* ptr) {
 		if (next) {
 			next->prev = header;
 		}
+
+#ifdef DEBUG_LOGGING
+		bytes_allocated -= sizeof(struct alloc_header_t);
+#endif /* DEBUG_LOGGING */
 	}
 
 	lock_release(&arena->arena_lock);
@@ -305,3 +341,25 @@ void kfree(void* ptr) {
 	alloc_check();
 #endif /* CHECK_ALLOC */
 }
+
+#ifdef DEBUG_LOGGING
+void alloc_log_usage(void) {
+	const char* a_s = "";
+	const char* b_s = "";
+
+	if (num_arena > prev_num_arena) {
+		a_s = "+";
+	}
+
+	if (bytes_allocated > prev_bytes_allocated) {
+		b_s = "+";
+	}
+
+	logging_log_debug("Heap - Arenas: %lu (%s%ld). Bytes Allocated %lu (%s%ld)",
+			num_arena, a_s, num_arena - prev_num_arena,
+			bytes_allocated, b_s, bytes_allocated - prev_bytes_allocated);
+
+	prev_num_arena = num_arena;
+	prev_bytes_allocated = bytes_allocated;
+}
+#endif /* DEBUG_LOGGING */

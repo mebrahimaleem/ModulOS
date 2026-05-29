@@ -27,13 +27,14 @@
 #include <core/cpu_instr.h>
 
 #include <lib/kmemset.h>
+#include <lib/kmemcpy.h>
 
 #include <apic/ipi.h>
 
 #define PAGE_PS 			0x80
 
-#define PAGE_ADDR_MASK				0x0000FFFFFFFFF000
-#define PAGE_ADDR_PAT_MASK		0x0000FFFFFFFFE000
+#define PAGE_ADDR_MASK				0x0000FFFFFFFFF000uLL
+#define PAGE_ADDR_PAT_MASK		0x0000FFFFFFFFE000uLL
 
 #define GET_PT_INDEX(addr) 		((addr & 0x1FF000) >> 12)
 #define GET_PD_INDEX(addr) 		((addr & 0x3FE00000) >> 21)
@@ -44,6 +45,8 @@
 
 #define PML4_CONSISTENT_START	256
 #define PML4_CONSISTENT_END		512
+
+#define PAGE_KEEP_FLAGS	(PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD | PAGE_PS)
 
 extern uint64_t kernel_pml4[512];
 
@@ -225,16 +228,18 @@ void paging_install_guard(uint64_t vaddr) {
 
 	if (*access & PAGE_PRESENT) {
 		logging_log_error("Cannot install page guard over mapped page");
-		panic(PANIC_STATE);
+		goto cleanup;
 	}
 
 	access = increase_granularity(vaddr, access, lvl, PAGE_4K);
 	if (!access) {
 		logging_log_error("Failed to install page guard");
-		panic(PANIC_STATE);
+		goto cleanup;
 	}
 
 	*access |= AVL_GUARD;
+
+cleanup:
 	lock_release(&paging_lock);
 }
 
@@ -246,8 +251,10 @@ void paging_remove_guard(uint64_t vaddr) {
 	if (lvl != PAGE_4K || !(*access & AVL_GUARD)) {
 		logging_log_error("Attempted to remove guard from ungaurded page @ 0x%x", vaddr);
 	}	
+	else {
+		*access = 0;
+	}
 
-	*access = 0;
 	lock_release(&paging_lock);
 }
 
@@ -296,7 +303,7 @@ static void free_pages(uint64_t entry, enum page_size_t lvl) {
 		}
 	}
 
-	mm_free_p(entry * PAGE_ADDR_MASK, PAGE_SIZE_4K);
+	mm_free_p(entry & PAGE_ADDR_MASK, PAGE_SIZE_4K);
 }
 
 void paging_free_userspace(uint64_t* pml4) {
@@ -309,4 +316,58 @@ void paging_free_userspace(uint64_t* pml4) {
 	}
 
 	mm_free_p((uint64_t)pml4, PAGE_SIZE_4K);
+}
+
+static void copy_pages(uint64_t access_, uint64_t copy_, enum page_size_t lvl) {
+	uint64_t* access = (uint64_t*)paging_ident(access_ & PAGE_ADDR_MASK);
+	uint64_t* copy = (uint64_t*)paging_ident(copy_ & PAGE_ADDR_MASK);
+
+	kmemset((void*)copy, 0, PAGE_SIZE_4K);
+
+	for (uint16_t i = 0; i < 512; i++) {
+		if (access[i] & PAGE_PRESENT) {
+			copy[i] = mm_alloc_p(PAGE_SIZE_4K);
+			copy[i] |= access[i] & PAGE_KEEP_FLAGS;
+
+			if (lvl != PAGE_4K && !(access[i] & PAGE_PS)) {
+				copy_pages(access[i], copy[i], lvl - 1);
+			}
+			else {
+				void* d = (void*)paging_ident(copy[i] & PAGE_ADDR_MASK);
+				void* s = (void*)paging_ident(access[i] & PAGE_ADDR_MASK);
+
+				switch (lvl) {
+					case PAGE_4K:
+						kmemcpy(d, s, PAGE_SIZE_4K);
+						break;
+					case PAGE_2M:
+						kmemcpy(d, s, PAGE_SIZE_2M);
+						break;
+					case PAGE_1G:
+						kmemcpy(d, s, PAGE_SIZE_1G);
+						break;
+					case _PAGE_512G:
+						break;
+				}
+			}
+		}
+	}
+}
+
+uint64_t paging_duplicate_lower(uint64_t cr3) {
+	uint64_t new_cr3 = paging_create_pml4();
+
+	uint64_t* access = (uint64_t*)paging_ident((uint64_t)cr3);
+	uint64_t* copy = (uint64_t*)paging_ident((uint64_t)new_cr3);
+
+	for (uint16_t i = 0; i < PML4_CONSISTENT_START; i++) {
+		if (access[i] & PAGE_PRESENT) {
+			copy[i] = mm_alloc_p(PAGE_SIZE_4K);
+			copy[i] |= access[i] & PAGE_KEEP_FLAGS;
+
+			copy_pages(access[i], copy[i], PAGE_1G);
+		}
+	}
+
+	return new_cr3;
 }

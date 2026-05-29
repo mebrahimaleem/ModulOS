@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <kernel/core/process.h>
+
 #define CANON_HIGH			0xFFFF800000000000
 #define VIRTUAL_LIMIT		IDENT_BASE
 
@@ -62,6 +64,10 @@ extern void mm_transaction_init(void);
 extern struct free_transaction_list_t* mm_get_shootdown_list(void);
 extern void mm_register_barrier(uint8_t id);
 extern void mm_barrier_disarm(uint8_t id);
+
+#ifdef DEBUG_LOGGING
+extern void mm_log_usage(void);
+#endif /* DEBUG_LOGGING */
 
 #endif /* KERNEL_CORE_MM_H */
 

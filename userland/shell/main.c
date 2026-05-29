@@ -18,49 +18,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int fork();
+int getpid();
+
 int main(int argc, char** argv) {
 	(void)argc;
 	(void)argv;
 
-	static char buffer[8];
+	while (1) {
+		printf("Hello from %u\n", getpid());
 
-	printf("Shell\n");
-
-	FILE* f = fopen("/test.txt", "r");
-	if (f == 0) {
-		perror("Failed to open file");
-		return EXIT_FAILURE;
+		if (fork()) {
+			break;
+		}
 	}
 
-	ssize_t bytes_read = fread(buffer, 1, 8, f);
-	if (bytes_read == -1) {
-		perror("Failed to read file");
-		return EXIT_FAILURE;
-	}
-
-	fclose(f);
-
-	printf("Bytes read: %lu\nContent: %s", bytes_read, buffer);
-
-	static char input_buf[64];
-	printf("Enter file name:\n");
-	scanf("%s", input_buf);
-
-	f = fopen(input_buf, "a");
-
-	if (f == 0) {
-		perror("Failed to open file");
-		return EXIT_FAILURE;
-	}
-
-	if (fwrite(buffer, 1, bytes_read, f) != bytes_read) {
-		perror("Failed to write to file");
-		return EXIT_FAILURE;
-	}
-
-	fclose(f);
-
-	printf("Done\n");
 
 	return EXIT_SUCCESS;
 }

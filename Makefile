@@ -138,7 +138,7 @@ $(TEST_TARGETS): test
 
 .PHONY: $(TEST_EXEC)
 $(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
-	$(CC) -g -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
+	$(CC) -g -no-pie -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 
 .PHONY: copy-doc
 copy-doc: COPYING LICENSES | $(COPY_DOC_TO)

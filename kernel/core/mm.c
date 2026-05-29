@@ -40,11 +40,11 @@
 
 #define SHOOTDOWN_DELAY_MS	5000
 
-struct mm_tree_node_t {
-	struct mm_tree_node_t* less;
-	struct mm_tree_node_t* more;
+struct mm_list_node_t {
+	struct mm_list_node_t* next;
+	struct mm_list_node_t* prev;
 	uint64_t base;
-	uint64_t limit;
+	size_t size;
 };
 
 struct disarm_list_t {
@@ -53,19 +53,36 @@ struct disarm_list_t {
 	uint8_t state;
 };
 
-static struct mm_tree_node_t* p_tree;
-static struct mm_tree_node_t* v_tree;
+#ifdef DEBUG_LOGGING
+uint64_t bytes_allocated;
+uint64_t prev_bytes_allocated;
+#endif /* DEBUG_LOGGING */
+
+struct mm_list_node_t init_nodes[MAX_INIT_NODES];
 
 extern uint8_t _kernel_pend;
 
 static uint64_t kernel_limit;
 
-static uint8_t p_lock;
-static uint8_t v_lock;
-static uint8_t n_lock;
+struct mm_list_node_t* p_begin;
+struct mm_list_node_t* p_end;
 
-static struct mm_tree_node_t node_pool[MAX_INIT_NODES];
-static struct mm_tree_node_t* free_nodes;
+struct mm_list_node_t* v_begin;
+struct mm_list_node_t* v_end;
+
+struct mm_list_node_t v_init;
+
+struct mm_list_node_t p_begin_guard;
+struct mm_list_node_t p_end_guard;
+
+struct mm_list_node_t v_begin_guard;
+struct mm_list_node_t v_end_guard;
+
+uint8_t p_lock;
+uint8_t v_lock;
+uint8_t f_lock;
+
+struct mm_list_node_t* reuse_nodes;
 
 static struct free_transaction_list_t* pending_free;
 static struct free_transaction_list_t* transaction_list;
@@ -74,200 +91,64 @@ static struct disarm_list_t* disarm_list;
 
 static struct signal_wait_t* free_pending_wait;
 
-static struct mm_tree_node_t* alloc_node(void) {
-	struct mm_tree_node_t* next;
-	lock_acquire(&n_lock);
-	if (free_nodes) {
-		next = free_nodes;
-		free_nodes = free_nodes->less;
-		lock_release(&n_lock);
-	}
-	else {
-		lock_release(&n_lock);
-		next = kmalloc(sizeof(struct mm_tree_node_t));
-	}
-
-	next->less = 0;
-	next->more = 0;
-	return next;
+static void free_node(struct mm_list_node_t* node) {
+	lock_acquire(&f_lock);
+	node->next = reuse_nodes;
+	reuse_nodes = node;
+	lock_release(&f_lock);
 }
 
-static void free_node(struct mm_tree_node_t* node) {
-	lock_acquire(&n_lock);
-	node->less = free_nodes;
-	free_nodes = node;
-	lock_release(&n_lock);
+static struct mm_list_node_t* alloc_node(void) {
+	struct mm_list_node_t* node;
+
+	lock_acquire(&f_lock);
+	node = reuse_nodes;
+	if (reuse_nodes) {
+		reuse_nodes = reuse_nodes->next;
+	}
+	lock_release(&f_lock);
+
+	if (node) {
+		return node;
+	}
+
+	return kmalloc(sizeof(struct mm_list_node_t));
 }
 
-static struct mm_tree_node_t* find_base_node(uint64_t base, struct mm_tree_node_t* root, struct mm_tree_node_t* parent) {
-	while (1) {
-		if (!root) {
-			return parent;
-		}
+static void insert_node(struct mm_list_node_t* node, struct mm_list_node_t* begin) {
+	struct mm_list_node_t* insert;
 
-		if (WITHIN_NODE(base, root->base, root->limit)) {
-			return root;
-		}
+	for (insert = begin->next; insert->base && insert->base < node->base; insert = insert->next);
 
-		parent = root;
+	node->next = insert;
+	node->prev = insert->prev;
 
-		if (base < root->base) {
-			root = root->less;
-		}
-		else {
-			root = root->more;
-		}
-	}
-}
+	insert->prev->next = node;
+	insert->prev = node;
 
-static void attach_node(struct mm_tree_node_t* root, struct mm_tree_node_t* node) {
-	if (node->base > root->base) {
-		if (root->more) {
-			attach_node(root->more, node);
-		}
-		else {
-			root->more = node;
-		}
-	}
-	else {
-		if (root->less) {
-			attach_node(root->less, node);
-		}
-		else {
-			root->less = node;
-		}
-	}
-}
+	if (node->prev->base + node->prev->size == node->base) {
+		node->prev->size += node->size;
 
-static uint64_t mm_alloc(
-		uint64_t limit,
-		struct mm_tree_node_t* root,
-		uint64_t max,
-		struct mm_tree_node_t* parent) {
-	uint64_t ret;
+		insert = node;
 
-	if (!root) {
-		return 0;
+		node->prev->next = node->next;
+		node->next->prev = node->prev;
+
+		node = node->prev;
+
+		free_node(insert);
 	}
 
-	if (root->base + limit > max) {
-		return mm_alloc(limit, root->less, max, root);
+	if (node->base + node->size == node->next->base) {
+		node->size += node->next->size;
+
+		insert = node->next;
+
+		node->next->next->prev = node;
+		node->next = node->next->next;
+
+		free_node(insert);
 	}
-
-	ret = mm_alloc(limit, root->more, max, root);
-	if (ret) {
-		return ret;
-	}
-
-	if (limit <= root->limit) {
-		root->limit -= limit;
-		ret = root->base;
-		root->base += limit;
-
-		if (root->limit == 0) {
-			if (root == parent->less) {
-				parent->less = 0;
-			}
-			else {
-				parent->more = 0;
-			}
-
-			if (root->less) {
-				attach_node(parent, root->less);
-			}
-			if (root->more) {
-				attach_node(parent, root->more);
-			}
-
-			free_node(root);
-		}
-
-		return ret;
-	}
-
-	return mm_alloc(limit, root->less, max, root);
-}
-
-static void mm_free(uint64_t base, uint64_t size, struct mm_tree_node_t* root, uint8_t* lock) {
-	uint64_t adj;
-	struct mm_tree_node_t* node;
-
-	adj = size % PAGE_SIZE_4K;
-	if (adj) {
-		size += PAGE_SIZE_4K - adj;
-	}
-
-	cpu_cli_if();
-	lock_acquire(lock);
-
-	node = find_base_node(base, root->more, root);
-
-	if (WITHIN_NODE(base, node->base, node->limit)) {
-		if (root == p_tree) {
-			logging_log_warning("Double free @ 0x%lx on p_tree", base);
-#ifdef DEBUG
-			cpu_trap();
-#endif /* DEBUG */
-		}
-		else {
-			logging_log_warning("Double free @ 0x%lx on v_tree", base);
-#ifdef DEBUG
-			cpu_trap();
-#endif /* DEBUG */
-		}
-	}
-	else if (base < node->base) {
-		node->less = alloc_node();
-		node->less->base = base;
-		node->less->limit = size;
-	}
-	else {
-		node->more = alloc_node();
-		node->more->base = base;
-		node->more->limit = size;
-	}
-
-	//TODO: coallese
-
-	lock_release(lock);
-	cpu_sti_if();
-}
-
-static uint64_t mm_alloc_max(size_t size, uint64_t align, uint64_t max, struct mm_tree_node_t* root, uint8_t* lock) {
-	uint64_t ret;
-	uint64_t adj;
-	struct mm_tree_node_t* padding;
-
-	adj = size % PAGE_SIZE_4K;
-	if (adj) {
-		size += PAGE_SIZE_4K - adj;
-	}
-
-	adj = align % PAGE_SIZE_4K;
-	if (adj) {
-		align += PAGE_SIZE_4K - adj;
-	}
-
-	lock_acquire(lock);
-	ret = mm_alloc(size + align, root->more, max, root);
-	lock_release(lock);
-
-	if (align) {
-		adj = ret % align;
-		if (adj) {
-			adj = align - adj;
-
-			padding = alloc_node();
-			padding->base = ret;
-			padding->limit = adj;
-
-			lock_acquire(lock);
-			attach_node(root, padding);
-			lock_release(lock);
-		}
-	}
-
-	return ret + adj;
 }
 
 void mm_init(
@@ -275,40 +156,40 @@ void mm_init(
 		void (*next_segment)(uint64_t* handle, struct mem_segment_t* seg)) {
 	kernel_limit = (uint64_t)&_kernel_pend;
 
-	free_pending_wait = 0;
+	uint64_t blocks = 0;
+	uint64_t init_node_i = 0;
+
+#ifdef DEBUG_LOGGING
+	bytes_allocated = 0;
+	prev_bytes_allocated = 0;
+#endif /* DEBUG_LOGGING */
 
 	lock_init(&p_lock);
 	lock_init(&v_lock);
-	lock_init(&n_lock);
-	lock_init(&pending_free_lock);
+	lock_init(&f_lock);
 
-	uint64_t blocks;
+	reuse_nodes = 0;
 
-	for (blocks = 0; blocks < MAX_INIT_NODES - 1; blocks++) {
-		node_pool[blocks].less = &node_pool[blocks + 1];	
-	}
-	node_pool[MAX_INIT_NODES - 1].less = 0;
-	free_nodes = &node_pool[0];
-
-	pending_free = 0;
-	disarm_list = 0;
-	
 	// find memory limit
 	uint64_t mem_limit = 0;
-	blocks = 0;
-
 
 	uint64_t handle;
 	struct mem_segment_t seg;
 
-	struct mm_tree_node_t* node;
 	uint64_t adj;
 
-	p_tree = alloc_node();
-	p_tree->base = 0;
-	p_tree->limit = 0;
-	p_tree->less = 0;
-	p_tree->more = 0;
+	p_begin_guard.base = 0;
+	p_begin_guard.size = 0;
+	p_begin_guard.next = &p_end_guard;
+
+	p_end_guard.base = 0;
+	p_end_guard.size = 0;
+	p_end_guard.prev = &p_begin_guard;
+
+	p_begin = &p_begin_guard;
+	p_end = &p_end_guard;
+
+	struct mm_list_node_t* temp;
 
 	first_segment(&handle);
 	for (next_segment(&handle, &seg); seg.size || seg.base; next_segment(&handle, &seg)) {
@@ -354,42 +235,39 @@ void mm_init(
 			continue;
 		}
 
-		node = find_base_node(seg.base, p_tree->more, p_tree);	
-		if (WITHIN_NODE(seg.base, node->base, node->limit)) {
-			logging_log_error("Overlapping memory regions 0x%lx into 0x%lx-0x%lx",
-					seg.base, node->base, node->base + node->limit);
-			panic(PANIC_STATE);
+		if (init_node_i == MAX_INIT_NODES) {
+			logging_log_warning("Out of initial memory node memory. Skipping allocation of 0x%lx bytes", seg.size);
+			continue;
 		}
 
-		if (seg.base < node->base) {
-			node->less = alloc_node();
-			node = node->less;
-		}
-		else {
-			node->more = alloc_node();
-			node = node->more;
-		}
+		temp = &init_nodes[init_node_i++];
+		temp->base = seg.base;
+		temp->size = seg.size;
 
-		node->base = seg.base;
-		node->limit = seg.size;
+		insert_node(temp, p_begin);
 	}
 
 	logging_log_info("Detected 0x%lX bytes (0x%lX GiB) of memory across %ld blocks",
 			mem_limit, (uint64_t)(mem_limit / SIZE_GIB), blocks);
 
-	v_tree = alloc_node();
-	v_tree->base = 0;
-	v_tree->limit = 0;
-	v_tree->less = 0;
-	v_tree->more = alloc_node();
+	v_init.base = CANON_HIGH;
+	v_init.size = VIRTUAL_LIMIT - CANON_HIGH;
+	v_init.prev = &v_begin_guard;
+	v_init.next = &v_end_guard;
 
-	v_tree->more->base = CANON_HIGH;
-	v_tree->more->limit = VIRTUAL_LIMIT - CANON_HIGH + 1;
-	v_tree->more->less = 0;
-	v_tree->more->more = 0;
+	v_begin_guard.base = 0;
+	v_begin_guard.size = 0;
+	v_begin_guard.next = &v_init;
+
+	v_end_guard.base = 0;
+	v_end_guard.size = 0;
+	v_end_guard.prev = &v_init;
+
+	v_begin = &v_begin_guard;
+	v_end = &v_end_guard;
 
 	logging_log_debug("Virtual space 0x%lx-0x%lx",
-			v_tree->more->base, v_tree->more->base + v_tree->more->limit);
+			v_init.base, v_init.base + v_init.size);
 
 	logging_log_debug("Initializing heap allocator");
 	alloc_init();
@@ -400,36 +278,147 @@ void mm_init(
 	logging_log_debug("Paging init done");
 }
 
+static uint64_t mm_alloc_max(size_t size,
+														 uint64_t align,
+														 uint64_t max,
+														 struct mm_list_node_t* end,
+														 uint8_t* lock) {
+	struct mm_list_node_t* node;
+
+	struct mm_list_node_t* extra = 0;
+
+	if (align) {
+		extra = alloc_node();
+	}
+
+	if (!size) {
+		return 0;
+	}
+
+	if (align % PAGE_SIZE_4K) {
+		return 0;
+	}
+
+	uint64_t rem = size % PAGE_SIZE_4K;
+
+	if (rem) {
+		size += PAGE_SIZE_4K - rem;
+	}
+
+	const uint64_t asize = size;
+
+	size += align;
+
+	lock_acquire(lock);
+	for (node = end->prev; node->base; node = node->prev) {
+		if (node->base + node->size < max && node->size >= size) {
+			break;
+		}
+	}
+
+	if (!node->base) {
+		lock_release(lock);
+		return 0;
+	}
+
+	uint64_t adj = align ? node->base % align : 0;
+
+	if (adj) {
+		extra->base = node->base;
+		extra->size = adj;
+
+		node->base += adj;
+		node->size -= adj;
+
+		extra->prev = node->prev;
+		extra->next = node;
+
+		node->prev->next = extra;
+		node->prev = extra;
+
+		extra = 0;
+	}
+
+	node->size -= asize;
+	uint64_t ret = node->base;
+
+	if (node->size) {
+		node->base += asize;
+		node = 0;
+	}
+	else {
+		node->prev->next = node->next;
+		node->next->prev = node->prev;
+	}
+
+	lock_release(lock);
+
+	if (node) {
+		free_node(node);
+	}
+
+	if (extra) {
+		free_node(extra);
+	}
+
+#ifdef DEBUG_LOGGING
+	bytes_allocated += asize;
+#endif /* DEBUG_LOGGING */
+	return ret;
+}
+
+static void mm_free(uint64_t base, uint64_t size, struct mm_list_node_t* begin, uint8_t* lock) {
+	struct mm_list_node_t* insert = alloc_node();
+
+	uint64_t rem = size % PAGE_SIZE_4K;
+
+	if (rem) {
+		size += PAGE_SIZE_4K - rem;
+	}
+
+#ifdef DEBUG_LOGGING
+	bytes_allocated -= size;
+#endif /* DEBUG_LOGGING */
+
+	insert->base = base;
+	insert->size = size;
+
+	lock_acquire(lock);
+	insert_node(insert, begin);
+	lock_release(lock);
+}
+
 uint64_t mm_alloc_p(size_t size) {
-	return mm_alloc_max(size, 0, ~0uLL, p_tree, &p_lock);
+	return mm_alloc_max(size, 0, ~0uLL, p_end, &p_lock);
 }
 
 uint64_t mm_alloc_v(size_t size) {
-	return mm_alloc_max(size, 0, ~0uLL, v_tree, &v_lock);
+	return mm_alloc_max(size, 0, ~0uLL, v_end, &v_lock);
 }
 
 uint64_t mm_alloc_palign(size_t size, uint64_t align) {
-	return mm_alloc_max(size, align, ~0uLL, p_tree, &p_lock);
+	return mm_alloc_max(size, align, ~0uLL, p_end, &p_lock);
 }
 
 uint64_t mm_alloc_valign(size_t size, uint64_t align) {
-	return mm_alloc_max(size, align, ~0uLL, v_tree, &v_lock);
+	return mm_alloc_max(size, align, ~0uLL, v_end, &v_lock);
 }
 
 uint64_t mm_alloc_pmax(size_t size, uint64_t align, uint64_t max) {
-	return mm_alloc_max(size, align, max, p_tree, &p_lock);
+	return mm_alloc_max(size, align, max, p_end, &p_lock);
 }
 
 uint64_t mm_alloc_vmax(size_t size, uint64_t align, uint64_t max) {
-	return mm_alloc_max(size, align, max, v_tree, &v_lock);
+	return mm_alloc_max(size, align, max, v_end, &v_lock);
 }
 
 void mm_free_p(uint64_t base, size_t size) {
-	mm_free(base, size, p_tree, &p_lock);
+	mm_free(base, size, p_begin, &p_lock);
 }
 
 void mm_free_v(uint64_t base, size_t size) {
 	struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
+
 	pending->base = base;
 	pending->size = size;
 	lock_acquire(&pending_free_lock);
@@ -494,7 +483,7 @@ __attribute((noreturn)) static void free_all_pending(void* _ign) {
 		while (transaction_list) {
 			next = transaction_list->next;
 
-			mm_free(transaction_list->base, transaction_list->size, v_tree, &v_lock);
+			mm_free(transaction_list->base, transaction_list->size, v_begin, &v_lock);
 
 			kfree(transaction_list);
 			transaction_list = next;
@@ -531,3 +520,18 @@ void mm_barrier_disarm(uint8_t id) {
 
 	signal_awake(free_pending_wait);
 }
+
+#ifdef DEBUG_LOGGING
+void mm_log_usage(void) {
+	const char* s = "";
+
+	if (bytes_allocated > prev_bytes_allocated) {
+		s = "+";
+	}
+
+	logging_log_debug("MM - Bytes Allocated %lu (%s%ld)",
+			bytes_allocated, s, bytes_allocated - prev_bytes_allocated);
+
+	prev_bytes_allocated = bytes_allocated;
+}
+#endif /* DEBUG_LOGGING */

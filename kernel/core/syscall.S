@@ -21,10 +21,10 @@
 
 .globl syscall_return
 syscall_return:
+movq %rcx, %rax // return value
 movq %rdi, %rcx // rip
 movq %rsi, %r11 // rflags
 movq %rdx, %rsp // rsp
-movq %rcx, %rax // return value
 
 sysretq
 
@@ -42,9 +42,13 @@ movq (%rsp), %rsp
 pushq %rcx
 pushq %r11
 
+pushq %rbp // for argument parsing
+
 movq %r10, %rcx
 
 call *syscall_handlers(,%rax,8)
+
+popq %rbp
 
 popq %r11
 popq %rcx
@@ -69,8 +73,8 @@ syscall_handlers:
 .quad syscall_dispatch_read
 .quad syscall_dispatch_write
 .quad syscall_dispatch_alloc
-.quad 0
-.quad 0
+.quad syscall_dispatch_fork
+.quad syscall_dispatch_execve
 .quad syscall_dispatch_open_dir
 .quad syscall_dispatch_read_dir
 .quad syscall_dispatch_truncate
@@ -85,6 +89,7 @@ syscall_handlers:
 .quad syscall_dispatch_link
 .quad syscall_dispatch_unlink
 .quad syscall_dispatch_stat
+.quad syscall_dispatch_getpid
 
 .set num_entries, . - syscall_handlers
 .if num_entries != SYSCALL_MAX * 8

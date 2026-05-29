@@ -144,8 +144,6 @@ struct array_list_t* array_list_dup(struct array_list_t* list, void* (*dup_func)
 		}
 	}
 
-	kmemcpy(copy->buffer, list->buffer, sizeof(void*) * list->cap);
-
 	return copy;
 }
 

@@ -254,8 +254,8 @@ TEST("array_list") {
 	ASSERT_TRUE(array_list_get(list1, 1) == (void*)2, "fails array_list_get after clear");
 	ASSERT_TRUE(array_list_get(list1, 100) == (void*)2, "fails array_list_get after clear");
 
-	ASSERT_TRUE(array_list_get(list2, 0) == (void*)101, "fails array_list_get after copy");
-	ASSERT_TRUE(array_list_get(list2, 1) == (void*)401, "fails array_list_get after copy");
+	ASSERT_TRUE(array_list_get(list2, 0) == (void*)102, "fails array_list_get after copy");
+	ASSERT_TRUE(array_list_get(list2, 1) == (void*)402, "fails array_list_get after copy");
 	ASSERT_TRUE(array_list_get(list2, 100) == (void*)2, "fails array_list_get after copy");
 
 	array_list_free(list1, 0);

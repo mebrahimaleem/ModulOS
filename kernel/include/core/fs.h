@@ -84,6 +84,8 @@ typedef enum file_status_t (*fs_truncate_t)(struct file_handle_t*, size_t);
 typedef enum file_status_t (*fs_link_t)(struct file_handle_t*, struct file_handle_t*);
 typedef enum file_status_t (*fs_unlink_t)(struct file_handle_t*);
 
+typedef struct file_handle_t* (*fs_dup_t)(struct file_handle_t*);
+
 typedef uint8_t (*fs_is_interactive_t)(struct file_handle_t*);
 
 void fs_init(void);
@@ -105,7 +107,8 @@ enum file_status_t fs_mount(
 		fs_delete_dir_t delete_dir,
 		fs_truncate_t truncate,
 		fs_link_t link,
-		fs_unlink_t unlink
+		fs_unlink_t unlink,
+		fs_dup_t dup
 		);
 
 extern struct fs_handle_t* fs_open_mode(const char* path, uint32_t flags, uint32_t mode);
@@ -134,5 +137,7 @@ extern enum file_status_t fs_unlink(struct fs_handle_t* handle);
 extern uint8_t fs_is_interactive(struct fs_handle_t* handle);
 
 extern void fs_path(struct fs_handle_t* handle, size_t max_len, char* buf);
+
+extern struct fs_handle_t* fs_dup(struct fs_handle_t* handle);
 
 #endif /* KERNEL_CORE_FS_H */

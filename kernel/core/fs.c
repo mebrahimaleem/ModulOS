@@ -73,6 +73,7 @@ struct vfs_mount_t {
 	fs_truncate_t truncate;
 	fs_link_t link;
 	fs_unlink_t unlink;
+	fs_dup_t dup;
 };
 
 struct vfs_open_file_t {
@@ -119,7 +120,8 @@ static struct vfs_mount_t dev_mount = {
 	.is_interactive = devfs_is_interactive,
 	.truncate = devfs_truncate,
 	.link = devfs_link,
-	.unlink = devfs_unlink
+	.unlink = devfs_unlink,
+	.dup = devfs_dup
 };
 
 static uint8_t fs_not_interactive(struct file_handle_t* handle) {
@@ -142,10 +144,14 @@ static inline char* path_next(char* path, size_t* len) {
 	return path;
 }
 
+static void vfs_reopen_file(struct vfs_open_file_t* file) {
+	file->refs++;
+}
+
 static struct vfs_open_file_t* lookup_register(char* path) {
 	size_t path_len = kstrlen(path);
 	uint64_t key = fnv64_1a(path, path_len);
-	struct vfs_open_file_t* file;
+	struct vfs_open_file_t* file = 0;
 
 	while (hash_table_get(open_table, key, (void**)&file)) {
 		if (kstrcmp(path, file->path + 1) == 0) {
@@ -170,7 +176,7 @@ static struct vfs_open_file_t* lookup_register(char* path) {
 		hash_table_insert(open_table, key, file);
 	}
 
-	file->refs++;
+	vfs_reopen_file(file);
 
 	return file;
 }
@@ -225,7 +231,8 @@ enum file_status_t fs_mount(
 		fs_delete_dir_t delete_dir,
 		fs_truncate_t truncate,
 		fs_link_t link,
-		fs_unlink_t unlink
+		fs_unlink_t unlink,
+		fs_dup_t dup
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -252,6 +259,7 @@ enum file_status_t fs_mount(
 		vfs_root.mount->truncate = truncate;
 		vfs_root.mount->link = link;
 		vfs_root.mount->unlink = unlink;
+		vfs_root.mount->dup = dup;
 
 		vfs_root.mount->is_interactive = fs_not_interactive;
 
@@ -528,7 +536,6 @@ enum file_status_t fs_truncate(struct fs_handle_t* handle, size_t size) {
 	lock_release(&handle->shared->lock);
 
 	return sts;
-
 }
 
 enum file_status_t fs_link(struct fs_handle_t* handle, struct fs_handle_t* replace) {
@@ -562,4 +569,23 @@ void fs_path(struct fs_handle_t* handle, size_t max_len, char* buf) {
 
 uint8_t fs_is_interactive(struct fs_handle_t* handle) {
 	return handle->mount->is_interactive(handle->handle);
+}
+
+struct fs_handle_t* fs_dup(struct fs_handle_t* handle) {
+	struct file_handle_t* dup = handle->mount->dup(handle->handle);
+
+	if (!dup) {
+		return 0;
+	}
+
+	semaphore_wait(fs_sem);
+	vfs_reopen_file(handle->shared);
+	semaphore_signal(fs_sem);
+
+	struct fs_handle_t* fs_handle = kmalloc(sizeof(struct fs_handle_t));
+	fs_handle->handle = dup;
+	fs_handle->mount = handle->mount;
+	fs_handle->shared = handle->shared;
+	fs_handle->flags = handle->flags;
+	return fs_handle;
 }

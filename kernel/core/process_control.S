@@ -46,3 +46,12 @@ movq 0x78(%rdi), %rax
 movq 0x50(%rdi), %rdi
 
 iretq
+
+.globl process_fork_internal
+process_fork_internal:
+movq %rbx, 0x70(%rdi)
+movq %r12, 0x28(%rdi)
+movq %r13, 0x20(%rdi)
+movq %r14, 0x18(%rdi)
+movq %r15, 0x20(%rdi)
+ret

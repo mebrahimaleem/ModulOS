@@ -46,4 +46,6 @@ extern enum file_status_t devfs_unlink(struct file_handle_t* handle);
 
 extern uint8_t devfs_is_interactive(struct file_handle_t* handle);
 
+extern struct file_handle_t* devfs_dup(struct file_handle_t* handle);
+
 #endif /* KERNEL_DEVFS_DEVFS_H */

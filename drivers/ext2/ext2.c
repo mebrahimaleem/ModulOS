@@ -949,11 +949,16 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 	}
 }
 
+
 static struct ext2_inode_handle_t* ext2_duplicate(struct ext2_inode_handle_t* handle) {
 	struct ext2_inode_handle_t* dup = kmalloc(sizeof(struct ext2_inode_handle_t));
 
 	*dup = *handle;
 	return dup;
+}
+
+static struct file_handle_t* ext2_dup(struct file_handle_t* handle) {
+	return (struct file_handle_t*)ext2_duplicate((struct ext2_inode_handle_t*)handle);
 }
 
 static void ext2_close(struct file_handle_t* handle) {
@@ -1445,7 +1450,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_delete_dir,
 					ext2_truncate,
 					ext2_link,
-					ext2_unlink
+					ext2_unlink,
+					ext2_dup
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);

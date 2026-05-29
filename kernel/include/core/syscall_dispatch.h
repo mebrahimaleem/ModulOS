@@ -29,7 +29,10 @@
 			uint64_t arg3, \
 			uint64_t arg6, \
 			uint64_t arg4, \
-			uint64_t arg5)
+			uint64_t arg5, \
+			uint64_t rbp,  \
+			uint64_t r11,  \
+			uint64_t rcx)  \
 
 typedef uint64_t (*syscall_dispatch_t)(
 		uint64_t arg1,
@@ -37,7 +40,10 @@ typedef uint64_t (*syscall_dispatch_t)(
 		uint64_t arg3,
 		uint64_t arg6,
 		uint64_t arg4,
-		uint64_t arg5);
+		uint64_t arg5,
+		uint64_t r11,
+		uint64_t rcx,
+		uint64_t rbp);
 
 
 extern syscall_dispatch_t syscall_handlers[SYSCALL_MAX];
@@ -48,8 +54,8 @@ extern DECLARE_SYSCALL(close);
 extern DECLARE_SYSCALL(read);
 extern DECLARE_SYSCALL(write);
 extern DECLARE_SYSCALL(alloc);
-// reserved
-// reserved
+extern DECLARE_SYSCALL(fork);
+extern DECLARE_SYSCALL(execve);
 extern DECLARE_SYSCALL(open_dir);
 extern DECLARE_SYSCALL(read_dir);
 extern DECLARE_SYSCALL(truncate);
@@ -64,5 +70,6 @@ extern DECLARE_SYSCALL(ccwd);
 extern DECLARE_SYSCALL(link);
 extern DECLARE_SYSCALL(unlink);
 extern DECLARE_SYSCALL(stat);
+extern DECLARE_SYSCALL(getpid);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

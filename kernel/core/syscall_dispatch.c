@@ -32,40 +32,34 @@
 #include <lib/kmemset.h>
 #include <lib/array_list.h>
 
-#define ARGC_0 \
-	(void)arg1; \
-	(void)arg2; \
-	(void)arg3; \
-	(void)arg4; \
-	(void)arg5; \
-	(void)arg6
-
-#define ARGC_1 \
-	(void)arg2; \
-	(void)arg3; \
-	(void)arg4; \
-	(void)arg5; \
-	(void)arg6
-
-#define ARGC_2 \
-	(void)arg3; \
-	(void)arg4; \
-	(void)arg5; \
-	(void)arg6
-
-#define ARGC_3 \
-	(void)arg4; \
-	(void)arg5; \
-	(void)arg6
-
-#define ARGC_4 \
-	(void)arg5; \
-	(void)arg6
+#define ARGC_6 \
+	(void)rbp; \
+	(void)rcx; \
+	(void)r11;
 
 #define ARGC_5 \
-	(void)arg6
+	ARGC_6 \
+	(void)arg6;
 
-#define ARGC_6
+#define ARGC_4 \
+	ARGC_5 \
+	(void)arg5;
+
+#define ARGC_3 \
+	ARGC_4 \
+	(void)arg4;
+
+#define ARGC_2 \
+	ARGC_3 \
+	(void)arg3;
+
+#define ARGC_1 \
+	ARGC_2 \
+	(void)arg2;
+
+#define ARGC_0 \
+	ARGC_1 \
+	(void)arg1;
 
 #define USERLAND_AT_FDCWD -100
 
@@ -171,6 +165,28 @@ DECLARE_SYSCALL(alloc) {
 	pcb->mem_top += arg1;
 
 	return vaddr;
+}
+
+DECLARE_SYSCALL(fork) {
+	ARGC_0;
+
+	uint64_t pid = process_fork(r11, rcx, rbp);
+
+	if (pid == -1uLL) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return pid;
+}
+
+DECLARE_SYSCALL(execve) {
+	ARGC_3;
+
+	(void)arg1;
+	(void)arg2;
+	(void)arg3;
+
+	return SYSCALL_STS_FAIL;
 }
 
 DECLARE_SYSCALL(open_dir) {
@@ -362,4 +378,12 @@ DECLARE_SYSCALL(stat) {
 	u_stat->st_size = info.size;
 
 	return SYSCALL_STS_OK;
+}
+
+DECLARE_SYSCALL(getpid) {
+	ARGC_0;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	return pcb->pid;
 }

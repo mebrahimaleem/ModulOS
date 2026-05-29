@@ -205,3 +205,24 @@ uint8_t devfs_is_interactive(struct file_handle_t* handle) {
 			return 1;
 	}
 }
+
+struct file_handle_t* devfs_dup(struct file_handle_t* handle) {
+	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
+
+	if (!dev_handle) {
+		return 0;
+	}
+
+	struct dev_handle_t* dev_handle2 = kmalloc(sizeof(struct dev_handle_t));
+
+	dev_handle2->type = dev_handle->type;
+
+	switch (dev_handle->type) {
+		case DEV_TYPE_TTY:
+			dev_handle2->dev_handle = dev_handle->dev_handle;
+			break;
+	}
+
+
+	return (struct file_handle_t*)dev_handle2;
+}

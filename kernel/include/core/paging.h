@@ -63,4 +63,6 @@ extern uint64_t paging_create_pml4(void);
 
 extern void paging_free_userspace(uint64_t* pml4);
 
+extern uint64_t paging_duplicate_lower(uint64_t cr3);
+
 #endif /* KERNEL_CORE_PAGING_H */

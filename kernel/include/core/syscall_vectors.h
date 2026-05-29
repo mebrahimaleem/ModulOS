@@ -79,14 +79,17 @@
 #define SYSCALL_ALLOC				5
 
 /*
- * reserved
+ * ret: child pid (pid_t)
  */
-#define SYSCALL_RESV1				6
+#define SYSCALL_FORK				6
 
 /*
- * reserved
+ * rdi: path
+ * rsi: argv
+ * rdx: envp
+ * ret: success (int)
  */
-#define SYSCALL_RESV2				7
+#define SYSCALL_EXECVE			7
 
 /*
  * rdi: handle (int)
@@ -178,6 +181,9 @@
  */
 #define SYSCALL_STAT				21
 
-#define SYSCALL_MAX					22
+/*
+ * ret: current pid (pid_t)
+ */
+#define SYSCALL_GETPID			22
 
-
+#define SYSCALL_MAX					23

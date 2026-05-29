@@ -71,6 +71,27 @@ int sys_tcb_set(void *pointer) {
 	__builtin_unreachable();
 }
 
+pid_t sys_getpid() {
+	return syscall_0(0, 0, 0, SYSCALL_GETPID);
+}
+
+int sys_fork(pid_t *child) {
+	pid_t pid = syscall_0(0, 0, 0, SYSCALL_FORK);
+
+	if (pid == SYSCALL_STS_FAIL) {
+		return ENOMEM;
+	}
+
+	*child = pid;
+	return 0;
+}
+
+int sys_execve(const char *path, char *const argv[], char *const envp[]) {
+	syscall_3((uint64_t)path, (uint64_t)argv, (uint64_t)envp, SYSCALL_EXECVE);
+
+	return EACCES;
+}
+
 // locking
 
 int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
@@ -313,6 +334,8 @@ int sys_link(const char *old_path, const char *new_path) {
 }
 
 int sys_unlinkat(int fd, const char *path, int flags) {
+	(void)flags;
+
 	int sts;
 	int f;
 
@@ -338,8 +361,24 @@ int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
 	(void)path;
 	(void)mode;
 
-	return ENOSYS;
-	//TODO
+	int sts;
+	int fd;
+
+	sts = sys_openat(dirfd, path, O_RDWR | O_CREAT | O_EXCL, 0, &fd);
+
+	if (sts) {
+		return sts;
+	}
+
+	sts = syscall_1(fd, 0, 0, SYSCALL_CREATE_DIR);
+	sys_close(fd);
+
+	if (sts) {
+		sys_unlinkat(dirfd, path, 0);
+		return EACCES;
+	}
+
+	return 0;
 }
 
 int sys_mkdir(const char *path, mode_t mode) {
@@ -415,3 +454,14 @@ int sys_clock_get(int clock, time_t *secs, long *nanos) {
 
 
 } //namespace mlibc
+
+extern "C" int fork() {
+	pid_t pid;
+	mlibc::sys_fork(&pid);
+
+	return pid;
+}
+
+extern "C" int getpid() {
+	return mlibc::sys_getpid();
+}
