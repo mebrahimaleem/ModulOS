@@ -1,4 +1,4 @@
-/* proc_data.h - per procesor data interface */
+/* memport.c - kernel allocator port to userland */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,28 +15,15 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_CORE_PROC_DATA_H
-#define KERNEL_CORE_PROC_DATA_H
+#include <stddef.h>
+#include <stdlib.h>
 
-#include <stdint.h>
+#include <memport.h>
 
-#include <kernel/core/tss.h>
-#include <kernel/core/process.h>
+void* kmalloc(size_t size) {
+	return malloc(size);
+}
 
-#define PROC_STS_INT_READY	0x01
-
-struct proc_data_t {
-	uint64_t kernel_rsp; // order matters
-	uint8_t arb_id;
-	struct tss_t* tss;
-	struct pcb_t* current_process;
-	uint64_t sts;
-};
-
-extern struct proc_data_t bsp_proc_data;
-extern struct proc_data_t** proc_data_ptr;
-
-extern void proc_data_set_id(uint8_t id);
-extern struct proc_data_t* proc_data_get(void);
-
-#endif /* KERNEL_CORE_PROC_DATA_H */
+void kfree(void* ptr) {
+	free(ptr);
+}

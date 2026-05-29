@@ -233,24 +233,24 @@ static uint8_t hpet_count;
 
 #define CHECK_AND_COPY(sig, tbl, store, fnd, post) \
 	do { \
-		if (!kmemcmp((uint8_t*)gen->Signature, sig, 4)) { \
+		if (!kmemcmp(gen->Signature, sig, 4)) { \
 			logging_log_info("Copying ACPI "  tbl " @ 0x%lX", (uint64_t)gen); \
 			store = kmalloc(gen->Length); \
-			kmemcpy((void*)store, (void*)gen, gen->Length); \
+			kmemcpy(store, gen, gen->Length); \
 			found |= fnd; \
 			post; \
 		} \
 	} \
 	while (0)
 
-static inline uint8_t verify_checksum(const volatile struct acpi_gen_header_t* table) {
-	const volatile struct acpi_gen_header_t* gen = (struct acpi_gen_header_t*)table;
-	return hash_byte_sum((void*)gen, gen->Length);
+static inline uint8_t verify_checksum(const struct acpi_gen_header_t* table) {
+	const struct acpi_gen_header_t* gen = (const struct acpi_gen_header_t*)table;
+	return hash_byte_sum(gen, gen->Length);
 }
 
-static volatile void* map_table(const volatile void* table) {
+static void* map_table(const void* table) {
 	uint64_t base = (uint64_t)table & PAGE_BASE_MASK, vaddr, len, off;
-	volatile struct acpi_gen_header_t* v_table;
+	struct acpi_gen_header_t* v_table;
 
 	vaddr = mm_alloc_v(PAGE_SIZE_4K * 2);
 	if (!vaddr) {
@@ -261,7 +261,7 @@ static volatile void* map_table(const volatile void* table) {
 	paging_map(vaddr, base, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 	paging_map(vaddr + PAGE_SIZE_4K, base + PAGE_SIZE_4K, PAGE_PRESENT | PAGE_RW | PAT_MMIO_4K, PAGE_4K);
 
-	v_table = (volatile struct acpi_gen_header_t*)(vaddr + (uint64_t)table - base);
+	v_table = (struct acpi_gen_header_t*)(vaddr + (uint64_t)table - base);
 	if (!vaddr) {
 		logging_log_error("Failed to allocate memory for ACPI table");
 		panic(PANIC_NO_MEM);
@@ -293,8 +293,8 @@ static volatile void* map_table(const volatile void* table) {
 	return (void*)(vaddr + (uint64_t)table - base);
 }
 
-static void unmap_table(const volatile void* table) {
-	volatile struct acpi_gen_header_t* v_table = (volatile struct acpi_gen_header_t*)table;
+static void unmap_table(const void* table) {
+	const struct acpi_gen_header_t* v_table = (const struct acpi_gen_header_t*)table;
 	uint64_t base, len, off;
 
 	base = (uint64_t)table & PAGE_BASE_MASK;
@@ -312,7 +312,7 @@ void acpi_copy_tables(void) {
 	hpet_count = 0;
 #endif /* HPET */
 
-	const volatile struct acpi_gen_header_t* gen;
+	const struct acpi_gen_header_t* gen;
 	uint8_t found;
 
 	if (kmemcmp(boot_context.rsdp.Signature, "RSD PTR ", 8)) {
@@ -329,7 +329,7 @@ void acpi_copy_tables(void) {
 		case RSDPV1:
 fallback:
 			found = 0;
-			volatile struct acpi_rsdt_t* rsdt = (volatile struct acpi_rsdt_t*)(uint64_t)boot_context.rsdp.RsdtAddress;
+			struct acpi_rsdt_t* rsdt = (struct acpi_rsdt_t*)(uint64_t)boot_context.rsdp.RsdtAddress;
 			rsdt = map_table(rsdt);
 			if (!rsdt) {
 				logging_log_error("Bad RSDT checksum");
@@ -343,9 +343,9 @@ fallback:
 
 			logging_log_info("Parsing ACPI RSDT entries @ 0x%lX", (uint64_t)&rsdt->Entry[0]);
 
-			for (const volatile uint32_t* entry = &rsdt->Entry[0];
+			for (const uint32_t* entry = &rsdt->Entry[0];
 					(uint64_t)entry < (uint64_t)rsdt + rsdt->Length; entry++) {
-				gen = (const volatile struct acpi_gen_header_t*)(uint64_t)*entry;
+				gen = (const struct acpi_gen_header_t*)(uint64_t)*entry;
 				gen = map_table(gen);
 
 				if (!gen) {
@@ -389,7 +389,7 @@ fallback:
 			}
 
 			found = 0;
-			volatile struct acpi_xsdt_t* xsdt = (volatile struct acpi_xsdt_t*)boot_context.rsdp.XsdtAddress;
+			struct acpi_xsdt_t* xsdt = (struct acpi_xsdt_t*)boot_context.rsdp.XsdtAddress;
 			xsdt = map_table(xsdt);
 
 			if (!xsdt) {
@@ -404,9 +404,9 @@ fallback:
 
 			logging_log_info("Parsing ACPI XSDT entries @ 0x%lX", (uint64_t)&xsdt->Entry[0]);
 
-			for (const volatile uint64_t* entry = &xsdt->Entry[0];
+			for (const uint64_t* entry = &xsdt->Entry[0];
 					(uint64_t)entry < (uint64_t)xsdt + xsdt->Length; entry++) {
-				gen = (const volatile struct acpi_gen_header_t*)*entry;
+				gen = (const struct acpi_gen_header_t*)*entry;
 				gen = map_table(gen);
 
 				if (!gen) {

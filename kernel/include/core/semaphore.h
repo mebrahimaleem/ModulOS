@@ -1,4 +1,4 @@
-/* kmemset.c - library memset implementation */
+/* semaphore.h - semaphore interface */
 /* Copyright (C) 2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,35 +15,24 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
+#ifndef KERNEL_CORE_SEMAPHORE_H
+#define KERNEL_CORE_SEMAPHORE_H
+
 #include <stdint.h>
 #include <stddef.h>
 
-#include <lib/kmemset.h>
+#define SEMAPHORE_CAP_UNLIM		(uint64_t)(-1)
 
-#define PAT(s) (((uint64_t)v8) << (8*s))
+struct semaphore_t;
 
-void* memset(void* ptr, int32_t v, size_t c) __attribute__((weak));
+extern struct semaphore_t* semaphore_alloc(size_t cap);
+extern void semaphore_free(struct semaphore_t* sem);
 
-void* memset(void* ptr, int32_t v, size_t c) {
-	uint8_t v8 = (uint8_t)v;
-	uint64_t v64 = PAT(0) | PAT(1) | PAT(2) | PAT(3) | PAT(4) | PAT(5) | PAT(6) | PAT(7);
-	uint64_t* ptr64 = (uint64_t*)ptr;
+extern void semaphore_wait(struct semaphore_t* sem);
+extern void semaphore_signal(struct semaphore_t* sem);
 
-	while (c >= sizeof(uint64_t)) {
-		*ptr64 = v64;
-		ptr64++;
-		c -= sizeof(uint64_t);
-	}
+extern void semaphore_wait_full(struct semaphore_t* sem);
+extern void semaphore_signal_full(struct semaphore_t* sem);
 
-	uint8_t* ptr8 = (uint8_t*)ptr64;
+#endif /* KERNEL_CORE_SEMAPHORE_H */
 
-	while (c >= sizeof(uint8_t)) {
-		*ptr8 = v8;
-		ptr8++;
-		c -= sizeof(uint8_t);
-	}
-
-	return ptr;
-}
-
-void* kmemset(void* ptr, int32_t v, size_t c) __attribute__((alias("memset")));

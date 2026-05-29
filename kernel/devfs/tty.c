@@ -50,8 +50,8 @@ typedef void (*tty_write_t)(uint8_t byte);
 struct tty_handle_t {
 	tty_write_t writer;
 	uint8_t* read_buffer;
-	volatile uint16_t write_index;
-	volatile uint16_t read_index;
+	uint16_t write_index;
+	uint16_t read_index;
 	struct signal_wait_t* signal;
 	enum {
 		TTY_MODE_COOKED,
@@ -97,7 +97,7 @@ struct tty_handle_t* tty_com2(void) {
 }
 #endif /* SERIAL */
 
-struct tty_handle_t* tty_open(char* name) {
+struct tty_handle_t* tty_open(const char* name) {
 #ifdef SERIAL
 	if (!kstrcmp(name, "S0")) {
 		// COM1
@@ -146,22 +146,22 @@ size_t tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
 	return read;
 }
 
-void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {
+void tty_write(struct tty_handle_t* tty, const void* buffer, size_t count) {
 	for (size_t i = 0; i < count; i++) {
-		uint8_t val = ((uint8_t*)buffer)[i];
+		uint8_t val = ((const uint8_t*)buffer)[i];
 		switch (val) {
 			case '\n':
 				tty->writer('\r');
 				__attribute__((fallthrough));
 			default:
-				tty->writer(((uint8_t*)buffer)[i]);
+				tty->writer(((const uint8_t*)buffer)[i]);
 				break;
 		}
 	}
 }
 
 uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
-	if (FULL(tty->read_index, tty->write_index)) {
+	if (byte == 0 || FULL(tty->read_index, tty->write_index)) {
 		return 0;
 	}
 

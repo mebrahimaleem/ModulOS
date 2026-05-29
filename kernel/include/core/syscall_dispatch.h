@@ -43,10 +43,26 @@ typedef uint64_t (*syscall_dispatch_t)(
 extern syscall_dispatch_t syscall_handlers[SYSCALL_MAX];
 
 extern DECLARE_SYSCALL(exit);
-extern DECLARE_SYSCALL(open);
+extern DECLARE_SYSCALL(openat);
 extern DECLARE_SYSCALL(close);
 extern DECLARE_SYSCALL(read);
 extern DECLARE_SYSCALL(write);
 extern DECLARE_SYSCALL(alloc);
+// reserved
+// reserved
+extern DECLARE_SYSCALL(open_dir);
+extern DECLARE_SYSCALL(read_dir);
+extern DECLARE_SYSCALL(truncate);
+extern DECLARE_SYSCALL(seek);
+extern DECLARE_SYSCALL(tell);
+extern DECLARE_SYSCALL(create_dir);
+extern DECLARE_SYSCALL(delete_dir);
+extern DECLARE_SYSCALL(epoch_time);
+extern DECLARE_SYSCALL(is_a_tty);
+extern DECLARE_SYSCALL(gcwd);
+extern DECLARE_SYSCALL(ccwd);
+extern DECLARE_SYSCALL(link);
+extern DECLARE_SYSCALL(unlink);
+extern DECLARE_SYSCALL(stat);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

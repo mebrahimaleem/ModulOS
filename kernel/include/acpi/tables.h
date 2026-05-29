@@ -53,12 +53,12 @@ struct acpi_madt_ics_gen_t {
 	uint8_t Type;
 	uint8_t Length;
 	uint8_t _[];
-} __attribute__((packed));
+};
 
 struct acpi_madt_ics_mps_t {
 	uint8_t PolarityAndTriggerMode;
 	uint8_t Reserved;
-} __attribute__((packed));
+};
 
 struct acpi_madt_ics_local_apic_t {
 	uint8_t Type;
@@ -66,7 +66,7 @@ struct acpi_madt_ics_local_apic_t {
 	uint8_t ACPIProcessorUID;
 	uint8_t APICID;
 	uint8_t Flags;
-} __attribute__((packed));
+};
 
 struct acpi_madt_ics_io_apic_t {
 	uint8_t Type;
@@ -99,7 +99,7 @@ struct acpi_madt_ics_local_apic_nmi_t {
 	uint8_t ACPIProcessorUID;
 	struct acpi_madt_ics_mps_t Flags;
 	uint8_t LocalAPICLINTNum;
-} __attribute__((packed));
+};
 
 struct acpi_mcfg_conf_t {
 	uint64_t base;

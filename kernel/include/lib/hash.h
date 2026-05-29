@@ -25,4 +25,6 @@ extern uint8_t hash_byte_sum(const void* ptr, size_t c);
 
 extern uint32_t crc32_ansi(const void* data, size_t length);
 
+extern uint64_t fnv64_1a(const void* data, size_t length);
+
 #endif /* KERNEL_LIB_HASH_H */

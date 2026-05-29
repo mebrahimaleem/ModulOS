@@ -21,15 +21,29 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <core/fs.h>
+#include <kernel/core/fs.h>
 
-extern struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, char* path);
+extern struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path, uint32_t flags, uint32_t mode);
 extern void devfs_close(struct file_handle_t* handle);
 
 extern enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_info_t* info);
 extern size_t devfs_read(struct file_handle_t* handle, void* buffer, size_t count);
 extern uint64_t devfs_get_seek(struct file_handle_t* handle);
 extern enum file_status_t devfs_seek(struct file_handle_t* handle, uint64_t seek);
-extern size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count);
+extern size_t devfs_write(struct file_handle_t* handle, const void* buffer, size_t count);
+extern void devfs_delete_final(struct file_handle_t* handle);
+
+extern enum file_status_t devfs_open_dir(struct file_handle_t* handle);
+
+extern enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct dir_info_t* info);
+
+extern enum file_status_t devfs_create_dir(struct file_handle_t* handle, const char* name);
+extern enum file_status_t devfs_delete_dir(struct file_handle_t* handle);
+
+extern enum file_status_t devfs_truncate(struct file_handle_t* handle, size_t size);
+extern enum file_status_t devfs_link(struct file_handle_t* handle, struct file_handle_t* replace);
+extern enum file_status_t devfs_unlink(struct file_handle_t* handle);
+
+extern uint8_t devfs_is_interactive(struct file_handle_t* handle);
 
 #endif /* KERNEL_DEVFS_DEVFS_H */

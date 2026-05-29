@@ -17,11 +17,11 @@
 
 #include <stdint.h>
 
-#ifndef KERNEL_INCLUDE_CORE_LOCK_H
-#define KERNEL_INCLUDE_CORE_LOCK_H
+#ifndef KERNEL_CORE_LOCK_H
+#define KERNEL_CORE_LOCK_H
 
 extern void lock_init(uint8_t* lock);
 extern void lock_acquire(uint8_t* lock);
 extern void lock_release(uint8_t* lock);
 
-#endif /* KERNEL_INCLUDE_CORE_LOCK_H */
+#endif /* KERNEL_CORE_LOCK_H */

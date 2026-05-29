@@ -22,9 +22,9 @@
 
 struct clock_src_t {
 	uint64_t period_fs;
-	uint64_t (*counter)(void*);
-	void (*reset)(void*, uint64_t);
-	void* meta;
+	uint64_t (*counter)(volatile void*);
+	void (*reset)(volatile void*, uint64_t);
+	volatile void* meta;
 };
 
 extern void clock_src_init(void);

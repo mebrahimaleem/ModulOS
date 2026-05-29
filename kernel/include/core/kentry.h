@@ -31,7 +31,7 @@
 
 struct boot_context_t {
 	struct acpi_rsdp_t rsdp;
-	volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
+	struct gdt_t(* gdt)[GDT_NUM_ENTRIES];
 #ifdef GRAPHICSBASE
 	struct framebuffer_t framebuffer;
 #endif /* GRAPHICSBASE */
@@ -42,5 +42,7 @@ extern struct boot_context_t boot_context;
 extern void kentry(void) __attribute__((noreturn));
 
 extern void kapentry(uint64_t arb_id) __attribute__((noreturn));
+
+extern void prepare_userland(void* cntx);
 
 #endif /* KERNEL_CORE_KENTRY_H */

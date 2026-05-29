@@ -2,7 +2,11 @@
 #define _ABIBITS_STAT_H
 
 #include <abi-bits/mode_t.h>
+#include <abi-bits/dev_t.h>
+
 #include <bits/size_t.h>
+#include <bits/ansi/time_t.h>
+#include <bits/ansi/timespec.h>
 
 #define S_IFMT 0x0F000
 #define S_IFBLK 0x06000
@@ -36,6 +40,8 @@
 struct stat {
 	size_t st_size;
 };
+
+#define stat64 stat
 
 #endif /* _ABIBITS_STAT_H */
 

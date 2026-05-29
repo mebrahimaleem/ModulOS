@@ -32,6 +32,7 @@
 #include <core/fs.h>
 
 #include <lib/kmemset.h>
+#include <lib/array_list.h>
 
 #include <apic/apic_regs.h>
 
@@ -70,7 +71,8 @@ void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	pcb->init_k_rsp_vaddr = init_rsp_vaddr;
 	pcb->init_k_rsp_paddr = init_rsp_paddr;
 	pcb->sched_cntr = SCHED_SKIP;
-	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
+	pcb->fd_table = array_list_alloc(1, 1, 0);
+	pcb->wd = 0;
 	proc_data_get()->current_process = pcb;
 	proc_data_get()->current_process->pid = process_assign_pid();
 	proc_data_get()->current_process->cr3 = 0;
@@ -126,11 +128,8 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 
 	pcb->pid = process_assign_pid();
 
-	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
-
-	pcb->fd_table[0] = fs_open("/dev/ttyS0");
-	pcb->fd_table[1] = fs_open("/dev/ttyS0");
-	pcb->fd_table[2] = fs_open("/dev/ttyS0");
+	pcb->fd_table = array_list_alloc(1, 1, 0);
+	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
 
 	return pcb;
 }
@@ -157,6 +156,10 @@ void process_kill_current(void) {
 	cpu_wait_loop();
 }
 
+static void close_fd(void* handle) {
+	fs_close(handle);
+}
+
 void process_discard(struct pcb_t* pcb) {
 	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
 	paging_unmap(pcb->init_k_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
@@ -172,13 +175,12 @@ void process_discard(struct pcb_t* pcb) {
 		paging_free_userspace((uint64_t*)pcb->cr3);
 	}
 
-	for (uint64_t i = 0; i < MAX_FD; i++) {
-		if (pcb->fd_table[i]) {
-			fs_close(pcb->fd_table[i]);
-		}
+	array_list_clear(pcb->fd_table, close_fd);
+	if (pcb->wd) {
+		fs_close(pcb->wd);
 	}
 
-	logging_log_debug("Killed %ld", pcb->pid);
+	logging_log_debug("Killed %lu (%ld)", pcb->pid, pcb->exit_code);
 
 	kfree(pcb);
 }

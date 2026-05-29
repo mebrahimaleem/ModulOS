@@ -37,3 +37,18 @@ char* kstrcpy_no_null(char* dest, const char* src) {
 
 	return dest;
 }
+
+char* kstrncpy(char* dest, const char* src, size_t len) {
+	if (!len) {
+		return dest;
+	}
+
+	while (*src && --len) {
+		*dest = *src;
+		src++;
+		dest++;
+	}
+
+	*dest = 0;
+	return dest + 1;
+}

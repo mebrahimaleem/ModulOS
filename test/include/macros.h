@@ -24,6 +24,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+
 enum _test_result_t {
 	_TEST_PASS,
 	_TEST_FAIL,
@@ -40,7 +42,7 @@ extern const char* _test_name;
 
 extern void _test_report(const char* report);
 
-#define TEST_NAME(name) const char* _test_name = name;
+#define TEST_NAME(name) const char* _test_name = name
 
 #define TEST_EXP_PASS(nm) _TEST_EXPAND(__COUNTER__, nm, _TEST_PASS)
 #define TEST_EXP_FAIL(nm) _TEST_EXPAND(__COUNTER__, nm, _TEST_FAIL)
@@ -60,19 +62,23 @@ extern void _test_report(const char* report);
 	static void _test_##id(void)
 
 #define TEST_PASS() exit(EXIT_SUCCESS)
-#define TEST_FAIL(code) exit(EXIT_FAILURE)
+#define TEST_FAIL() exit(EXIT_FAILURE)
 
 #define ASSERT_TRUE(condition, report) \
-	if (!(condition)) { \
-		_test_report(report); \
-		TEST_FAIL(); \
-	}
+	do { \
+		if (!(condition)) { \
+			_test_report(report); \
+			TEST_FAIL(); \
+		} \
+	} while (0)
 
 #define ASSERT_FALSE(condition, report) \
-	if ((condition)) { \
-		_test_report(report); \
-		TEST_FAIL(); \
-	}
+	do { \
+		if ((condition)) { \
+			_test_report(report); \
+			TEST_FAIL(); \
+		} \
+	} while (0)
 
 #define ASSERT_EXCEPTION(callback, report, ...) \
 	do { \
@@ -86,9 +92,9 @@ extern void _test_report(const char* report);
 		} \
 		else { \
 			callback(__VA_OPT__(__VA_ARGS__)); \
-			exit(0); \
+			exit(EXIT_SUCCESS); \
 		} \
-	} while (0);
+	} while (0)
 
 #define ASSERT_NO_EXCEPTION(callback, report, ...) \
 	do { \
@@ -102,8 +108,8 @@ extern void _test_report(const char* report);
 		} \
 		else { \
 			callback(__VA_ARGS__); \
-			exit(0); \
+			exit(EXIT_SUCCESS); \
 		} \
-	} while (0);
+	} while (0)
 
 #endif /* TEST_HELPERS_MACROS_H */

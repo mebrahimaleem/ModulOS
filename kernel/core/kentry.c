@@ -35,6 +35,9 @@
 #include <core/gdt.h>
 #include <core/syscall.h>
 #include <core/mm.h>
+#include <core/elf.h>
+#include <core/lock.h>
+#include <core/panic.h>
 
 #include <lib/kmemcpy.h>
 
@@ -64,7 +67,7 @@ struct boot_context_t boot_context;
 extern uint8_t ap_bootstrap_start;
 extern uint64_t* init_stacks;
 extern uint8_t ap_bootstrap_end;
-extern volatile struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
+extern struct gdt_t(** ap_gdts)[GDT_NUM_ENTRIES];
 extern uint8_t* ap_init_locks;
 
 extern uint64_t init_stack_vaddr;
@@ -72,6 +75,9 @@ extern uint64_t init_stack_paddr;
 
 extern uint64_t* init_stacks_paddr;
 extern uint64_t* init_stacks_vaddr;
+
+static uint8_t prepare_userland_lock;
+static uint8_t init_done;
 
 static inline void write_syscall_msr(void) {
 	msr_write(MSR_STAR, ((GDT_USER_CS - 0x10) << 48) | (GDT_KERNEL_CS << 32));
@@ -95,7 +101,8 @@ void kentry(void) {
 	paging_ensure_mapped();
 	scheduler_init();
 
-	mm_transaction_init();
+	init_done = 0;
+	lock_init(&prepare_userland_lock);
 
 	write_syscall_msr();
 	cpu_set_cr4(CR4_FSGSBASE);
@@ -128,6 +135,7 @@ void kentry(void) {
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
+	mm_transaction_init();
 	tty_init();
 	pcie_init();
 	pcie_enumerate();
@@ -181,4 +189,39 @@ void kapentry(uint64_t arb_id) {
 	logging_log_info("AP init complete");
 
 	process_kill_current();
+}
+
+void prepare_userland(void* cntx) {
+	(void)cntx;
+
+	struct fs_handle_t* f = fs_open("/test.txt", FILE_FLAGS_READ | FILE_FLAGS_WRITE | FILE_FLAGS_CREATE);
+	if (f == 0) {
+		logging_log_error("Failed to create /test.txt");
+	}
+	fs_write(f, "Hi\n", 3);
+	fs_close(f);
+
+	lock_acquire(&prepare_userland_lock);
+	if (init_done) {
+		logging_log_error("Multiple calls to prepare userland");
+		panic(PANIC_STATE);
+	}
+
+	init_done = 1;
+	lock_release(&prepare_userland_lock);
+
+	struct fs_handle_t* shell = fs_open("/bin/shell", FILE_FLAGS_READ);
+	if (!shell) {
+		logging_log_error("Failed to open shell file");
+	}
+
+	else {
+		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), "/bin/shell ModulOS", "USER=root PWD=/");
+		if (!shell_pcb) {
+			logging_log_error("Failed to load shell file");
+		}
+		fs_close(shell);
+
+		scheduler_schedule(shell_pcb);
+	}
 }

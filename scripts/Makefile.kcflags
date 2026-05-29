@@ -16,7 +16,9 @@
 
 CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
 	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
-	-Wstrict-prototypes
+	-Wstrict-prototypes -Wundef -Wcast-qual -Wstrict-overflow=5 -Wswitch-enum -Winit-self -Wdouble-promotion \
+	-Wformat=2 -Wnull-dereference -Wpacked -Wvolatile-register-var -Walloca -Wvla -Wframe-larger-than=1024 \
+	-Wstrict-aliasing=2 -Wmissing-noreturn -Wmissing-format-attribute
 
 ifndef DEBUG
 	CWARN := $(CWARN) -Werror

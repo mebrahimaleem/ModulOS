@@ -34,8 +34,8 @@
 #define IST_LO_MASK			0xFFFFFFFF
 #define IST_HI_SHFT			32
 
-void tss_init(volatile struct gdt_t(* gdt)[GDT_NUM_ENTRIES]) {
-	volatile struct tss_t* tss = kmalloc(sizeof(struct tss_t));
+void tss_init(struct gdt_t(* gdt)[GDT_NUM_ENTRIES]) {
+	struct tss_t* tss = kmalloc(sizeof(struct tss_t));
 
 	kmemset((void*)tss, 0, sizeof(struct tss_t));
 

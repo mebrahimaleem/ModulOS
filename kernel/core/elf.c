@@ -35,6 +35,7 @@
 #include <lib/kmemcpy.h>
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
+#include <lib/array_list.h>
 
 #define EI_MAG0				0
 #define EI_CLASS			4
@@ -109,7 +110,10 @@
 #define AT_EXECFN 			31
 #define AT_SYSINFO_EHDR 33
 
-enum {
+#define FD_INIT_SIZE		4
+#define FD_GROWTH				8
+
+enum at_index_t {
 	AT_INDEX_PHDR,
 	AT_INDEX_PHENT,
 	AT_INDEX_PHNUM,
@@ -123,7 +127,7 @@ enum {
 	AT_INDEX_CLKTCK,
 
 	AT_INDEX_NULL
-} at_index_t;
+};
 
 typedef struct {
 	int a_type;
@@ -537,11 +541,13 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		}
 	}
 
-	kmemset(pcb->fd_table, 0, sizeof(struct fs_handle_t*) * MAX_FD);
-
-	pcb->fd_table[0] = fs_open("/dev/ttyS0");
-	pcb->fd_table[1] = fs_open("/dev/ttyS0");
-	pcb->fd_table[2] = fs_open("/dev/ttyS0");
+	pcb->fd_table = array_list_alloc(FD_INIT_SIZE, FD_GROWTH, 0);
+	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
+#ifdef SERIAL
+	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_READ));
+	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
+	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
+#endif /* SERIAL */
 
 restore_cr3:
 

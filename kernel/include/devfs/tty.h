@@ -32,10 +32,10 @@ extern struct tty_handle_t* tty_com1(void);
 extern struct tty_handle_t* tty_com2(void);
 #endif /* SERIAL */
 
-extern struct tty_handle_t* tty_open(char* name);
+extern struct tty_handle_t* tty_open(const char* name);
 extern void tty_close(struct tty_handle_t* tty);
 extern size_t tty_read(struct tty_handle_t* tty, void* buffer, size_t count);
 extern uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte);
-extern void tty_write(struct tty_handle_t* tty, void* buffer, size_t count);
+extern void tty_write(struct tty_handle_t* tty, const void* buffer, size_t count);
 
 #endif /* KERNEL_DEVFS_TTY_H */

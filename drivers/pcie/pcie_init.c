@@ -46,7 +46,7 @@
 
 #define PCI_BRIDGE_SEC_NUM(seg, bus, dev, func)	(0xFF & (pcie_read(seg, bus, dev, func, 0x18) >> 8))
 
-#define DISABLE_INT(seg, bus, dev, func)	pcie_write(seg, bus, dev, func, 0x4, pcie_read(seg, bus, dev, 0, 0x4) | 0x400);
+#define DISABLE_INT(seg, bus, dev, func)	pcie_write(seg, bus, dev, func, 0x4, pcie_read(seg, bus, dev, 0, 0x4) | 0x400)
 
 extern uint64_t**** ecam;
 

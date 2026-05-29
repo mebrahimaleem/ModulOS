@@ -255,13 +255,13 @@ static enum disk_error_t ahci_read_lba(void* cntx, void* buffer, uint64_t lba, u
 
 
 	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 	}
 
 	hba_write(ahci, PXCI_OFF(port), 1u << slot);
 	
 	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 
 		if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
 			logging_log_error("AHCI error while reading");
@@ -381,13 +381,13 @@ static enum disk_error_t ahci_write_lba(void* cntx, void* buffer, uint64_t lba, 
 
 
 	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 	}
 
 	hba_write(ahci, PXCI_OFF(port), 1u << slot);
 	
 	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 
 		if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
 			logging_log_error("AHCI error while reading");
@@ -462,13 +462,13 @@ static enum disk_error_t ahci_flush_cache(void* cntx) {
 	ahci->ports[port]->com_list[slot].ctba_u0 = 0;
 
 	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 	}
 
 	hba_write(ahci, PXCI_OFF(port), 1u << slot);
 
 	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 
 		if (hba_read(ahci, PXIS_OFF(port)) & IS_TFES) {
 			logging_log_error("AHCI flush cache error");
@@ -494,7 +494,7 @@ static enum disk_error_t ahci_flush_cache(void* cntx) {
 static void port_identify(struct ahci_t* ahci, uint32_t port) {
 	uint8_t slot;
 	uint32_t paddr_identity;
-	volatile uint16_t* identity;
+	uint16_t* identity;
 	uint8_t model[41];
 
 	paddr_identity = (uint32_t)mm_alloc_pmax(PAGE_SIZE_4K, 0, ~0u);
@@ -515,12 +515,18 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 
 	lock_acquire(&ahci->lock);
 	slot = find_slot(ahci, port);
+
+	if (slot == SLOT_NO_SLOT) {
+		logging_log_error("No available slots for identification");
+		panic(PANIC_STATE);
+	}
+
 	ahci->used_com |= 1u << slot;
 	lock_release(&ahci->lock);
 
 	kmemset(&ahci->ports[port]->com_list[slot], 0, sizeof(struct ahci_command_header_t));
 	kmemset(ahci->com_tables_v[slot], 0, PAGE_SIZE_4K);
-	kmemset((void*)identity, 0, PAGE_SIZE_4K);
+	kmemset(identity, 0, PAGE_SIZE_4K);
 
 	ahci->com_tables_v[slot]->prdt[0].dba = paddr_identity;
 	ahci->com_tables_v[slot]->prdt[0].dbau = 0;
@@ -542,13 +548,13 @@ static void port_identify(struct ahci_t* ahci, uint32_t port) {
 	ahci->ports[port]->com_list[slot].ctba_u0 = 0;
 
 	while (hba_read(ahci, PXTFD_OFF(port)) & TFD_STS_CON_MASK) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 	}
 
 	hba_write(ahci, PXCI_OFF(port), 1u << slot);
 	
 	while (hba_read(ahci, PXCI_OFF(port)) & (1u << slot)) {
-		time_busy_wait(10 * TIME_CONV_MS_TO_NS);
+		time_busy_wait(100);
 	}
 
 	lock_release(&ahci->ports[port]->lock);

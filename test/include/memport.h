@@ -1,4 +1,4 @@
-/* mergesort.h - mergesort interface */
+/* memport.h - kernel allocator port to userland interface */
 /* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,9 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_MERGESORT_H
-#define KERNEL_LIB_MERGESORT_H
+#ifndef TEST_HELPERS_MEMPORT_H
+#define TEST_HELPERS_MEMPORT_H
 
-extern void* mergesort_ll_inplace_ul(void* ll, void** (*next)(void*), unsigned long (*value)(void*));
+#include <stddef.h>
 
-#endif /* KERNEL_LIB_MERGESORT_H */
+void* kmalloc(size_t size);
+void kfree(void* ptr);
+
+#endif /* TEST_HELPERS_MEMPORT_H */

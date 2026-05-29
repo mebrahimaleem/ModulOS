@@ -19,29 +19,48 @@
 #include <stdlib.h>
 
 int main(int argc, char** argv) {
-	printf("%s\n", argv[0]);
-	if (argc > 1) {
-		printf("%s ", argv[1]);
-	}
+	(void)argc;
+	(void)argv;
+
+	static char buffer[8];
+
 	printf("Shell\n");
 
-	FILE* f = fopen(argv[0], "r");
-
-	if (!f) {
-		perror("Failed top open file");
-	}
-
-	static char buffer[4];
-
-	ssize_t read = fread(buffer, 1, sizeof(buffer), f);
-	if (read != 4) {
-		fprintf(stderr, "Failed to read file\n");
+	FILE* f = fopen("/test.txt", "r");
+	if (f == 0) {
+		perror("Failed to open file");
 		return EXIT_FAILURE;
 	}
 
-	printf("%3s\n", &buffer[1]);
+	ssize_t bytes_read = fread(buffer, 1, 8, f);
+	if (bytes_read == -1) {
+		perror("Failed to read file");
+		return EXIT_FAILURE;
+	}
 
 	fclose(f);
+
+	printf("Bytes read: %lu\nContent: %s", bytes_read, buffer);
+
+	static char input_buf[64];
+	printf("Enter file name:\n");
+	scanf("%s", input_buf);
+
+	f = fopen(input_buf, "a");
+
+	if (f == 0) {
+		perror("Failed to open file");
+		return EXIT_FAILURE;
+	}
+
+	if (fwrite(buffer, 1, bytes_read, f) != bytes_read) {
+		perror("Failed to write to file");
+		return EXIT_FAILURE;
+	}
+
+	fclose(f);
+
+	printf("Done\n");
 
 	return EXIT_SUCCESS;
 }

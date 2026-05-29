@@ -241,7 +241,7 @@ void serial_log(enum log_severity_t severity, const char* s, va_list args) {
 			serial_printf(s, serial_com12, args);
 			serial_print("\r\n", serial_com12);
 			break;
-		default:
+		case SEVERITY_NON:
 			serial_printf(s, serial_com12, args);
 			break;
 	}

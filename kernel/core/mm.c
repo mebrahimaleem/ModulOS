@@ -30,8 +30,6 @@
 #include <core/time.h>
 #include <core/signal.h>
 
-#include <lib/mergesort.h>
-
 #include <apic/ipi.h>
 
 #define PAGE_4K_MASK		0xFFFFFFFFFFFFF000
@@ -52,7 +50,7 @@ struct mm_tree_node_t {
 struct disarm_list_t {
 	struct disarm_list_t* next;
 	uint8_t id;
-	volatile uint8_t state;
+	uint8_t state;
 };
 
 static struct mm_tree_node_t* p_tree;
@@ -69,9 +67,9 @@ static uint8_t n_lock;
 static struct mm_tree_node_t node_pool[MAX_INIT_NODES];
 static struct mm_tree_node_t* free_nodes;
 
-static struct free_transaction_list_t* volatile pending_free;
+static struct free_transaction_list_t* pending_free;
 static struct free_transaction_list_t* transaction_list;
-uint8_t pending_free_lock;
+static uint8_t pending_free_lock;
 static struct disarm_list_t* disarm_list;
 
 static struct signal_wait_t* free_pending_wait;
@@ -431,12 +429,12 @@ void mm_free_p(uint64_t base, size_t size) {
 }
 
 void mm_free_v(uint64_t base, size_t size) {
-	volatile struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
+	struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
 	pending->base = base;
 	pending->size = size;
 	lock_acquire(&pending_free_lock);
 	pending->next = pending_free;
-	pending_free = (struct free_transaction_list_t* volatile)pending;
+	pending_free = (struct free_transaction_list_t*)pending;
 	lock_release(&pending_free_lock);
 
 	if (free_pending_wait) {
@@ -444,7 +442,7 @@ void mm_free_v(uint64_t base, size_t size) {
 	}
 }
 
-static void free_all_pending(void* _ign) {
+__attribute((noreturn)) static void free_all_pending(void* _ign) {
 	(void)_ign;
 
 	struct free_transaction_list_t* next;

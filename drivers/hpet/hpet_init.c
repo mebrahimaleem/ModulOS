@@ -54,13 +54,13 @@ static volatile struct hpet_group_t {
 	struct hpet_timer_t timers[32];
 } __attribute__((packed))* hpet_reg_bases[8];
 
-static uint64_t hpet_get_counter(void* meta) {
+static uint64_t hpet_get_counter(volatile void* meta) {
 	volatile struct hpet_group_t* hpet = meta;
 	const uint64_t ret = hpet->counter;
 	return ret;
 }
 
-static void hpet_set_counter(void* meta, uint64_t counter) {
+static void hpet_set_counter(volatile void* meta, uint64_t counter) {
 	volatile struct hpet_group_t* hpet = meta;
 	hpet->gen_conf &= ~(uint64_t)HPET_GROUP_ENA;
 	hpet->counter = counter;
@@ -104,7 +104,7 @@ void hpet_init(void) {
 			clock = kmalloc(sizeof(struct clock_src_t));
 			clock->counter = hpet_get_counter;
 			clock->reset = hpet_set_counter;
-			clock->meta = (void*)hpet_reg_bases[i];
+			clock->meta = hpet_reg_bases[i];
 			clock->period_fs = (hpet_reg_bases[i]->cap & HPET_PER) >> HPET_PER_SHF;
 			clock_src_register(clock);
 

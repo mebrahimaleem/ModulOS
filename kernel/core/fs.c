@@ -22,18 +22,37 @@
 #include <core/alloc.h>
 #include <core/logging.h>
 #include <core/panic.h>
+#include <core/semaphore.h>
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemcpy.h>
 #include <lib/kstrcmp.h>
 #include <lib/kstrcpy.h>
 #include <lib/kstrlen.h>
+#include <lib/hash.h>
+#include <lib/hash_table.h>
 
 #include <devfs/devfs.h>
 
-//TODO: implement per file blocking
+#define OPEN_TABLE_BUCKETS		100
 
-static uint8_t fs_lock;
+/*
+ * Locking conventions:
+ *
+ * The vfs layer guarantees non concurrent access to the same file, up to absolute paths.
+ * The vfs layer does not guarnatee non concurrent access to directory creation, file creation,
+ * multiple references to the same file via hard links, or atomic operations for multiple step
+ * calls (e.g. directory listing).
+ *
+ * In other words, the vfs is only responsible for ensuring that no two access are made to the
+ * inode at the same time. It is the actual fs driver's responsibility to ensure consistent access
+ * to filesystem metadata such as inode tables and journals
+ *
+ * Internally, the vfs must guarantee locked access to the open_table via the fs_lock. The vfs must
+ * also guarantee locked access to the vfs tree.
+ */
+
+static struct semaphore_t* fs_sem;
 
 struct vfs_mount_t {
 	struct mount_cntx_t* cntx;
@@ -45,11 +64,30 @@ struct vfs_mount_t {
 	fs_get_seek_t get_seek;
 	fs_seek_t seek;
 	fs_write_t write;
+	fs_delete_final_t delete_final;
+	fs_open_dir_t open_dir;
+	fs_read_dir_t read_dir;
+	fs_create_dir_t create_dir;
+	fs_delete_dir_t delete_dir;
+	fs_is_interactive_t is_interactive;
+	fs_truncate_t truncate;
+	fs_link_t link;
+	fs_unlink_t unlink;
+};
+
+struct vfs_open_file_t {
+	char* path;
+	uint64_t refs;
+	uint64_t key;
+	uint8_t lock;
+	uint8_t pending_delete;
 };
 
 struct fs_handle_t {
 	struct vfs_mount_t* mount;
 	struct file_handle_t* handle;
+	struct vfs_open_file_t* shared;
+	uint32_t flags;
 };
 
 struct vfs_tree_node_t {
@@ -64,6 +102,8 @@ struct vfs_tree_node_t {
 static struct vfs_tree_node_t vfs_root;
 static struct vfs_tree_node_t dev_root;
 
+static struct hash_table_t* open_table;
+
 static struct vfs_mount_t dev_mount = {
 	.cntx = 0,
 	.open = devfs_open,
@@ -72,8 +112,20 @@ static struct vfs_mount_t dev_mount = {
 	.read = devfs_read,
 	.get_seek = devfs_get_seek,
 	.seek = devfs_seek,
-	.write = devfs_write
+	.write = devfs_write,
+	.delete_final = devfs_delete_final,
+	.open_dir = devfs_open_dir,
+	.read_dir = devfs_read_dir,
+	.is_interactive = devfs_is_interactive,
+	.truncate = devfs_truncate,
+	.link = devfs_link,
+	.unlink = devfs_unlink
 };
+
+static uint8_t fs_not_interactive(struct file_handle_t* handle) {
+	(void)handle;
+	return 0;
+}
 
 static inline char* path_next(char* path, size_t* len) {
 	*len = 0;
@@ -90,8 +142,58 @@ static inline char* path_next(char* path, size_t* len) {
 	return path;
 }
 
+static struct vfs_open_file_t* lookup_register(char* path) {
+	size_t path_len = kstrlen(path);
+	uint64_t key = fnv64_1a(path, path_len);
+	struct vfs_open_file_t* file;
+
+	while (hash_table_get(open_table, key, (void**)&file)) {
+		if (kstrcmp(path, file->path + 1) == 0) {
+			break;
+		}
+
+		key++;
+	}
+
+	if (!file) {
+		file = kmalloc(sizeof(struct vfs_open_file_t));
+
+		file->path = kmalloc(path_len + 2);
+		file->path[0] = '/';
+		kstrcpy(file->path + 1, path);
+
+		file->refs = 0;
+		file->key = key;
+		file->pending_delete = 0;
+		lock_init(&file->lock);
+
+		hash_table_insert(open_table, key, file);
+	}
+
+	file->refs++;
+
+	return file;
+}
+
+static uint8_t lookup_close(struct vfs_open_file_t* file) {
+	file->refs--;
+
+	if (file->refs) {
+		return 0;
+	}
+
+	kfree(file->path);
+	void* ign;
+	hash_table_remove(open_table, file->key, &ign);
+
+	uint8_t pending_delete = file->pending_delete;
+
+	kfree(file);
+	return pending_delete;
+}
+
 void fs_init(void) {
-	lock_init(&fs_lock);
+	fs_sem = semaphore_alloc(SEMAPHORE_CAP_UNLIM);
 
 	vfs_root.co = 0;
 	vfs_root.sub = &dev_root;
@@ -102,6 +204,8 @@ void fs_init(void) {
 	dev_root.sub = 0;
 	dev_root.name = "dev";
 	dev_root.mount = &dev_mount;
+
+	open_table = hash_table_alloc(OPEN_TABLE_BUCKETS);
 }
 
 enum file_status_t fs_mount(
@@ -113,7 +217,15 @@ enum file_status_t fs_mount(
 		fs_read_t read,
 		fs_get_seek_t get_seek,
 		fs_seek_t seek,
-		fs_write_t write
+		fs_write_t write,
+		fs_delete_final_t delete_final,
+		fs_open_dir_t open_dir,
+		fs_read_dir_t read_dir,
+		fs_create_dir_t create_dir,
+		fs_delete_dir_t delete_dir,
+		fs_truncate_t truncate,
+		fs_link_t link,
+		fs_unlink_t unlink
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -132,6 +244,16 @@ enum file_status_t fs_mount(
 		vfs_root.mount->get_seek = get_seek;
 		vfs_root.mount->seek = seek;
 		vfs_root.mount->write = write;
+		vfs_root.mount->delete_final = delete_final;
+		vfs_root.mount->open_dir = open_dir;
+		vfs_root.mount->read_dir = read_dir;
+		vfs_root.mount->create_dir = create_dir;
+		vfs_root.mount->delete_dir = delete_dir;
+		vfs_root.mount->truncate = truncate;
+		vfs_root.mount->link = link;
+		vfs_root.mount->unlink = unlink;
+
+		vfs_root.mount->is_interactive = fs_not_interactive;
 
 		return FILE_OK;
 	}
@@ -141,13 +263,13 @@ enum file_status_t fs_mount(
 	return FILE_ERROR;
 }
 
-struct fs_handle_t* fs_open(const char* path) {
+static const char* find_mount(const char* path, struct vfs_mount_t** mount_out, void** clean_path_out, char** path_write_out) {
 	struct vfs_tree_node_t* node = &vfs_root, * walk = 0;
-	size_t len = kstrlen(path);
-	char* clean_path = kmalloc(len + 1);
-	char* mount_path = (char*)"";
+	const char* mount_path = "";
 	struct vfs_mount_t* mount = 0;
 
+	size_t len = kstrlen(path);
+	char* clean_path = kmalloc(len + 1);
 
 	uint64_t num_chars = 0;
 	uint64_t skip = 0;
@@ -199,8 +321,9 @@ struct fs_handle_t* fs_open(const char* path) {
 		path_write++; // one to skip /
 	}
 
+	*path_write_out = path_write;
 
-	//lock_acquire(&fs_lock);
+	semaphore_wait(fs_sem);
 
 	do {
 		if (node->mount) {
@@ -220,46 +343,101 @@ struct fs_handle_t* fs_open(const char* path) {
 
 	} while (walk && node == walk);
 
-	//lock_release(&fs_lock);
+	semaphore_signal(fs_sem);
+
+	*mount_out = mount;
+	*clean_path_out = clean_path;
+
+	return mount_path;
+}
+
+struct fs_handle_t* fs_open_mode(const char* path, uint32_t flags, uint32_t mode) {
+	struct vfs_mount_t* mount;
+	void* clean_path;
+	char* path_write;
+	const char* mount_path = find_mount(path, &mount, &clean_path, &path_write);
 
 	if (!mount) {
 		kfree(clean_path);
 		return 0;
 	}
 
-	struct file_handle_t* handle = mount->open(mount->cntx, mount_path);
+	struct file_handle_t* handle = mount->open(mount->cntx, mount_path, flags, mode);
+
+	if (!handle) {
+		return 0;
+	}
+
+	semaphore_wait(fs_sem);
+	struct vfs_open_file_t* open_file = lookup_register(path_write);
+	semaphore_signal(fs_sem);
 
 	kfree(clean_path);
 
 	struct fs_handle_t* fs_handle = kmalloc(sizeof(struct fs_handle_t));
 	fs_handle->handle = handle;
 	fs_handle->mount = mount;
+	fs_handle->shared = open_file;
+	fs_handle->flags = flags;
 	return fs_handle;
 }
 
-void fs_close(struct fs_handle_t* handle) {
-	//lock_acquire(&fs_lock);
+struct fs_handle_t* fs_open(const char* path, uint32_t flags) {
+	return fs_open_mode(path, flags, 0);
+}
 
+struct fs_handle_t* fs_openat(const char* path, uint32_t flags, struct fs_handle_t* at, uint32_t mode) {
+
+	if (*path == '/') {
+		// absolute, no at
+		return fs_open_mode(path, flags, mode);
+	}
+	else {
+		size_t prefix_len = kstrlen(at->shared->path);
+		size_t suffix_len = kstrlen(path);
+		char* full_path = kmalloc(prefix_len + suffix_len + 1);
+		kmemcpy(full_path, at->shared->path, prefix_len);
+		kmemcpy(full_path + prefix_len, path, suffix_len);
+		full_path[prefix_len + suffix_len] = 0;
+		struct fs_handle_t* ret = fs_open_mode(full_path, flags, mode);
+		kfree(full_path);
+		return ret;
+	}
+}
+
+void fs_close(struct fs_handle_t* handle) {
+	semaphore_wait_full(fs_sem);
+	if (lookup_close(handle->shared)) {
+		handle->mount->delete_final(handle->handle);
+	}
+	semaphore_signal_full(fs_sem);
+
+	lock_acquire(&handle->shared->lock);
 	handle->mount->close(handle->handle);
-	//lock_release(&fs_lock);
+	lock_release(&handle->shared->lock);
 
 	kfree(handle);
 }
 
 enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
-	//lock_acquire(&fs_lock);
 
+	lock_acquire(&handle->shared->lock);
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
-	//lock_release(&fs_lock);
+	lock_release(&handle->shared->lock);
+
 	return ret;
 }
 
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	//lock_acquire(&fs_lock);
+	if (!(handle->flags & FILE_FLAGS_READ)) {
+		return 0;
+	}
+
+	lock_acquire(&handle->shared->lock);
 	ret = handle->mount->read(handle->handle, buffer, count);
-	//lock_release(&fs_lock);
+	lock_release(&handle->shared->lock);
 
 	return ret;
 }
@@ -267,9 +445,9 @@ size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 uint64_t fs_get_seek(struct fs_handle_t* handle) {
 	uint64_t seek;
 
-	//lock_acquire(&fs_lock);
+	lock_acquire(&handle->shared->lock);
 	seek = handle->mount->get_seek(handle->handle);
-	//lock_release(&fs_lock);
+	lock_release(&handle->shared->lock);
 
 	return seek;
 }
@@ -277,19 +455,111 @@ uint64_t fs_get_seek(struct fs_handle_t* handle) {
 enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	enum file_status_t sts;
 
-	//lock_acquire(&fs_lock);
+	lock_acquire(&handle->shared->lock);
 	sts = handle->mount->seek(handle->handle, seek);
-	//lock_release(&fs_lock);
+	lock_release(&handle->shared->lock);
 
 	return sts;
 }
 
-size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
+size_t fs_write(struct fs_handle_t* handle, const void* buffer, size_t count) {
 	size_t ret;
 
-	//lock_acquire(&fs_lock);
+	if (!(handle->flags & FILE_FLAGS_WRITE)) {
+		return 0;
+	}
+
+	lock_acquire(&handle->shared->lock);
 	ret = handle->mount->write(handle->handle, buffer, count);
-	//lock_release(&fs_lock);
+	lock_release(&handle->shared->lock);
 
 	return ret;
+}
+
+struct fs_handle_t* fs_open_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->open_dir(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	if (sts != FILE_OK) {
+		return 0;
+	}
+
+	return handle;
+}
+
+enum file_status_t fs_create_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->create_dir(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_delete_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->delete_dir(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* info) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->read_dir(handle->handle, info);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_truncate(struct fs_handle_t* handle, size_t size) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->truncate(handle->handle, size);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+
+}
+
+enum file_status_t fs_link(struct fs_handle_t* handle, struct fs_handle_t* replace) {
+	enum file_status_t sts;
+
+	if (handle->mount != replace->mount) {
+		return FILE_BAD_FLAGS; // cannot create hardlink between filesystems
+	}
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->link(handle->handle, replace->handle);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_unlink(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->unlink(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+
+}
+
+void fs_path(struct fs_handle_t* handle, size_t max_len, char* buf) {
+	kstrncpy(buf, handle->shared->path, max_len);
+}
+
+uint8_t fs_is_interactive(struct fs_handle_t* handle) {
+	return handle->mount->is_interactive(handle->handle);
 }

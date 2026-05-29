@@ -40,7 +40,7 @@
 #define ICR_PID_SHFT	24
 
 static uint8_t tlb_shootdown_vector;
-uint8_t shootdown_enable = 0;
+static uint8_t shootdown_enable = 0;
 
 struct shootdown_node_t {
 	struct shootdown_node_t* next;

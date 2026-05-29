@@ -36,7 +36,7 @@ struct disk_t {
 	struct disk_t* next;
 };
 
-uint8_t disk_lock;
+static uint8_t disk_lock;
 
 static struct disk_t* disk_list;
 static uint64_t disk_id;

@@ -25,8 +25,9 @@
 #include <kernel/core/fs.h>
 #include <kernel/core/signal.h>
 
-#define MAX_FD		256
-#define MAX_META	1
+#include <kernel/lib/array_list.h>
+
+#define MAX_META		1
 
 struct pcb_t;
 
@@ -68,7 +69,10 @@ struct pcb_t {
 
 	struct pcb_t* next;
 
-	struct fs_handle_t* fd_table[MAX_FD];
+	uint64_t exit_code;
+
+	struct fs_handle_t* wd;
+	struct array_list_t* fd_table;
 
 	uint8_t fxdata[512] __attribute__((aligned(16)));
 

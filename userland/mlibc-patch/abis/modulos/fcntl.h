@@ -6,10 +6,10 @@
 
 #define O_PATH 010000000
 
-#define O_ACCMODE (03 | O_PATH)
-#define O_RDONLY   00
-#define O_WRONLY   01
-#define O_RDWR     02
+#define O_ACCMODE (0x03)
+#define O_RDONLY   0x1
+#define O_WRONLY   0x2
+#define O_RDWR     0x3
 
 #define O_CREAT         0100
 #define O_EXCL          0200

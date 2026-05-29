@@ -18,9 +18,13 @@
 #ifndef KERNEL_LIB_KSTRCPY_H
 #define KERNEL_LIB_KSTRCPY_H
 
+#include <stddef.h>
+
 extern char* kstrcpy(char* dest, const char* src);
 
 extern char* kstrcpy_no_null(char* dest, const char* src);
+
+extern char* kstrncpy(char* dest, const char* src, size_t len);
 
 #endif /* KERNEL_LIB_KSTRCPY_H */
 

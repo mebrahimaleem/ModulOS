@@ -206,7 +206,7 @@ next_arena:
 		lock_acquire(&alloc_lock);
 		i = i->next;
 		lock_release(&alloc_lock);
-	};
+	}
 
 	// out of heap space, new arena
 	arena_base = mm_alloc_p(ARENA_SIZE);

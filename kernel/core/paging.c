@@ -103,9 +103,12 @@ static uint64_t* increase_granularity(uint64_t vaddr, uint64_t* access, enum pag
 			case PAGE_1G:
 				access = &(access)[GET_PD_INDEX(vaddr)];
 				break;
-			default:
+			case PAGE_2M:
 				access = &(access)[GET_PT_INDEX(vaddr)];
 				break;
+			case PAGE_4K:
+				logging_log_error("Invalid call to increase granularity");
+				panic(PANIC_STATE);
 		}
 	}
 

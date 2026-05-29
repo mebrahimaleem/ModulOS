@@ -30,8 +30,8 @@
 #include <apic/apic_regs.h>
 
 static uint8_t lock_sched;
-static volatile struct pcb_t* active_queue;
-static volatile struct pcb_t* active_queue_tail;
+static struct pcb_t* active_queue;
+static struct pcb_t* active_queue_tail;
 
 static struct pcb_t* sleep_queue;
 
@@ -71,7 +71,6 @@ void scheduler_run(void) {
 				cpu_cli();
 				apic_write_reg(APIC_REG_EOI, APIC_EOI);
 				process_resume(current_pcb);
-				break;
 			case SCHED_KILL:
 				process_discard(current_pcb);
 				break;
@@ -93,9 +92,6 @@ void scheduler_run(void) {
 			case SCHED_CALLBACK:
 				current_pcb->sleep_state.callback(current_pcb);
 				break;
-			default:
-				logging_log_error("Invalid scheduler code %u", current_pcb->sched_cntr);
-				__attribute__((fallthrough));
 			case SCHED_READY:
 			case SCHED_SIGNAL_READY:
 				scheduler_schedule(current_pcb);

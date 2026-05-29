@@ -72,7 +72,7 @@ struct mb2_tag_t {
 
 		struct {
 			struct acpi_rsdp_t rsdp;
-		} __attribute__((packed)) rsdpv2;
+		} rsdpv2;
 
 #ifdef GRAPHICSBASE
 		struct {
@@ -91,8 +91,8 @@ struct mb2_tag_t {
 					uint8_t framebuffer_green_mask_size;
 					uint8_t framebuffer_blue_field_position;
 					uint8_t framebuffer_blue_mask_size;
-				} __attribute__((packed)) rgb;
-			} __attribute__((packed)) color_info;
+				} rgb;
+			} color_info;
 		} __attribute__((packed)) framebuffer;
 #endif /* GRAPHICSBASE */
 	} tag;
@@ -101,11 +101,11 @@ struct mb2_tag_t {
 struct mb2_info_t {
 	const uint32_t total_size;
 	const uint32_t reserved;
-} __attribute__((packed)) header;
+} __attribute__((packed));
 
-extern volatile struct gdt_t gdt[GDT_NUM_ENTRIES];
+extern struct gdt_t gdt[GDT_NUM_ENTRIES];
 
-static volatile struct mb2_tag_t* memmap_tag;
+static struct mb2_tag_t* memmap_tag;
 
 extern uint64_t init_stack_paddr;
 extern uint64_t init_stack_vaddr;
