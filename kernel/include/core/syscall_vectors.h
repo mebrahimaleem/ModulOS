@@ -43,10 +43,12 @@
 
 /*
  * rdi: path (const char*)
- * rsi: mode (uint8_t)
+ * rsi: flags (uint8_t)
+ * rdx: at (int)
+ * r8 : mode (int)
  * ret: handle (int)
  */
-#define SYSCALL_OPEN				1
+#define SYSCALL_OPENAT			1
 
 /*
  * rdi: handle (int)
@@ -77,36 +79,35 @@
 #define SYSCALL_ALLOC				5
 
 /*
- * rdi: handle (int)
- * rsi: name (const char*)
- * ret: success (int)
+ * reserved
  */
-#define SYSCALL_CREATE			6
+#define SYSCALL_RESV1				6
+
+/*
+ * reserved
+ */
+#define SYSCALL_RESV2				7
 
 /*
  * rdi: handle (int)
- * ret: success (int)
- */
-#define SYSCALL_DELETE			7
-
-/*
- * rdi: handle (int)
- * ret handle (void*)
+ * ret handle (int)
  */
 #define SYSCALL_OPEN_DIR		8
 
 /*
- * rdi: handle (void*)
+ * rdi: handle (int)
  * rsi: info buffer (void*)
- * ret: success (int)
+ * rdx: max_size (size_t)
+ * ret: size (size_t)
  */
 #define SYSCALL_READ_DIR		9
 
 /*
- * rdi: handle (void*)
- * ret: (void)
+ * rdi: handle (int)
+ * rsi: size (size_t)
+ * ret: success (int)
  */
-#define SYSCALL_CLOSE_DIR		10
+#define SYSCALL_TRUNCATE		10
 
 /*
  * rdi: handle (int)
@@ -116,14 +117,13 @@
 #define SYSCALL_SEEK				11
 
 /*
- * rdi: handle (int)
+ * rdi: handle
  * ret: seek (long int)
  */
 #define SYSCALL_TELL				12
 
 /*
  * rdi: handle (int)
- * rsi: name (const char*)
  * ret: success (int)
  */
 #define SYSCALL_CREATE_DIR	13
@@ -141,10 +141,43 @@
 
 /*
  * rdi: handle (int)
- * ret: 1 on tty. 0 otherwise
+ * ret: 1 on tty. 0 otherwise (int)
  */
 #define SYSCALL_IS_A_TTY		16
 
-#define SYSCALL_MAX					17
+/*
+ * rdi: buffer (char*)
+ * rsi: max len (size_t)
+ * ret: success (int)
+ */
+#define SYSCALL_GCWD				17
+
+/*
+ * rdi: handle (int)
+ * ret: success (int)
+ */
+#define SYSCALL_CCWD				18
+
+/*
+ * rdi: handle
+ * rsi: replace handle
+ * ret: success (int)
+ */
+#define SYSCALL_LINK				19
+
+/*
+ * rdi: handle (int)
+ * ret: success (int)
+ */
+#define SYSCALL_UNLINK			20
+
+/*
+ * rdi: handle (int)
+ * rsi: statbuf (struct file_info_t*)
+ * ret: success (int)
+ */
+#define SYSCALL_STAT				21
+
+#define SYSCALL_MAX					22
 
 

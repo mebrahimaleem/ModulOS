@@ -868,7 +868,7 @@ static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 }
 
 
-static void ext2_close_dir(struct file_handle_t* handle) {
+static void ext2_reset_dir(struct file_handle_t* handle) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 
 	inode_handle->seek = 0;
@@ -881,7 +881,7 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 	struct ext2_inode_t inode;
 
 	if (!(inode_handle->ext2_mode & MODE_DIR)) {
-		return FILE_BAD_MODE;
+		return FILE_BAD_FLAGS;
 	}
 
 	if (get_inode(inode_handle, &inode)) {
@@ -956,12 +956,16 @@ static struct ext2_inode_handle_t* ext2_duplicate(struct ext2_inode_handle_t* ha
 	return dup;
 }
 
-static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* path) {
+static void ext2_close(struct file_handle_t* handle) {
+	kfree(handle);
+}
+
+static const char* reduce_path(struct ext2_t* ext2, const char* path, struct ext2_inode_handle_t** handle_ret) {
 	size_t path_len;
 	uint8_t cntrl = 0;
 
 	struct ext2_inode_handle_t* handle = kmalloc(sizeof(struct ext2_inode_handle_t));
-	handle->ext2 = (struct ext2_t*)cntx;
+	handle->ext2 = ext2;
 	handle->inode_index = EXT2_ROOT_INO;
 	handle->ext2_mode = 0;
 
@@ -978,7 +982,7 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* pa
 		while (ext2_read_dir((struct file_handle_t*)handle, &info) == FILE_OK) {
 			if (path_len == kstrlen(info.name) && kmemcmp(path, info.name, path_len) == 0) {
 				cntrl = 0;
-				ext2_close_dir((struct file_handle_t*)handle);
+				ext2_reset_dir((struct file_handle_t*)handle);
 				handle->inode_index = info.inode_num;
 				break;
 			}
@@ -996,197 +1000,36 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* pa
 		}
 	}
 
-	ext2_close_dir((struct file_handle_t*)handle);
+	ext2_reset_dir((struct file_handle_t*)handle);
+	*handle_ret = handle;
 
-	if (*path) {
-		// file not found
-		kfree(handle);
-		return 0;
-	}
-
-	return (struct file_handle_t*)handle;
+	return path;
 }
 
-static void ext2_close(struct file_handle_t* handle) {
-	kfree(handle);
-}
+static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uint32_t mode) {
+	(void)mode;
 
-static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count) {
-	struct ext2_inode_t inode;
-	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	uint8_t* block_buffer = 0;
-	uint64_t block;
-
-	if (!inode_handle || get_inode(inode_handle, &inode)) {
-		return 0;
-	}
-
-	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
-	const uint64_t block_size = inode_handle->ext2->block_size;
-
-	size_t read = 0;
-	uint64_t write_seek = 0;
-	size_t read_len;
-	uint64_t full_seek = ext2_get_seek(handle);
-
-
-	while (count) {
-		if (full_seek > size) {
-			break;
-		}
-
-		read_len = block_size; // default full block
-
-		if (count < block_size) {
-			// read partial, only requested
-			read_len = count;
-		}
-
-		if (read_len + inode_handle->seek > block_size) {
-			// read partial, not past block
-			read_len = block_size - inode_handle->seek;
-		}
-
-		switch (get_block(inode_handle->ext2, &inode, inode_handle->seek_block, &block)) {
-			case BLOCK_OK:
-				block_buffer = read_block(block, inode_handle->ext2);
-
-				if (!block_buffer) {
-					return read;
-				}
-
-				if (read_len + full_seek > size) {
-					// full block read, but only copy up to limit of the file
-					read_len = size - full_seek;
-					count = 0;
-				}
-
-				kmemcpy((uint8_t*)buffer + write_seek, block_buffer + inode_handle->seek, read_len);
-
-				kfree(block_buffer);
-				break;
-			case BLOCK_SPARSE:
-				kmemset((uint8_t*)buffer + write_seek, 0, read_len);
-				break;
-			case BLOCK_ERROR:
-				return read;
-		}
-
-		write_seek += read_len;
-		full_seek += read_len;
-		inode_handle->seek += read_len;
-		count -= read_len;
-		read += read_len;
-
-		if (inode_handle->seek == block_size) {
-			inode_handle->seek = 0;
-			inode_handle->seek_block++;
-		}
-	}
-
-	return read;
-}
-
-static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek) {
-	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	const uint64_t block_size = inode_handle->ext2->block_size;
-
-	inode_handle->seek_block = seek / block_size;
-	inode_handle->seek = seek % block_size;
-
-	return FILE_OK;
-}
-
-static size_t ext2_write(struct file_handle_t* handle, void* buffer, size_t count) {
-	struct ext2_inode_t inode;
-	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
-	uint8_t* block_buffer = 0;
-	uint64_t block;
-
-	if (!inode_handle || get_inode(inode_handle, &inode)) {
-		return 0;
-	}
-
-	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
-	const uint64_t block_size = inode_handle->ext2->block_size;
-
-	size_t written = 0;
-	uint64_t read_seek = 0;
-	size_t write_len;
-	uint64_t full_seek = ext2_get_seek(handle);
-
-
-	while (count) {
-		write_len = block_size; // default full block
-
-		if (count < block_size) {
-			// write partial, only requested
-			write_len = count;
-		}
-
-		if (write_len + inode_handle->seek > block_size) {
-			// write partial, not past block
-			write_len = block_size - inode_handle->seek;
-		}
-
-		switch (get_block(inode_handle->ext2, &inode, inode_handle->seek_block, &block)) {
-			case BLOCK_SPARSE:
-				block = assign_block(inode_handle, inode_handle->seek_block, &inode, 0);
-
-				if (!block) {
-					goto update_inode;
-				}
-
-				__attribute__((fallthrough));
-			case BLOCK_OK:
-				block_buffer = read_block(block, inode_handle->ext2);
-
-				if (!block_buffer) {
-					goto update_inode;
-				}
-
-				kmemcpy(block_buffer + inode_handle->seek, (uint8_t*)buffer + read_seek, write_len);
-
-				block_buffer = write_block(block, inode_handle->ext2, block_buffer);
-
-				if (!block_buffer) {
-					goto update_inode;
-				}
-
-				kfree(block_buffer);
-				break;
-			case BLOCK_ERROR:
-				goto update_inode;
-		}
-
-		read_seek += write_len;
-		full_seek += write_len;
-		inode_handle->seek += write_len;
-		count -= write_len;
-		written += write_len;
-
-		if (inode_handle->seek == block_size) {
-			inode_handle->seek = 0;
-			inode_handle->seek_block++;
-		}
-	}
-
-update_inode:
-	if (full_seek > size) {
-		inode.i_size = (uint32_t)full_seek;
-		inode.i_dir_acl = (uint32_t)(full_seek >> 32);
-
-		set_inode(inode_handle, &inode);
-	}
-
-	return written;
-}
-
-static enum file_status_t ext2_create(struct file_handle_t* handle, const char* name) {
 	enum file_status_t sts;
+	struct ext2_inode_handle_t* handle;
+
+	path = reduce_path(ext2, path, &handle);
+
+	if (!*path) {
+		return FILE_BUSY;
+	}
+
+	const char* name = path;
+
+	while (*path && *path != '/') {
+		path++;
+	}
+
+	if (*path == '/') {
+		return FILE_DNE;
+	}
 
 	struct file_info_t info;
-	if ((sts = ext2_stat(handle, &info)) != FILE_OK) {
+	if ((sts = ext2_stat((struct file_handle_t*)handle, &info)) != FILE_OK) {
 		return sts;
 	}
 
@@ -1194,18 +1037,16 @@ static enum file_status_t ext2_create(struct file_handle_t* handle, const char* 
 		return FILE_NO_SUPPORT;
 	}
 
-
 	struct dir_info_t dir_info;
 	struct ext2_inode_handle_t* inode_handle = ext2_duplicate((struct ext2_inode_handle_t*)handle);
 
-	lock_acquire(&inode_handle->ext2->lock);
+	lock_acquire(&ext2->lock);
 
 	ext2_open_dir((struct file_handle_t*)inode_handle);
 
-
 	while (ext2_read_dir((struct file_handle_t*)inode_handle, &dir_info) == FILE_OK) {
 		if (kstrcmp(dir_info.name, name) == 0) {
-			ext2_close_dir((struct file_handle_t*)inode_handle);
+			ext2_reset_dir((struct file_handle_t*)inode_handle);
 
 			lock_release(&inode_handle->ext2->lock);
 
@@ -1263,7 +1104,7 @@ static enum file_status_t ext2_create(struct file_handle_t* handle, const char* 
 
 	uint64_t block;
 	ext2_open_dir((struct file_handle_t*)parent_handle);
-	//TODO: allocate on in already used block
+	//TODO: allocate on an already used block
 	while (1) {
 		switch (get_block(parent_handle->ext2, &parent_inode, parent_handle->seek_block, &block)) {
 			case BLOCK_SPARSE:
@@ -1300,7 +1141,7 @@ static enum file_status_t ext2_create(struct file_handle_t* handle, const char* 
 	}
 
 cleanup:
-	ext2_close_dir((struct file_handle_t*)inode_handle);
+	ext2_reset_dir((struct file_handle_t*)inode_handle);
 
 	lock_release(&inode_handle->ext2->lock);
 
@@ -1310,23 +1151,230 @@ cleanup:
 	return sts;
 }
 
-static enum file_status_t ext2_delete(struct file_handle_t* handle) {
-	(void)handle;
-	return FILE_NO_SUPPORT;
+static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* path, uint32_t flags, uint32_t mode) {
+	struct ext2_t* ext2 = (struct ext2_t*)cntx;
+	struct ext2_inode_handle_t* handle;
+
+	path = reduce_path(ext2, path, &handle);
+
+	if (*path) {
+		// file not found
+		kfree(handle);
+
+		if (flags & FILE_FLAGS_CREATE) {
+			enum file_status_t create_sts = ext2_create(ext2, path, mode);
+			if (create_sts == FILE_OK) {
+				return ext2_open(cntx, path, flags & FILE_FLAGS_CREATE, mode);
+			}
+		}
+		return 0;
+	}
+
+	return (struct file_handle_t*)handle;
+}
+
+static size_t ext2_read(struct file_handle_t* handle, void* buffer, size_t count) {
+	struct ext2_inode_t inode;
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	uint8_t* block_buffer = 0;
+	uint64_t block;
+
+	if (!inode_handle || get_inode(inode_handle, &inode)) {
+		return 0;
+	}
+
+	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	const uint64_t block_size = inode_handle->ext2->block_size;
+
+	size_t read = 0;
+	uint64_t write_seek = 0;
+	size_t read_len;
+	uint64_t full_seek = ext2_get_seek(handle);
+
+
+	while (count) {
+		if (full_seek >= size) {
+			break;
+		}
+
+		read_len = block_size; // default full block
+
+		if (count < block_size) {
+			// read partial, only requested
+			read_len = count;
+		}
+
+		if (read_len + inode_handle->seek > block_size) {
+			// read partial, not past block
+			read_len = block_size - inode_handle->seek;
+		}
+
+		switch (get_block(inode_handle->ext2, &inode, inode_handle->seek_block, &block)) {
+			case BLOCK_OK:
+				block_buffer = read_block(block, inode_handle->ext2);
+
+				if (!block_buffer) {
+					return read;
+				}
+
+				if (read_len + full_seek >= size) {
+					// full block read, but only copy up to limit of the file
+					read_len = size - full_seek;
+					count = 0;
+				}
+
+				kmemcpy((uint8_t*)buffer + write_seek, block_buffer + inode_handle->seek, read_len);
+
+				kfree(block_buffer);
+				break;
+			case BLOCK_SPARSE:
+				kmemset((uint8_t*)buffer + write_seek, 0, read_len);
+				break;
+			case BLOCK_ERROR:
+				return read;
+		}
+
+		write_seek += read_len;
+		full_seek += read_len;
+		inode_handle->seek += read_len;
+		count -= read_len;
+		read += read_len;
+
+		if (inode_handle->seek == block_size) {
+			inode_handle->seek = 0;
+			inode_handle->seek_block++;
+		}
+	}
+
+	return read;
+}
+
+static enum file_status_t ext2_seek(struct file_handle_t* handle, uint64_t seek) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	const uint64_t block_size = inode_handle->ext2->block_size;
+
+	inode_handle->seek_block = seek / block_size;
+	inode_handle->seek = seek % block_size;
+
+	return FILE_OK;
+}
+
+static size_t ext2_write(struct file_handle_t* handle, const void* buffer, size_t count) {
+	struct ext2_inode_t inode;
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+	uint8_t* block_buffer = 0;
+	uint64_t block;
+
+	if (!inode_handle || get_inode(inode_handle, &inode)) {
+		return 0;
+	}
+
+	const uint64_t size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	const uint64_t block_size = inode_handle->ext2->block_size;
+
+	size_t written = 0;
+	uint64_t read_seek = 0;
+	size_t write_len;
+	uint64_t full_seek = ext2_get_seek(handle);
+
+
+	while (count) {
+		write_len = block_size; // default full block
+
+		if (count < block_size) {
+			// write partial, only requested
+			write_len = count;
+		}
+
+		if (write_len + inode_handle->seek > block_size) {
+			// write partial, not past block
+			write_len = block_size - inode_handle->seek;
+		}
+
+		switch (get_block(inode_handle->ext2, &inode, inode_handle->seek_block, &block)) {
+			case BLOCK_SPARSE:
+				block = assign_block(inode_handle, inode_handle->seek_block, &inode, 0);
+
+				if (!block) {
+					goto update_inode;
+				}
+
+				__attribute__((fallthrough));
+			case BLOCK_OK:
+				block_buffer = read_block(block, inode_handle->ext2);
+
+				if (!block_buffer) {
+					goto update_inode;
+				}
+
+				kmemcpy(block_buffer + inode_handle->seek, (const uint8_t*)buffer + read_seek, write_len);
+
+				block_buffer = write_block(block, inode_handle->ext2, block_buffer);
+
+				if (!block_buffer) {
+					goto update_inode;
+				}
+
+				kfree(block_buffer);
+				break;
+			case BLOCK_ERROR:
+				goto update_inode;
+		}
+
+		read_seek += write_len;
+		full_seek += write_len;
+		inode_handle->seek += write_len;
+		count -= write_len;
+		written += write_len;
+
+		if (inode_handle->seek == block_size) {
+			inode_handle->seek = 0;
+			inode_handle->seek_block++;
+		}
+	}
+
+update_inode:
+	if (full_seek > size) {
+		inode.i_size = (uint32_t)full_seek;
+		inode.i_dir_acl = (uint32_t)(full_seek >> 32);
+
+		set_inode(inode_handle, &inode);
+	}
+
+	return written;
 }
 
 static void ext2_delete_final(struct file_handle_t* handle) {
 	(void)handle;
 }
 
-static enum file_status_t ext2_create_dir(struct file_handle_t* handle, const char* name) {
+static enum file_status_t ext2_create_dir(struct file_handle_t* handle) {
 	(void)handle;
-	(void)name;
 
 	return FILE_NO_SUPPORT;
 }
 
 static enum file_status_t ext2_delete_dir(struct file_handle_t* handle) {
+	(void)handle;
+
+	return FILE_NO_SUPPORT;
+}
+
+static enum file_status_t ext2_truncate(struct file_handle_t* handle, size_t size) {
+	(void)handle;
+	(void)size;
+
+	return FILE_NO_SUPPORT;
+}
+
+static enum file_status_t ext2_link(struct file_handle_t* handle, struct file_handle_t* replace) {
+	(void)handle;
+	(void)replace;
+
+	return FILE_NO_SUPPORT;
+}
+
+static enum file_status_t ext2_unlink(struct file_handle_t* handle) {
 	(void)handle;
 
 	return FILE_NO_SUPPORT;
@@ -1390,14 +1438,14 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_get_seek,
 					ext2_seek,
 					ext2_write,
-					ext2_create,
-					ext2_delete,
 					ext2_delete_final,
 					ext2_open_dir,
-					ext2_close_dir,
 					ext2_read_dir,
 					ext2_create_dir,
-					ext2_delete_dir
+					ext2_delete_dir,
+					ext2_truncate,
+					ext2_link,
+					ext2_unlink
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);

@@ -136,6 +136,7 @@ $(USERLAND_TARGETS): userland
 
 $(TEST_TARGETS): test
 
+.PHONY: $(TEST_EXEC)
 $(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
 	$(CC) -g -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 

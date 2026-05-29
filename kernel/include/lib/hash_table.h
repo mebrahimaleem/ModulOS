@@ -27,9 +27,19 @@ extern struct hash_table_t* hash_table_alloc(size_t buckets);
 
 extern void* hash_table_insert(struct hash_table_t* table, uint64_t key, void* value);
 
-extern void* hash_table_get(struct hash_table_t* table, uint64_t key);
+extern uint8_t hash_table_get(struct hash_table_t* table, uint64_t key, void** out);
 
-extern void* hash_table_remove(struct hash_table_t* table, uint64_t key);
+extern uint8_t hash_table_remove(struct hash_table_t* table, uint64_t key, void** out);
+
+extern void hash_table_clear(struct hash_table_t* table, void (*free_func)(void*));
+
+extern void hash_table_free(struct hash_table_t* table, void (*free_func)(void*));
+
+extern void hash_table_copy(struct hash_table_t* table, struct hash_table_t* copy, void* (*dup_func)(void*));
+
+extern void hash_table_resize(struct hash_table_t* table, size_t buckets);
+
+extern size_t hash_table_count(struct hash_table_t* table);
 
 #endif /* KERNEL_LIB_HASH_TABLE_H */
 

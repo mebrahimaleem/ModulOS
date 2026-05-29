@@ -146,22 +146,22 @@ size_t tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
 	return read;
 }
 
-void tty_write(struct tty_handle_t* tty, void* buffer, size_t count) {
+void tty_write(struct tty_handle_t* tty, const void* buffer, size_t count) {
 	for (size_t i = 0; i < count; i++) {
-		uint8_t val = ((uint8_t*)buffer)[i];
+		uint8_t val = ((const uint8_t*)buffer)[i];
 		switch (val) {
 			case '\n':
 				tty->writer('\r');
 				__attribute__((fallthrough));
 			default:
-				tty->writer(((uint8_t*)buffer)[i]);
+				tty->writer(((const uint8_t*)buffer)[i]);
 				break;
 		}
 	}
 }
 
 uint8_t tty_queue_read(struct tty_handle_t* tty, uint8_t byte) {
-	if (FULL(tty->read_index, tty->write_index)) {
+	if (byte == 0 || FULL(tty->read_index, tty->write_index)) {
 		return 0;
 	}
 

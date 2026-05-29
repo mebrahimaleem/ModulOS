@@ -64,15 +64,15 @@ struct vfs_mount_t {
 	fs_get_seek_t get_seek;
 	fs_seek_t seek;
 	fs_write_t write;
-	fs_create_t create;
-	fs_delete_t delete;
 	fs_delete_final_t delete_final;
 	fs_open_dir_t open_dir;
-	fs_close_dir_t close_dir;
 	fs_read_dir_t read_dir;
 	fs_create_dir_t create_dir;
 	fs_delete_dir_t delete_dir;
 	fs_is_interactive_t is_interactive;
+	fs_truncate_t truncate;
+	fs_link_t link;
+	fs_unlink_t unlink;
 };
 
 struct vfs_open_file_t {
@@ -87,7 +87,7 @@ struct fs_handle_t {
 	struct vfs_mount_t* mount;
 	struct file_handle_t* handle;
 	struct vfs_open_file_t* shared;
-	uint8_t mode;
+	uint32_t flags;
 };
 
 struct vfs_tree_node_t {
@@ -113,13 +113,13 @@ static struct vfs_mount_t dev_mount = {
 	.get_seek = devfs_get_seek,
 	.seek = devfs_seek,
 	.write = devfs_write,
-	.create = devfs_create,
-	.delete = devfs_delete,
 	.delete_final = devfs_delete_final,
 	.open_dir = devfs_open_dir,
-	.close_dir = devfs_close_dir,
 	.read_dir = devfs_read_dir,
-	.is_interactive = devfs_is_interactive
+	.is_interactive = devfs_is_interactive,
+	.truncate = devfs_truncate,
+	.link = devfs_link,
+	.unlink = devfs_unlink
 };
 
 static uint8_t fs_not_interactive(struct file_handle_t* handle) {
@@ -143,11 +143,12 @@ static inline char* path_next(char* path, size_t* len) {
 }
 
 static struct vfs_open_file_t* lookup_register(char* path) {
-	uint64_t key = fnv64_1a(path, kstrlen(path));
+	size_t path_len = kstrlen(path);
+	uint64_t key = fnv64_1a(path, path_len);
 	struct vfs_open_file_t* file;
 
-	while ((file = hash_table_get(open_table, key))) {
-		if (kstrcmp(path, file->path) == 0) {
+	while (hash_table_get(open_table, key, (void**)&file)) {
+		if (kstrcmp(path, file->path + 1) == 0) {
 			break;
 		}
 
@@ -157,8 +158,9 @@ static struct vfs_open_file_t* lookup_register(char* path) {
 	if (!file) {
 		file = kmalloc(sizeof(struct vfs_open_file_t));
 
-		file->path = kmalloc(kstrlen(path) + 1);
-		kstrcpy(file->path, path);
+		file->path = kmalloc(path_len + 2);
+		file->path[0] = '/';
+		kstrcpy(file->path + 1, path);
 
 		file->refs = 0;
 		file->key = key;
@@ -181,7 +183,8 @@ static uint8_t lookup_close(struct vfs_open_file_t* file) {
 	}
 
 	kfree(file->path);
-	hash_table_remove(open_table, file->key);
+	void* ign;
+	hash_table_remove(open_table, file->key, &ign);
 
 	uint8_t pending_delete = file->pending_delete;
 
@@ -215,14 +218,14 @@ enum file_status_t fs_mount(
 		fs_get_seek_t get_seek,
 		fs_seek_t seek,
 		fs_write_t write,
-		fs_create_t create,
-		fs_delete_t delete,
 		fs_delete_final_t delete_final,
 		fs_open_dir_t open_dir,
-		fs_close_dir_t close_dir,
 		fs_read_dir_t read_dir,
 		fs_create_dir_t create_dir,
-		fs_delete_dir_t delete_dir
+		fs_delete_dir_t delete_dir,
+		fs_truncate_t truncate,
+		fs_link_t link,
+		fs_unlink_t unlink
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -241,14 +244,14 @@ enum file_status_t fs_mount(
 		vfs_root.mount->get_seek = get_seek;
 		vfs_root.mount->seek = seek;
 		vfs_root.mount->write = write;
-		vfs_root.mount->create = create;
-		vfs_root.mount->delete = delete;
 		vfs_root.mount->delete_final = delete_final;
 		vfs_root.mount->open_dir = open_dir;
-		vfs_root.mount->close_dir = close_dir;
 		vfs_root.mount->read_dir = read_dir;
 		vfs_root.mount->create_dir = create_dir;
 		vfs_root.mount->delete_dir = delete_dir;
+		vfs_root.mount->truncate = truncate;
+		vfs_root.mount->link = link;
+		vfs_root.mount->unlink = unlink;
 
 		vfs_root.mount->is_interactive = fs_not_interactive;
 
@@ -348,7 +351,7 @@ static const char* find_mount(const char* path, struct vfs_mount_t** mount_out, 
 	return mount_path;
 }
 
-struct fs_handle_t* fs_open(const char* path, uint8_t mode) {
+struct fs_handle_t* fs_open_mode(const char* path, uint32_t flags, uint32_t mode) {
 	struct vfs_mount_t* mount;
 	void* clean_path;
 	char* path_write;
@@ -359,7 +362,7 @@ struct fs_handle_t* fs_open(const char* path, uint8_t mode) {
 		return 0;
 	}
 
-	struct file_handle_t* handle = mount->open(mount->cntx, mount_path);
+	struct file_handle_t* handle = mount->open(mount->cntx, mount_path, flags, mode);
 
 	if (!handle) {
 		return 0;
@@ -375,8 +378,31 @@ struct fs_handle_t* fs_open(const char* path, uint8_t mode) {
 	fs_handle->handle = handle;
 	fs_handle->mount = mount;
 	fs_handle->shared = open_file;
-	fs_handle->mode = mode;
+	fs_handle->flags = flags;
 	return fs_handle;
+}
+
+struct fs_handle_t* fs_open(const char* path, uint32_t flags) {
+	return fs_open_mode(path, flags, 0);
+}
+
+struct fs_handle_t* fs_openat(const char* path, uint32_t flags, struct fs_handle_t* at, uint32_t mode) {
+
+	if (*path == '/') {
+		// absolute, no at
+		return fs_open_mode(path, flags, mode);
+	}
+	else {
+		size_t prefix_len = kstrlen(at->shared->path);
+		size_t suffix_len = kstrlen(path);
+		char* full_path = kmalloc(prefix_len + suffix_len + 1);
+		kmemcpy(full_path, at->shared->path, prefix_len);
+		kmemcpy(full_path + prefix_len, path, suffix_len);
+		full_path[prefix_len + suffix_len] = 0;
+		struct fs_handle_t* ret = fs_open_mode(full_path, flags, mode);
+		kfree(full_path);
+		return ret;
+	}
 }
 
 void fs_close(struct fs_handle_t* handle) {
@@ -405,7 +431,7 @@ enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info)
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	if (!(handle->mode & FILE_MODE_READ)) {
+	if (!(handle->flags & FILE_FLAGS_READ)) {
 		return 0;
 	}
 
@@ -429,46 +455,25 @@ uint64_t fs_get_seek(struct fs_handle_t* handle) {
 enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 	enum file_status_t sts;
 
-	lock_release(&handle->shared->lock);
+	lock_acquire(&handle->shared->lock);
 	sts = handle->mount->seek(handle->handle, seek);
 	lock_release(&handle->shared->lock);
 
 	return sts;
 }
 
-size_t fs_write(struct fs_handle_t* handle, void* buffer, size_t count) {
+size_t fs_write(struct fs_handle_t* handle, const void* buffer, size_t count) {
 	size_t ret;
 
-	if (!(handle->mode & FILE_MODE_WRITE)) {
+	if (!(handle->flags & FILE_FLAGS_WRITE)) {
 		return 0;
 	}
 
-	lock_release(&handle->shared->lock);
+	lock_acquire(&handle->shared->lock);
 	ret = handle->mount->write(handle->handle, buffer, count);
 	lock_release(&handle->shared->lock);
 
 	return ret;
-}
-
-enum file_status_t fs_create(struct fs_handle_t* handle, const char* name) {
-	enum file_status_t sts;
-
-	lock_acquire(&handle->shared->lock);
-	sts = handle->mount->create(handle->handle, name);
-	lock_release(&handle->shared->lock);
-
-	return sts;
-}
-
-enum file_status_t fs_delete(struct fs_handle_t* handle) {
-	enum file_status_t sts;
-
-	lock_acquire(&handle->shared->lock);
-	sts = handle->mount->delete(handle->handle);
-	handle->shared->pending_delete = 1;
-	lock_release(&handle->shared->lock);
-
-	return sts;
 }
 
 struct fs_handle_t* fs_open_dir(struct fs_handle_t* handle) {
@@ -485,10 +490,24 @@ struct fs_handle_t* fs_open_dir(struct fs_handle_t* handle) {
 	return handle;
 }
 
-void fs_close_dir(struct fs_handle_t* handle) {
+enum file_status_t fs_create_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
 	lock_acquire(&handle->shared->lock);
-	handle->mount->close_dir(handle->handle);
+	sts = handle->mount->create_dir(handle->handle);
 	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_delete_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->delete_dir(handle->handle);
+	lock_release(&handle->shared->lock);
+
+	return sts;
 }
 
 enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* info) {
@@ -501,25 +520,44 @@ enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* in
 	return sts;
 }
 
-enum file_status_t fs_create_dir(struct fs_handle_t* handle, const char* name) {
+enum file_status_t fs_truncate(struct fs_handle_t* handle, size_t size) {
 	enum file_status_t sts;
 
 	lock_acquire(&handle->shared->lock);
-	sts = handle->mount->create_dir(handle->handle, name);
+	sts = handle->mount->truncate(handle->handle, size);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+
+}
+
+enum file_status_t fs_link(struct fs_handle_t* handle, struct fs_handle_t* replace) {
+	enum file_status_t sts;
+
+	if (handle->mount != replace->mount) {
+		return FILE_BAD_FLAGS; // cannot create hardlink between filesystems
+	}
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->link(handle->handle, replace->handle);
 	lock_release(&handle->shared->lock);
 
 	return sts;
 }
 
-enum file_status_t fs_delete_dir(struct fs_handle_t* handle) {
+enum file_status_t fs_unlink(struct fs_handle_t* handle) {
 	enum file_status_t sts;
 
 	lock_acquire(&handle->shared->lock);
-	sts = handle->mount->delete_dir(handle->handle);
-	handle->shared->pending_delete = 1;
+	sts = handle->mount->unlink(handle->handle);
 	lock_release(&handle->shared->lock);
 
 	return sts;
+
+}
+
+void fs_path(struct fs_handle_t* handle, size_t max_len, char* buf) {
+	kstrncpy(buf, handle->shared->path, max_len);
 }
 
 uint8_t fs_is_interactive(struct fs_handle_t* handle) {

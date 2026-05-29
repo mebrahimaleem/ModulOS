@@ -55,7 +55,7 @@ void signal_wait(struct signal_wait_t* wait) {
 	process_set_callback(signal_wait_callback);
 
 	while (current->sched_cntr != SCHED_SIGNAL_READY) {
-		cpu_wait_loop();
+		cpu_hlt();
 	}
 
 	current->sched_cntr = SCHED_READY;

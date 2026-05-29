@@ -15,7 +15,7 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <memory.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -30,6 +30,7 @@
 #include <kernel/lib/kstrcmp.h>
 #include <kernel/lib/hash.h>
 #include <kernel/lib/hash_table.h>
+#include <kernel/lib/array_list.h>
 
 #define MEM_TEST_SIZE	256
 
@@ -132,4 +133,131 @@ TEST("crc32_ansi") {
 TEST("fnc64_1a") {
 	ASSERT_TRUE(fnv64_1a("Hello, World!", 13) == 0x6ef05bd7cc857c54, "fails expected checksum");
 	ASSERT_FALSE(fnv64_1a("Hello, World!", 12) == 0x6ef05bd7cc857c54, "fails expected checksum");
+}
+
+static void* hash_table_dup_fun(void* value) {
+	return (void*)((uint64_t)value + 1);
+}
+
+TEST("hash_table") {
+	struct hash_table_t* table1 = hash_table_alloc(10);
+	struct hash_table_t* table2 = hash_table_alloc(10);
+	void* tmp;
+
+	ASSERT_TRUE(hash_table_insert(table1, 1, (void*)1) == (void*)1, "fails hash_table_insert");
+	ASSERT_TRUE(hash_table_insert(table1, 2, (void*)2) == (void*)2, "fails hash_table_insert");
+	ASSERT_TRUE(hash_table_insert(table1, 328642, (void*)3) == (void*)3, "fails hash_table_insert");
+	ASSERT_TRUE(hash_table_insert(table1, ~834ULL, (void*)4) == (void*)4, "fails hash_table_insert");
+	ASSERT_TRUE(hash_table_insert(table1, 1, (void*)5) == (void*)1, "fails hash_table_insert");
+	ASSERT_TRUE(hash_table_insert(table1, 11, (void*)6) == (void*)6, "fails hash_table_insert");
+
+	ASSERT_TRUE(hash_table_get(table1, 1, &tmp), "fails hash_table_get");
+	ASSERT_TRUE(tmp == (void*)5, "fails hash_table_get");
+
+	ASSERT_TRUE(hash_table_get(table1, 2, &tmp), "fails hash_table_get");
+	ASSERT_TRUE(tmp == (void*)2, "fails hash_table_get");
+
+	ASSERT_TRUE(hash_table_get(table1, 328642, &tmp), "fails hash_table_get");
+	ASSERT_TRUE(tmp == (void*)3, "fails hash_table_get");
+
+	ASSERT_TRUE(hash_table_get(table1, ~834ULL, &tmp), "fails hash_table_get");
+	ASSERT_TRUE(tmp == (void*)4, "fails hash_table_get");
+
+	ASSERT_TRUE(hash_table_get(table1, 11, &tmp), "fails hash_table_get");
+	ASSERT_TRUE(tmp == (void*)6, "fails hash_table_get");
+
+	ASSERT_FALSE(hash_table_get(table1, 3, &tmp), "fails hash_table_get");
+	ASSERT_FALSE(hash_table_get(table1, 0, &tmp), "fails hash_table_get");
+	ASSERT_FALSE(hash_table_get(table2, 0, &tmp), "fails hash_table_get");
+
+	ASSERT_TRUE(hash_table_remove(table1, 1, &tmp), "fails hash_table_remove");
+	ASSERT_TRUE(tmp == (void*)5, "fails hash_table_remove");
+	tmp = (void*)0;
+	ASSERT_FALSE(hash_table_remove(table1, 1, &tmp), "fails hash_table_remove");
+	ASSERT_TRUE(tmp == (void*)0, "fails hash_table_remove");
+
+	ASSERT_TRUE(hash_table_get(table1, 11, &tmp), "fails hash_table_get after remove");
+	ASSERT_FALSE(hash_table_remove(table2, 1, &tmp), "fails hash_table_remove");
+
+	hash_table_copy(table1, table2, hash_table_dup_fun);
+	hash_table_clear(table1, 0);
+
+	ASSERT_TRUE(hash_table_count(table1) == 0, "fails hash_table_count");
+	ASSERT_TRUE(hash_table_count(table2) == 4, "fails hash_table_count");
+
+	ASSERT_FALSE(hash_table_get(table1, 11, &tmp), "fails hash_table_get after clear");
+	ASSERT_TRUE(hash_table_get(table2, 11, &tmp), "fails hash_table_get after copy");
+	ASSERT_TRUE(tmp == (void*)7, "fails hash_table_get after copy");
+
+	hash_table_insert(table2, 1, (void*)8);
+	hash_table_insert(table2, 101, (void*)9);
+	hash_table_resize(table2, 100);
+
+	ASSERT_TRUE(hash_table_get(table2, 1, &tmp), "fails hash_table_get after resize");
+	ASSERT_TRUE(tmp == (void*)8, "fails hash_table_get after resize");
+
+	ASSERT_TRUE(hash_table_get(table2, 2, &tmp), "fails hash_table_get after resize");
+	ASSERT_TRUE(tmp == (void*)3, "fails hash_table_get after resize");
+
+	ASSERT_TRUE(hash_table_get(table2, 328642, &tmp), "fails hash_table_get after resize");
+	ASSERT_TRUE(tmp == (void*)4, "fails hash_table_get after resize");
+
+	ASSERT_TRUE(hash_table_get(table2, ~834ULL, &tmp), "fails hash_table_get after resize");
+	ASSERT_TRUE(tmp == (void*)5, "fails hash_table_get after resize");
+
+	ASSERT_TRUE(hash_table_get(table2, 11, &tmp), "fails hash_table_get after resize");
+	ASSERT_TRUE(tmp == (void*)7, "fails hash_table_get after resize");
+
+	ASSERT_TRUE(hash_table_get(table2, 101, &tmp), "fails hash_table_get after resize");
+	ASSERT_TRUE(tmp == (void*)9, "fails hash_table_get after resize");
+
+	hash_table_free(table1, 0);
+	hash_table_free(table2, 0);
+}
+
+static void* array_list_dup_fun(void* value) {
+	return (void*)((uint64_t)value + 1);
+}
+
+TEST("array_list") {
+	struct array_list_t* list1 = array_list_alloc(1, 1, (void*)2);
+	struct array_list_t* list2;
+
+	ASSERT_TRUE(array_list_count(list1) == 0, "fails array_list_count");
+
+	ASSERT_TRUE(array_list_get(list1, 0) == (void*)2, "fails array_list_get");
+	ASSERT_TRUE(array_list_get(list1, 1) == (void*)2, "fails array_list_get");
+
+	ASSERT_TRUE(array_list_push(list1, (void*)101) == 0, "fails array_list_push");
+	ASSERT_TRUE(array_list_push(list1, (void*)201) == 1, "fails array_list_push");
+	ASSERT_TRUE(array_list_push(list1, (void*)301) == 2, "fails array_list_push");
+
+	ASSERT_TRUE(array_list_get(list1, 0) == (void*)101, "fails array_list_get");
+	ASSERT_TRUE(array_list_get(list1, 1) == (void*)201, "fails array_list_get");
+	ASSERT_TRUE(array_list_get(list1, 100) == (void*)2, "fails array_list_get");
+
+	ASSERT_TRUE(array_list_remove(list1, 1) == (void*)201, "fails array_list_remove");
+	ASSERT_TRUE(array_list_remove(list1, 3) == (void*)2, "fails array_list_remove");
+	ASSERT_TRUE(array_list_remove(list1, 100) == (void*)2, "fails array_list_remove");
+
+	ASSERT_TRUE(array_list_push(list1, (void*)401) == 1, "fails array_list_push");
+
+	list2 = array_list_dup(list1, array_list_dup_fun);
+	array_list_clear(list1, 0);
+
+	ASSERT_TRUE(array_list_count(list1) == 0, "fails array_list_count after clear");
+	ASSERT_TRUE(array_list_count(list2) == 3, "fails array_list_count after copy");
+
+	ASSERT_TRUE(array_list_push(list1, (void*)501) == 0, "fails array_list_push after clear");
+
+	ASSERT_TRUE(array_list_get(list1, 0) == (void*)501, "fails array_list_get after clear");
+	ASSERT_TRUE(array_list_get(list1, 1) == (void*)2, "fails array_list_get after clear");
+	ASSERT_TRUE(array_list_get(list1, 100) == (void*)2, "fails array_list_get after clear");
+
+	ASSERT_TRUE(array_list_get(list2, 0) == (void*)101, "fails array_list_get after copy");
+	ASSERT_TRUE(array_list_get(list2, 1) == (void*)401, "fails array_list_get after copy");
+	ASSERT_TRUE(array_list_get(list2, 100) == (void*)2, "fails array_list_get after copy");
+
+	array_list_free(list1, 0);
+	array_list_free(list2, 0);
 }

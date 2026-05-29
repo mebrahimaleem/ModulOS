@@ -1,5 +1,5 @@
-/* kstrcpy.h - kernel string copy interface */
-/* Copyright (C) 2026  Ebrahim Aleem
+/* memport.h - kernel allocator port to userland interface */
+/* Copyright (C) 2025-2026  Ebrahim Aleem
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,16 +15,12 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#ifndef KERNEL_LIB_KSTRCPY_H
-#define KERNEL_LIB_KSTRCPY_H
+#ifndef TEST_HELPERS_MEMPORT_H
+#define TEST_HELPERS_MEMPORT_H
 
 #include <stddef.h>
 
-extern char* kstrcpy(char* dest, const char* src);
+void* kmalloc(size_t size);
+void kfree(void* ptr);
 
-extern char* kstrcpy_no_null(char* dest, const char* src);
-
-extern char* kstrncpy(char* dest, const char* src, size_t len);
-
-#endif /* KERNEL_LIB_KSTRCPY_H */
-
+#endif /* TEST_HELPERS_MEMPORT_H */

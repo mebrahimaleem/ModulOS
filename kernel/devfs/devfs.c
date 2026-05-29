@@ -35,8 +35,10 @@ struct dev_handle_t {
 	} type;
 };
 
-struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path) {
+struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path, uint32_t flags, uint32_t mode) {
 	(void)cntx;
+	(void)flags;
+	(void)mode;
 	struct dev_handle_t* dev_handle;
 
 	// tty devices
@@ -129,7 +131,7 @@ enum file_status_t devfs_seek(struct file_handle_t* handle, uint64_t seek) {
 	}
 }
 
-size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count) {
+size_t devfs_write(struct file_handle_t* handle, const void* buffer, size_t count) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 
 	if (!dev_handle) {
@@ -143,17 +145,6 @@ size_t devfs_write(struct file_handle_t* handle, void* buffer, size_t count) {
 	}
 }
 
-enum file_status_t devfs_create(struct file_handle_t* handle, const char* name) {
-	(void)handle;
-	(void)name;
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_delete(struct file_handle_t* handle) {
-	(void)handle;
-	return FILE_NO_SUPPORT;
-}
-
 void devfs_delete_final(struct file_handle_t* handle) {
 	(void)handle;
 }
@@ -161,10 +152,6 @@ void devfs_delete_final(struct file_handle_t* handle) {
 enum file_status_t devfs_open_dir(struct file_handle_t* handle) {
 	(void)handle;
 	return FILE_NO_SUPPORT;
-}
-
-void devfs_close_dir(struct file_handle_t* handle) {
-	(void)handle;
 }
 
 enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
@@ -181,6 +168,26 @@ enum file_status_t devfs_create_dir(struct file_handle_t* handle, const char* na
 }
 
 enum file_status_t devfs_delete_dir(struct file_handle_t* handle) {
+	(void)handle;
+
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_truncate(struct file_handle_t* handle, size_t size) {
+	(void)handle;
+	(void)size;
+
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_link(struct file_handle_t* handle, struct file_handle_t* replace) {
+	(void)handle;
+	(void)replace;
+
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_unlink(struct file_handle_t* handle) {
 	(void)handle;
 
 	return FILE_NO_SUPPORT;

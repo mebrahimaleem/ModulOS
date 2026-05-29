@@ -39,7 +39,7 @@ mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
 	git -C $@ checkout v6.3.1
 	git -C $@ apply ../mlibc-patch/mlibc-v6-3-1-port.patch
-	cp -r mlibc-patch/* $@
+	cp -r mlibc-patch/* mlibc/
 
 $(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
 	meson setup \
@@ -54,6 +54,7 @@ $(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../user
 
 .PHONY: libc
 libc: $(OBJ_DIR)/mlibc-meson-setup
+	cp -u -r mlibc-patch/* mlibc/
 	ninja -C $(OBJ_DIR)/libc-build/
 	meson install --only-changed -C $(OBJ_DIR)/libc-build/
 

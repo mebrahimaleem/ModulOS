@@ -194,8 +194,11 @@ void kapentry(uint64_t arb_id) {
 void prepare_userland(void* cntx) {
 	(void)cntx;
 
-	struct fs_handle_t* f = fs_open("/", FILE_MODE_READ | FILE_MODE_WRITE);
-	fs_create(f, "test.txt");
+	struct fs_handle_t* f = fs_open("/test.txt", FILE_FLAGS_READ | FILE_FLAGS_WRITE | FILE_FLAGS_CREATE);
+	if (f == 0) {
+		logging_log_error("Failed to create /test.txt");
+	}
+	fs_write(f, "Hi\n", 3);
 	fs_close(f);
 
 	lock_acquire(&prepare_userland_lock);
@@ -207,7 +210,7 @@ void prepare_userland(void* cntx) {
 	init_done = 1;
 	lock_release(&prepare_userland_lock);
 
-	struct fs_handle_t* shell = fs_open("/bin/shell", FILE_MODE_READ);
+	struct fs_handle_t* shell = fs_open("/bin/shell", FILE_FLAGS_READ);
 	if (!shell) {
 		logging_log_error("Failed to open shell file");
 	}
