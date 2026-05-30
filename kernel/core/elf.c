@@ -561,6 +561,10 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* const
 
 	struct pcb_t* pcb = load_base(file, &old_cr3, invoker, env);
 
+	if (!pcb) {
+		return 0;
+	}
+
 	pcb->init_k_rsp_paddr = stack_paddr;
 	pcb->init_k_rsp_vaddr = stack_vaddr;
 	pcb->rsp = rsp;
@@ -620,10 +624,6 @@ struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker
 		kfree(envp[count]);
 	}
 	kfree(envp);
-
-	if (!pcb) {
-		return 0;
-	}
 
 	if (!pcb) {
 		return 0;

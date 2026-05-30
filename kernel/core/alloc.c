@@ -74,14 +74,14 @@ static struct alloc_arena_t* arena_head;
 static uint8_t alloc_lock;
 
 #ifdef DEBUG_LOGGING_MEM
-static uint64_t num_arena;
-static uint64_t bytes_allocated;
-static uint64_t bytes_freed;
-static uint64_t total_bytes;
+static int64_t num_arena;
+static int64_t bytes_allocated;
+static int64_t bytes_freed;
+static int64_t total_bytes;
 
-static uint64_t num_allocs;
-static uint64_t num_frees;
-static uint64_t total_allocs;
+static int64_t num_allocs;
+static int64_t num_frees;
+static int64_t total_allocs;
 
 static uint8_t u_lock;
 #endif /* DEBUG_LOGGING_MEM */
@@ -294,7 +294,7 @@ void kfree(void* ptr) {
 	struct alloc_header_t* next;
 
 	if (IS_FREE(header->size)) {
-		logging_log_warning("Double free @ 0x%x", ptr);
+		logging_log_warning("Double free @ 0x%lx", ptr);
 		return;
 	}
 
@@ -358,16 +358,16 @@ void kfree(void* ptr) {
 #ifdef DEBUG_LOGGING_MEM
 void alloc_log_usage(void) {
 	lock_acquire(&u_lock);
-	uint64_t a = num_arena;
-	uint64_t ba = bytes_allocated;
-	uint64_t bf = bytes_freed;
+	int64_t a = num_arena;
+	int64_t ba = bytes_allocated;
+	int64_t bf = bytes_freed;
 	total_bytes += ba - bf;
-	uint64_t b = total_bytes;
+	int64_t b = total_bytes;
 
-	uint64_t na = num_allocs;
-	uint64_t nf = num_frees;
+	int64_t na = num_allocs;
+	int64_t nf = num_frees;
 	total_allocs += na - nf;
-	uint64_t n = total_allocs;
+	int64_t n = total_allocs;
 
 	bytes_allocated = 0;
 	bytes_freed = 0;
@@ -376,7 +376,7 @@ void alloc_log_usage(void) {
 	num_frees = 0;
 	lock_release(&u_lock);
 
-	logging_log_debug("Heap - Bytes Allocated %lu/%lu (+%lu/-%lu) # %lu (+%lu/-%lu)",
+	logging_log_debug("Heap - Bytes Allocated %ld/%lu (+%lu/-%lu) # %ld (+%lu/-%lu)",
 			b, a, ba, bf, n, na, nf);
 }
 #endif /* DEBUG_LOGGING_MEM */

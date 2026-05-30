@@ -54,21 +54,21 @@ struct disarm_list_t {
 };
 
 #ifdef DEBUG_LOGGING_MEM
-static uint64_t bytes_allocated_p;
-static uint64_t bytes_freed_p;
-static uint64_t total_bytes_allocated_p;
+static int64_t bytes_allocated_p;
+static int64_t bytes_freed_p;
+static int64_t total_bytes_allocated_p;
 
-static uint64_t bytes_allocated_v;
-static uint64_t bytes_freed_v;
-static uint64_t total_bytes_allocated_v;
+static int64_t bytes_allocated_v;
+static int64_t bytes_freed_v;
+static int64_t total_bytes_allocated_v;
 
-static uint64_t num_allocs_p;
-static uint64_t num_frees_p;
-static uint64_t num_allocs_v;
-static uint64_t num_frees_v;
+static int64_t num_allocs_p;
+static int64_t num_frees_p;
+static int64_t num_allocs_v;
+static int64_t num_frees_v;
 
-static uint64_t total_allocs_p;
-static uint64_t total_allocs_v;
+static int64_t total_allocs_p;
+static int64_t total_allocs_v;
 
 static uint8_t u_lock;
 #endif /* DEBUG_LOGGING_MEM */
@@ -130,10 +130,21 @@ static struct mm_list_node_t* alloc_node(void) {
 	return kmalloc(sizeof(struct mm_list_node_t));
 }
 
-static void insert_node(struct mm_list_node_t* node, struct mm_list_node_t* begin) {
+static uint8_t insert_node(struct mm_list_node_t* node, struct mm_list_node_t* begin) {
 	struct mm_list_node_t* insert;
 
 	for (insert = begin->next; insert->base && insert->base < node->base; insert = insert->next);
+
+	if (insert->base && node->base + node->size > insert->base) {
+		logging_log_warning("Double free @ 0x%lx-0x%lx with 0x%lx-0x%lx", node->base, node->base + node->size,
+																																		insert->base, insert->base + insert->size);
+		return 1;
+	}
+
+	if (insert->prev->base + insert->prev->size > node->base) {
+		logging_log_warning("Double free @ 0x%lx-0x%lx with 0x%lx-0x%lx", node->base, node->base + node->size,
+																																		insert->prev->base, insert->prev->base + insert->prev->size);
+	}
 
 	node->next = insert;
 	node->prev = insert->prev;
@@ -164,6 +175,8 @@ static void insert_node(struct mm_list_node_t* node, struct mm_list_node_t* begi
 
 		free_node(insert);
 	}
+
+	return 0;
 }
 
 void mm_init(
@@ -275,7 +288,10 @@ void mm_init(
 		temp->base = seg.base;
 		temp->size = seg.size;
 
-		insert_node(temp, p_begin);
+		if (insert_node(temp, p_begin)) {
+			logging_log_error("Inconsistent memory map: Overalpping regions");
+			panic(PANIC_STATE);
+		}
 	}
 
 	logging_log_info("Detected 0x%lX bytes (0x%lX GiB) of memory across %ld blocks",
@@ -417,6 +433,16 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_list_node_t* begin, 
 		size += PAGE_SIZE_4K - rem;
 	}
 
+	insert->base = base;
+	insert->size = size;
+
+	lock_acquire(lock);
+	if (insert_node(insert, begin)) {
+		lock_release(lock);
+		return;
+	}
+	lock_release(lock);
+
 #ifdef DEBUG_LOGGING_MEM
 	lock_acquire(&u_lock);
 	if (lock == &p_lock) {
@@ -429,13 +455,6 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_list_node_t* begin, 
 	}
 	lock_release(&u_lock);
 #endif /* DEBUG_LOGGING_MEM */
-
-	insert->base = base;
-	insert->size = size;
-
-	lock_acquire(lock);
-	insert_node(insert, begin);
-	lock_release(lock);
 }
 
 uint64_t mm_alloc_p(size_t size) {
@@ -598,28 +617,28 @@ void mm_barrier_disarm(uint8_t id) {
 #ifdef DEBUG_LOGGING_MEM
 void mm_log_usage(void) {
 	lock_acquire(&u_lock);
-	uint64_t pa = bytes_allocated_p;
-	uint64_t pf = bytes_freed_p;
+	int64_t pa = bytes_allocated_p;
+	int64_t pf = bytes_freed_p;
 	total_bytes_allocated_p += pa - pf;
-	uint64_t p = total_bytes_allocated_p;
+	int64_t p = total_bytes_allocated_p;
 
 	bytes_allocated_p = 0;
 	bytes_freed_p = 0;
 
-	uint64_t va = bytes_allocated_v;
-	uint64_t vf = bytes_freed_v;
+	int64_t va = bytes_allocated_v;
+	int64_t vf = bytes_freed_v;
 	total_bytes_allocated_v += va - vf;
-	uint64_t v = total_bytes_allocated_v;
+	int64_t v = total_bytes_allocated_v;
 
-	uint64_t pna = num_allocs_p;
-	uint64_t pnf = num_frees_p;
+	int64_t pna = num_allocs_p;
+	int64_t pnf = num_frees_p;
 	total_allocs_p += pna - pnf;
-	uint64_t pn = total_allocs_p;
+	int64_t pn = total_allocs_p;
 
-	uint64_t vna = num_allocs_v;
-	uint64_t vnf = num_frees_v;
+	int64_t vna = num_allocs_v;
+	int64_t vnf = num_frees_v;
 	total_allocs_v += vna - vnf;
-	uint64_t vn = total_allocs_v;
+	int64_t vn = total_allocs_v;
 
 	bytes_allocated_v = 0;
 	bytes_freed_v = 0;
@@ -631,9 +650,9 @@ void mm_log_usage(void) {
 
 	lock_release(&u_lock);
 
-	logging_log_debug("MM - Physical Bytes Allocated %lu (+%lu/-%lu) # %lu (+%lu/-%lu)",
+	logging_log_debug("MM - Physical Bytes Allocated %ld (+%lu/-%lu) # %ld (+%lu/-%lu)",
 			p, pa, pf, pn, pna, pnf);
-	logging_log_debug("MM - Virtual Bytes Allocated %lu (+%lu/-%lu) # %lu (+%lu/-%lu)",
+	logging_log_debug("MM - Virtual Bytes Allocated %ld (+%lu/-%lu) # %ld (+%lu/-%lu)",
 			v, va, vf, vn, vna, vnf);
 }
 #endif /* DEBUG_LOGGING_MEM */

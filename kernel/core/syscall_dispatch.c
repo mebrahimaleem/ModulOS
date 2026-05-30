@@ -151,7 +151,7 @@ DECLARE_SYSCALL(alloc) {
 
 	struct pcb_t* pcb = proc_data_get()->current_process;
 	uint64_t paddr = mm_alloc_p(arg1);
-	
+
 	if (!paddr) {
 		return SYSCALL_STS_FAIL;
 	}
