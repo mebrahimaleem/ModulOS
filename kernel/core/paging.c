@@ -92,7 +92,7 @@ static enum page_size_t page_walk(uint64_t vaddr, uint64_t** access, uint64_t* p
 static uint64_t* increase_granularity(uint64_t vaddr, uint64_t* access, enum page_size_t lvl, enum page_size_t page_size) {
 	for (; lvl > page_size; lvl--) {
 		*access = mm_alloc_p(PAGE_SIZE_4K);
-		if (!access) {
+		if (!*access) {
 			return 0;
 		}
 		*access |= PAGE_PRESENT | PAGE_RW | PAGE_US;
@@ -221,6 +221,10 @@ uint64_t paging_ident(uint64_t paddr) {
 	return paddr + IDENT_BASE;
 }
 
+uint64_t paging_unident(uint64_t vaddr) {
+	return vaddr - IDENT_BASE;
+}
+
 void paging_install_guard(uint64_t vaddr) {
 	uint64_t* access;
 	lock_acquire(&paging_lock);
@@ -300,10 +304,25 @@ static void free_pages(uint64_t entry, enum page_size_t lvl) {
 			if (lvl != PAGE_4K && !(access[i] & PAGE_PS)) {
 				free_pages(access[i], lvl-1);
 			}
+			else {
+				switch (lvl) {
+					case PAGE_4K:
+						mm_free_p_ident(access[i] & PAGE_ADDR_MASK, PAGE_SIZE_4K);
+						break;
+					case PAGE_2M:
+						mm_free_p_ident(access[i] & PAGE_ADDR_MASK, PAGE_SIZE_2M);
+						break;
+					case PAGE_1G:
+						mm_free_p_ident(access[i] & PAGE_ADDR_MASK, PAGE_SIZE_1G);
+						break;
+					case _PAGE_512G:
+						break;
+				}
+			}
 		}
 	}
 
-	mm_free_p(entry & PAGE_ADDR_MASK, PAGE_SIZE_4K);
+	mm_free_p_ident(entry & PAGE_ADDR_MASK, PAGE_SIZE_4K);
 }
 
 void paging_free_userspace(uint64_t* pml4) {
@@ -315,7 +334,7 @@ void paging_free_userspace(uint64_t* pml4) {
 		}
 	}
 
-	mm_free_p((uint64_t)pml4, PAGE_SIZE_4K);
+	mm_free_p_ident((uint64_t)pml4, PAGE_SIZE_4K);
 }
 
 static void copy_pages(uint64_t access_, uint64_t copy_, enum page_size_t lvl) {
@@ -326,24 +345,31 @@ static void copy_pages(uint64_t access_, uint64_t copy_, enum page_size_t lvl) {
 
 	for (uint16_t i = 0; i < 512; i++) {
 		if (access[i] & PAGE_PRESENT) {
-			copy[i] = mm_alloc_p(PAGE_SIZE_4K);
-			copy[i] |= access[i] & PAGE_KEEP_FLAGS;
+			copy[i] = access[i] & PAGE_KEEP_FLAGS;
 
 			if (lvl != PAGE_4K && !(access[i] & PAGE_PS)) {
+				copy[i] |= mm_alloc_p(PAGE_SIZE_4K);
+
 				copy_pages(access[i], copy[i], lvl - 1);
 			}
 			else {
-				void* d = (void*)paging_ident(copy[i] & PAGE_ADDR_MASK);
 				void* s = (void*)paging_ident(access[i] & PAGE_ADDR_MASK);
+				void* d;
 
 				switch (lvl) {
 					case PAGE_4K:
+						copy[i] |= mm_alloc_p(PAGE_SIZE_4K);
+						d = (void*)paging_ident(copy[i] & PAGE_ADDR_MASK);
 						kmemcpy(d, s, PAGE_SIZE_4K);
 						break;
 					case PAGE_2M:
+						copy[i] |= mm_alloc_p(PAGE_SIZE_2M);
+						d = (void*)paging_ident(copy[i] & PAGE_ADDR_MASK);
 						kmemcpy(d, s, PAGE_SIZE_2M);
 						break;
 					case PAGE_1G:
+						copy[i] |= mm_alloc_p(PAGE_SIZE_1G);
+						d = (void*)paging_ident(copy[i] & PAGE_ADDR_MASK);
 						kmemcpy(d, s, PAGE_SIZE_1G);
 						break;
 					case _PAGE_512G:

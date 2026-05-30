@@ -53,7 +53,9 @@ extern uint8_t paging_update_perms(uint64_t vaddr, uint64_t flg, enum page_size_
 
 extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint64_t flg, enum page_size_t page_size);
 extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
+
 extern uint64_t paging_ident(uint64_t paddr);
+extern uint64_t paging_unident(uint64_t vaddr);
 
 extern void paging_install_guard(uint64_t vaddr);
 extern void paging_remove_guard(uint64_t vaddr);

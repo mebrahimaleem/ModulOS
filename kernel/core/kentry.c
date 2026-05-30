@@ -85,8 +85,8 @@ static inline void write_syscall_msr(void) {
 	msr_write(MSR_FMASK, RFL_MASK);
 }
 
-#ifdef DEBUG_LOGGING
-#define LOG_DELAY_MS	5000
+#ifdef DEBUG_LOGGING_MEM
+#define LOG_DELAY_MS	1000
 
 __attribute__((noreturn)) static void periodic_logging(void* _ign) {
 	(void)_ign;
@@ -98,7 +98,7 @@ __attribute__((noreturn)) static void periodic_logging(void* _ign) {
 		time_sleep(LOG_DELAY_MS);
 	}
 }
-#endif /* DEBUG_LOGGING */
+#endif /* DEBUG_LOGGING_MEM */
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
@@ -172,9 +172,9 @@ void kentry(void) {
 	mm_transaction_init();
 	process_init_reaper();
 
-#ifdef DEBUG_LOGGING
+#ifdef DEBUG_LOGGING_MEM
 	scheduler_schedule(process_from_func(periodic_logging, 0));
-#endif /* DEBUG_LOGGING */
+#endif /* DEBUG_LOGGING_MEM */
 
 	process_kill_current();
 }

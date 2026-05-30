@@ -38,7 +38,7 @@
 #define MAX_INIT_NODES	64
 #define WITHIN_NODE(base, b, l)	(base >= b && base < b + l)
 
-#define SHOOTDOWN_DELAY_MS	5000
+#define SHOOTDOWN_DELAY_MS	1000
 
 struct mm_list_node_t {
 	struct mm_list_node_t* next;
@@ -53,10 +53,25 @@ struct disarm_list_t {
 	uint8_t state;
 };
 
-#ifdef DEBUG_LOGGING
-uint64_t bytes_allocated;
-uint64_t prev_bytes_allocated;
-#endif /* DEBUG_LOGGING */
+#ifdef DEBUG_LOGGING_MEM
+static uint64_t bytes_allocated_p;
+static uint64_t bytes_freed_p;
+static uint64_t total_bytes_allocated_p;
+
+static uint64_t bytes_allocated_v;
+static uint64_t bytes_freed_v;
+static uint64_t total_bytes_allocated_v;
+
+static uint64_t num_allocs_p;
+static uint64_t num_frees_p;
+static uint64_t num_allocs_v;
+static uint64_t num_frees_v;
+
+static uint64_t total_allocs_p;
+static uint64_t total_allocs_v;
+
+static uint8_t u_lock;
+#endif /* DEBUG_LOGGING_MEM */
 
 struct mm_list_node_t init_nodes[MAX_INIT_NODES];
 
@@ -159,10 +174,26 @@ void mm_init(
 	uint64_t blocks = 0;
 	uint64_t init_node_i = 0;
 
-#ifdef DEBUG_LOGGING
-	bytes_allocated = 0;
-	prev_bytes_allocated = 0;
-#endif /* DEBUG_LOGGING */
+#ifdef DEBUG_LOGGING_MEM
+	bytes_allocated_p = 0;
+	bytes_freed_p = 0;
+	total_bytes_allocated_p = 0;
+
+	bytes_allocated_v = 0;
+	bytes_freed_v = 0;
+	total_bytes_allocated_v = 0;
+
+	num_allocs_p = 0;
+	num_allocs_v = 0;
+
+	num_frees_p = 0;
+	num_frees_v = 0;
+
+	total_allocs_p = 0;
+	total_allocs_v = 0;
+
+	lock_init(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
 
 	lock_init(&p_lock);
 	lock_init(&v_lock);
@@ -361,9 +392,19 @@ static uint64_t mm_alloc_max(size_t size,
 		free_node(extra);
 	}
 
-#ifdef DEBUG_LOGGING
-	bytes_allocated += asize;
-#endif /* DEBUG_LOGGING */
+#ifdef DEBUG_LOGGING_MEM
+	lock_acquire(&u_lock);
+	if (lock == &p_lock) {
+		bytes_allocated_p += asize;
+		num_allocs_p++;
+	}
+	else {
+		bytes_allocated_v += asize;
+		num_allocs_v++;
+	}
+	lock_release(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
+
 	return ret;
 }
 
@@ -376,9 +417,18 @@ static void mm_free(uint64_t base, uint64_t size, struct mm_list_node_t* begin, 
 		size += PAGE_SIZE_4K - rem;
 	}
 
-#ifdef DEBUG_LOGGING
-	bytes_allocated -= size;
-#endif /* DEBUG_LOGGING */
+#ifdef DEBUG_LOGGING_MEM
+	lock_acquire(&u_lock);
+	if (lock == &p_lock) {
+		bytes_freed_p += size;
+		num_frees_p++;
+	}
+	else {
+		bytes_freed_v += size;
+		num_frees_v++;
+	}
+	lock_release(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
 
 	insert->base = base;
 	insert->size = size;
@@ -416,11 +466,28 @@ void mm_free_p(uint64_t base, size_t size) {
 	mm_free(base, size, p_begin, &p_lock);
 }
 
+void mm_free_p_ident(uint64_t base, size_t size) {
+	struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
+
+	pending->base = paging_ident(base);
+	pending->size = size;
+	pending->type = MM_TRANS_IDNT;
+	lock_acquire(&pending_free_lock);
+	pending->next = pending_free;
+	pending_free = (struct free_transaction_list_t*)pending;
+	lock_release(&pending_free_lock);
+
+	if (free_pending_wait) {
+		signal_awake(free_pending_wait);
+	}
+}
+
 void mm_free_v(uint64_t base, size_t size) {
 	struct free_transaction_list_t* pending = kmalloc(sizeof(struct free_transaction_list_t));
 
 	pending->base = base;
 	pending->size = size;
+	pending->type = MM_TRANS_VIRT;
 	lock_acquire(&pending_free_lock);
 	pending->next = pending_free;
 	pending_free = (struct free_transaction_list_t*)pending;
@@ -483,7 +550,14 @@ __attribute((noreturn)) static void free_all_pending(void* _ign) {
 		while (transaction_list) {
 			next = transaction_list->next;
 
-			mm_free(transaction_list->base, transaction_list->size, v_begin, &v_lock);
+			switch (transaction_list->type) {
+				case MM_TRANS_VIRT:
+					mm_free(transaction_list->base, transaction_list->size, v_begin, &v_lock);
+					break;
+				case MM_TRANS_IDNT:
+					mm_free(paging_unident(transaction_list->base), transaction_list->size, p_begin, &p_lock);
+					break;
+			}
 
 			kfree(transaction_list);
 			transaction_list = next;
@@ -521,17 +595,45 @@ void mm_barrier_disarm(uint8_t id) {
 	signal_awake(free_pending_wait);
 }
 
-#ifdef DEBUG_LOGGING
+#ifdef DEBUG_LOGGING_MEM
 void mm_log_usage(void) {
-	const char* s = "";
+	lock_acquire(&u_lock);
+	uint64_t pa = bytes_allocated_p;
+	uint64_t pf = bytes_freed_p;
+	total_bytes_allocated_p += pa - pf;
+	uint64_t p = total_bytes_allocated_p;
 
-	if (bytes_allocated > prev_bytes_allocated) {
-		s = "+";
-	}
+	bytes_allocated_p = 0;
+	bytes_freed_p = 0;
 
-	logging_log_debug("MM - Bytes Allocated %lu (%s%ld)",
-			bytes_allocated, s, bytes_allocated - prev_bytes_allocated);
+	uint64_t va = bytes_allocated_v;
+	uint64_t vf = bytes_freed_v;
+	total_bytes_allocated_v += va - vf;
+	uint64_t v = total_bytes_allocated_v;
 
-	prev_bytes_allocated = bytes_allocated;
+	uint64_t pna = num_allocs_p;
+	uint64_t pnf = num_frees_p;
+	total_allocs_p += pna - pnf;
+	uint64_t pn = total_allocs_p;
+
+	uint64_t vna = num_allocs_v;
+	uint64_t vnf = num_frees_v;
+	total_allocs_v += vna - vnf;
+	uint64_t vn = total_allocs_v;
+
+	bytes_allocated_v = 0;
+	bytes_freed_v = 0;
+
+	num_allocs_p = 0;
+	num_allocs_v = 0;
+	num_frees_p = 0;
+	num_frees_v = 0;
+
+	lock_release(&u_lock);
+
+	logging_log_debug("MM - Physical Bytes Allocated %lu (+%lu/-%lu) # %lu (+%lu/-%lu)",
+			p, pa, pf, pn, pna, pnf);
+	logging_log_debug("MM - Virtual Bytes Allocated %lu (+%lu/-%lu) # %lu (+%lu/-%lu)",
+			v, va, vf, vn, vna, vnf);
 }
-#endif /* DEBUG_LOGGING */
+#endif /* DEBUG_LOGGING_MEM */

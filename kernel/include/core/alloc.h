@@ -26,8 +26,8 @@ extern void alloc_init(void);
 extern void* kmalloc(size_t size);
 extern void kfree(void* ptr);
 
-#ifdef DEBUG_LOGGING
+#ifdef DEBUG_LOGGING_MEM
 extern void alloc_log_usage(void);
-#endif /* DEBUG_LOGGING */
+#endif /* DEBUG_LOGGING_MEM */
 
 #endif /* KERNEL_CORE_ALLOC_H */

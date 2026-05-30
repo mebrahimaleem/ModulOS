@@ -41,7 +41,7 @@
 
 #define INIT_RFLG				0x200
 #define INIT_STACK_SIZE 0x4000
-#define REAP_DELAY_MS		5000
+#define REAP_DELAY_MS		1000
 
 // change manual paging map when adjusting stack size
 
@@ -340,14 +340,16 @@ __attribute__((noreturn)) static void process_reap(void* _ign) {
 			signal_wait(reap_wait);
 		}
 
-		struct pcb_t* pcb;
+		struct pcb_t* pcb, * next;
 
 		lock_acquire(&lock_reap);
 		pcb = reap_queue;
 		reap_queue = 0;
 		lock_release(&lock_reap);
 
-		for (; pcb; pcb = pcb->next) {
+		for (; pcb; pcb = next) {
+			next = pcb->next;
+
 			_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
 			paging_unmap(pcb->init_k_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
 			paging_unmap(pcb->init_k_rsp_vaddr + 2 * PAGE_SIZE_4K, PAGE_4K);
@@ -362,12 +364,11 @@ __attribute__((noreturn)) static void process_reap(void* _ign) {
 				paging_free_userspace((uint64_t*)pcb->cr3);
 			}
 
-			array_list_clear(pcb->fd_table, close_fd);
+			array_list_free(pcb->fd_table, close_fd);
 			if (pcb->wd) {
 				fs_close(pcb->wd);
 			}
 
-			logging_log_debug("Killed %lu (%ld)", pcb->pid, pcb->exit_code);
 
 			kfree(pcb);
 		}
