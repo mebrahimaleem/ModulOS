@@ -241,16 +241,13 @@ uint8_t elf_is_elf(struct fs_handle_t* file) {
 	return check_valid(file, &header);
 }
 
-struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invoker, const char* env) {
+static struct pcb_t* load_base(struct fs_handle_t* file,
+															 uint64_t* cr3_ret,
+															 const char* const* argv,
+															 const char* const* envp) {
 	Elf64_Ehdr header;
-	uint64_t stack_paddr, stack_vaddr, rsp;
 
 	if (check_valid(file, &header)) {
-		return 0;
-	}
-
-	if (process_create_guarded_stack(&stack_vaddr, &stack_paddr, &rsp)) {
-		logging_log_error("Failed to allocate stack");
 		return 0;
 	}
 
@@ -272,16 +269,6 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		pcb->r14 =
 		pcb->r15 = 0;
 
-
-	pcb->init_k_rsp_paddr = stack_paddr;
-	pcb->init_k_rsp_vaddr = stack_vaddr;
-	pcb->rsp = rsp;
-
-	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
-	pcb->k_rsp_hi = rsp >> 32;
-
-	pcb->fsbase = 0;
-
 	pcb->rflags = INIT_USERLAND_RFL;
 
 	pcb->rdi = header.e_entry; // rip
@@ -291,18 +278,12 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 	pcb->cs = GDT_KERNEL_CS;
 	pcb->ss = GDT_KERNEL_SS;
 
+	pcb->fsbase = 0;
+
 	pcb->sched_cntr = SCHED_READY;
-	pcb->pid = pid;
 
-	cpu_restore_fx(pcb->fxdata);
+	cpu_save_fx(pcb->fxdata);
 
-	pcb->cr3 = paging_create_pml4();
-	if (!pcb->cr3) {
-		logging_log_error("Failed to create pml4 for process");
-		kfree(pcb);
-		return 0;
-	}
-	
 	Elf64_Phdr pheader;
 
 	Elf64_Off ph_off = header.e_phoff;
@@ -390,6 +371,12 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		}
 	}
 
+	pcb->cr3 = paging_create_pml4();
+	if (!pcb->cr3) {
+		kfree(pcb);
+		return 0;
+	}
+
 	uint64_t old_cr3 = proc_data_get()->current_process->cr3;
 	proc_data_get()->current_process->cr3 = pcb->cr3;
 
@@ -420,7 +407,7 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 	uint64_t pheaders_base = memtop;
 
 	// map in pheaders
-	size_t pheader_total = header.e_phentsize & header.e_phnum;
+	size_t pheader_total = header.e_phentsize * header.e_phnum;
 	for (size_t off = 0; off < pheader_total; off += PAGE_SIZE_4K) {
 		paddr = mm_alloc_p(PAGE_SIZE_4K);
 
@@ -461,62 +448,6 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
 	}
 
-	// create auxv
-	uint64_t invoke_addr = INIT_USERLAND_RSP - kstrlen(invoker) - 1;
-	uint64_t env_addr = invoke_addr - kstrlen(env) - 1;
-	uint64_t random_addr = env_addr - 16;
-	auxv_t* auxv_addr = (auxv_t*)(random_addr - sizeof(default_auxv));
-
-	kstrcpy((char*)invoke_addr, invoker);
-	kstrcpy((char*)env_addr, env);
-	kmemcpy(auxv_addr, default_auxv, sizeof(default_auxv));
-
-	// leave upper bytes untouched for "randomness"
-	*(volatile uint64_t*)random_addr = time_since_init_fs(); //TODO: better randomization
-
-	auxv_addr[AT_INDEX_PHDR].a_un.a_val = (int64_t)pheaders_base;
-	auxv_addr[AT_INDEX_PHENT].a_un.a_val = header.e_phentsize;
-	auxv_addr[AT_INDEX_PHNUM].a_un.a_val = header.e_phnum;
-	auxv_addr[AT_INDEX_RANDOM].a_un.a_val = (int64_t)random_addr;
-
-	uint64_t* stack_builder = (uint64_t*)auxv_addr;
-	stack_builder--;
-	*stack_builder = 0; // env end
-	
-	char* inf_chars;
-	for (inf_chars = (char*)(env_addr + kstrlen(env)); inf_chars >= (char*)env_addr; inf_chars--) {
-		if (*inf_chars == ' ') {
-			stack_builder--;
-			*stack_builder = (uint64_t)inf_chars + 1;
-			*inf_chars = 0;
-		}
-	}
-
-	stack_builder--;
-	*stack_builder = (uint64_t)inf_chars + 1;
-
-	stack_builder--;
-	*stack_builder = 0; // env start
-	
-	uint64_t argc = 1;
-
-	for (inf_chars = (char*)(invoke_addr + kstrlen(invoker)); inf_chars >= (char*)invoke_addr; inf_chars--) {
-		if (*inf_chars == ' ') {
-			stack_builder--;
-			*stack_builder = (uint64_t)inf_chars + 1;
-			*inf_chars = 0;
-			argc++;
-		}
-	}
-
-	stack_builder--;
-	*stack_builder = (uint64_t)inf_chars + 1;
-
-	stack_builder--;
-	*stack_builder = argc;
-
-	pcb->rdx = (uint64_t)stack_builder; // rsp
-
 	// copy in executable
 	ph_off = header.e_phoff;
 	for (Elf64_Half i = 0; i < header.e_phnum; i++) {
@@ -541,6 +472,105 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		}
 	}
 
+	size_t argv_len = 0;
+	int64_t argc = 0;
+	int64_t envc = 0;
+
+	for (uint64_t i = 0; argv[i]; i++) {
+		argv_len += kstrlen(argv[i]) + 1;
+		argc++;
+	}
+
+	size_t envp_len = 0;
+
+	for (uint64_t i = 0; envp[i]; i++) {
+		envp_len += kstrlen(envp[i]) + 1;
+		envc++;
+	}
+
+	// create auxv
+	uint64_t invoke_addr = INIT_USERLAND_RSP - argv_len;
+	uint64_t env_addr = invoke_addr - envp_len;
+	uint64_t random_addr = env_addr - 16;
+	auxv_t* auxv_addr = (auxv_t*)(random_addr - sizeof(default_auxv));
+
+	kmemcpy(auxv_addr, default_auxv, sizeof(default_auxv));
+
+	// leave upper bytes untouched for "randomness"
+	*(volatile uint64_t*)random_addr = time_since_init_fs(); //TODO: better randomization
+
+	auxv_addr[AT_INDEX_PHDR].a_un.a_val = (int64_t)pheaders_base;
+	auxv_addr[AT_INDEX_PHENT].a_un.a_val = header.e_phentsize;
+	auxv_addr[AT_INDEX_PHNUM].a_un.a_val = header.e_phnum;
+	auxv_addr[AT_INDEX_RANDOM].a_un.a_val = (int64_t)random_addr;
+
+	uint64_t* stack_builder = (uint64_t*)auxv_addr;
+	stack_builder--;
+	*stack_builder = 0; // env end
+	
+	char* data_char = (char*)env_addr;
+	char* next_char;
+
+	for (int64_t i = envc - 1; i >= 0; i--) {
+		next_char = kstpcpy(data_char, envp[i]) + 1;
+
+		stack_builder--;
+		*stack_builder = (uint64_t)data_char;
+
+		data_char = next_char;
+	}
+
+	stack_builder--;
+	*stack_builder = 0; // env start
+
+	for (int64_t i = argc - 1; i >= 0; i--) {
+		next_char = kstpcpy(data_char, argv[i]) + 1;
+
+		stack_builder--;
+		*stack_builder = (uint64_t)data_char;
+
+		data_char = next_char;
+	}
+
+	stack_builder--;
+	*stack_builder = (uint64_t)argc;
+
+	pcb->rdx = (uint64_t)stack_builder; // rsp
+
+restore_cr3:
+	while (mem_regs) {
+		temp = mem_regs->next;
+		kfree(mem_regs);
+		mem_regs = temp;
+	}
+
+	*cr3_ret = old_cr3;
+	return pcb;
+}
+
+struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* const* invoker, const char* const* env) {
+	uint64_t stack_paddr, stack_vaddr, rsp;
+
+	uint64_t old_cr3;
+
+
+	if (process_create_guarded_stack(&stack_vaddr, &stack_paddr, &rsp)) {
+		logging_log_error("Failed to allocate stack");
+		return 0;
+	}
+
+	struct pcb_t* pcb = load_base(file, &old_cr3, invoker, env);
+
+	pcb->init_k_rsp_paddr = stack_paddr;
+	pcb->init_k_rsp_vaddr = stack_vaddr;
+	pcb->rsp = rsp;
+
+	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
+	pcb->k_rsp_hi = rsp >> 32;
+
+	pcb->pid = pid;
+	
+
 	pcb->fd_table = array_list_alloc(FD_INIT_SIZE, FD_GROWTH, 0);
 	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
 #ifdef SERIAL
@@ -549,13 +579,69 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
 #endif /* SERIAL */
 
-restore_cr3:
+	proc_data_get()->current_process->cr3 = old_cr3;
+	cpu_set_cr3(old_cr3);
 
-	while (mem_regs) {
-		temp = mem_regs->next;
-		kfree(mem_regs);
-		mem_regs = temp;
+	return pcb;
+}
+
+struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker, const char* const* env) {
+	uint64_t old_cr3;
+
+	uint64_t count;
+	for (count = 0; invoker[count]; count++);
+
+	char** argv = kmalloc(sizeof(char*) * (count + 1));
+
+	for (count = 0; invoker[count]; count++) {
+		argv[count] = kmalloc(kstrlen(invoker[count]) + 1);
+		kstrcpy(argv[count], invoker[count]);
 	}
+	argv[count] = 0;
+
+	for (count = 0; env[count]; count++);
+
+	char** envp = kmalloc(sizeof(char*) * (count + 1));
+
+	for (count = 0; env[count]; count++) {
+		envp[count] = kmalloc(kstrlen(env[count]) + 1);
+		kstrcpy(envp[count], env[count]);
+	}
+	envp[count] = 0;
+
+	struct pcb_t* pcb = load_base(file, &old_cr3, (const char* const*)argv, (const char* const*)envp);
+
+	for (count = 0; argv[count]; count++) {
+		kfree(argv[count]);
+	}
+	kfree(argv);
+
+	for (count = 0; envp[count]; count++) {
+		kfree(envp[count]);
+	}
+	kfree(envp);
+
+	if (!pcb) {
+		return 0;
+	}
+
+	if (!pcb) {
+		return 0;
+	}
+
+	struct pcb_t* cpcb = proc_data_get()->current_process;
+
+	pcb->init_k_rsp_paddr = cpcb->init_k_rsp_paddr;
+	pcb->init_k_rsp_vaddr = cpcb->init_k_rsp_vaddr;
+	pcb->rsp = (uint64_t)cpcb->k_rsp_lo | ((uint64_t)cpcb->k_rsp_hi >> 32);
+
+	pcb->k_rsp_lo = cpcb->k_rsp_lo;
+	pcb->k_rsp_hi = cpcb->k_rsp_hi;
+
+	pcb->pid = cpcb->pid;
+	
+	pcb->fd_table = cpcb->fd_table;
+	pcb->wd = cpcb->wd;
 
 	proc_data_get()->current_process->cr3 = old_cr3;
 	cpu_set_cr3(old_cr3);

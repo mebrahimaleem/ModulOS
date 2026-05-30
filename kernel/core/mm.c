@@ -352,7 +352,7 @@ static uint64_t mm_alloc_max(size_t size,
 		return 0;
 	}
 
-	uint64_t adj = align ? node->base % align : 0;
+	uint64_t adj = (align) ? (align - (node->base % align)) : 0;
 
 	if (adj) {
 		extra->base = node->base;

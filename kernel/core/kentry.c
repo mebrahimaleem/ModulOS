@@ -215,13 +215,6 @@ void kapentry(uint64_t arb_id) {
 void prepare_userland(void* cntx) {
 	(void)cntx;
 
-	struct fs_handle_t* f = fs_open("/test.txt", FILE_FLAGS_READ | FILE_FLAGS_WRITE | FILE_FLAGS_CREATE);
-	if (f == 0) {
-		logging_log_error("Failed to create /test.txt");
-	}
-	fs_write(f, "Hi\n", 3);
-	fs_close(f);
-
 	lock_acquire(&prepare_userland_lock);
 	if (init_done) {
 		logging_log_error("Multiple calls to prepare userland");
@@ -237,7 +230,9 @@ void prepare_userland(void* cntx) {
 	}
 
 	else {
-		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), "/bin/shell ModulOS", "USER=root PWD=/");
+		const char* const invoker[] = {"/bin/shell", "ModulOS", 0};
+		const char* const env[] = {"USER=root", "PWD=/", 0};
+		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), invoker, env);
 		if (!shell_pcb) {
 			logging_log_error("Failed to load shell file");
 		}

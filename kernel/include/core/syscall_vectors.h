@@ -84,9 +84,9 @@
 #define SYSCALL_FORK				6
 
 /*
- * rdi: path
- * rsi: argv
- * rdx: envp
+ * rdi: path (const char*)
+ * rsi: argv (const char*)
+ * rdx: envp (const char*)
  * ret: success (int)
  */
 #define SYSCALL_EXECVE			7

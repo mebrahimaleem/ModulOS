@@ -18,21 +18,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int fork();
-int getpid();
+extern char** environ;
+
+extern int fork();
+extern void execve(const char* path, char* const argv[], char* const envp[]);
 
 int main(int argc, char** argv) {
-	(void)argc;
-	(void)argv;
-
-	while (1) {
-		printf("Hello from %u\n", getpid());
-
-		if (fork()) {
-			break;
-		}
+	for (int i = 0; i < argc; i++) {
+		printf("%s\n", argv[i]);
 	}
 
+	for (int i = 0; environ[i]; i++) {
+		printf("%s\n", environ[i]);
+	}
+
+	if (fork()) {
+		printf("Forked. Exiting...\n");
+	}
+	else {
+		printf("Self executing...\n");
+		char* const a[] = {argv[0], "Test", 0};
+		char* const e[] = {"Callee=US", 0};
+		execve(argv[0], a, e);
+		printf("Fatal\n");
+	}
 
 	return EXIT_SUCCESS;
 }

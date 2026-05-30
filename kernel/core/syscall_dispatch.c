@@ -28,6 +28,9 @@
 #include <core/proc_data.h>
 #include <core/process.h>
 #include <core/time.h>
+#include <core/elf.h>
+#include <core/cpu_instr.h>
+#include <core/scheduler.h>
 
 #include <lib/kmemset.h>
 #include <lib/array_list.h>
@@ -179,14 +182,38 @@ DECLARE_SYSCALL(fork) {
 	return pid;
 }
 
+static void execve_transfer(struct pcb_t* pcb) {
+	scheduler_schedule(pcb->meta[0]);
+
+	pcb->init_k_rsp_vaddr = 0;
+	pcb->fd_table = 0;
+	pcb->wd = 0;
+
+	process_discard(pcb);
+}
+
 DECLARE_SYSCALL(execve) {
 	ARGC_3;
 
-	(void)arg1;
-	(void)arg2;
-	(void)arg3;
+	struct fs_handle_t* handle = fs_open((const char*)arg1, FILE_FLAGS_READ);
 
-	return SYSCALL_STS_FAIL;
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	struct pcb_t* e = elf_overwrite(handle, (const char* const*)arg2, (const char* const*)arg3);
+
+	if (!e) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	pcb->meta[0] = e;
+	pcb->sleep_state.callback = execve_transfer;
+	pcb->sched_cntr = SCHED_CALLBACK;
+
+	cpu_wait_loop();
 }
 
 DECLARE_SYSCALL(open_dir) {

@@ -25,6 +25,8 @@
 
 extern uint8_t elf_is_elf(struct fs_handle_t* file);
 
-extern struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invoker, const char* env);
+extern struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* const* invoker, const char* const* env);
+
+extern struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker, const char* const* env);
 
 #endif /* KERNEL_CORE_ELF_H */

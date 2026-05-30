@@ -351,24 +351,28 @@ __attribute__((noreturn)) static void process_reap(void* _ign) {
 			next = pcb->next;
 
 			_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
-			paging_unmap(pcb->init_k_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
-			paging_unmap(pcb->init_k_rsp_vaddr + 2 * PAGE_SIZE_4K, PAGE_4K);
-			paging_unmap(pcb->init_k_rsp_vaddr + 3 * PAGE_SIZE_4K, PAGE_4K);
-			paging_unmap(pcb->init_k_rsp_vaddr + 4 * PAGE_SIZE_4K, PAGE_4K);
-			paging_remove_guard(pcb->init_k_rsp_vaddr);
+			if (pcb->init_k_rsp_vaddr) {
+				paging_unmap(pcb->init_k_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
+				paging_unmap(pcb->init_k_rsp_vaddr + 2 * PAGE_SIZE_4K, PAGE_4K);
+				paging_unmap(pcb->init_k_rsp_vaddr + 3 * PAGE_SIZE_4K, PAGE_4K);
+				paging_unmap(pcb->init_k_rsp_vaddr + 4 * PAGE_SIZE_4K, PAGE_4K);
+				paging_remove_guard(pcb->init_k_rsp_vaddr);
 
-			mm_free_p(pcb->init_k_rsp_paddr, INIT_STACK_SIZE);
-			mm_free_v(pcb->init_k_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
+				mm_free_p(pcb->init_k_rsp_paddr, INIT_STACK_SIZE);
+				mm_free_v(pcb->init_k_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
+			}
 
 			if (pcb->cr3) {
 				paging_free_userspace((uint64_t*)pcb->cr3);
 			}
 
-			array_list_free(pcb->fd_table, close_fd);
+			if (pcb->fd_table) {
+				array_list_free(pcb->fd_table, close_fd);
+			}
+
 			if (pcb->wd) {
 				fs_close(pcb->wd);
 			}
-
 
 			kfree(pcb);
 		}

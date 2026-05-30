@@ -25,6 +25,8 @@
 #include <abi-bits/seek-whence.h>
 #include <abi-bits/errno.h>
 
+#include <stdlib.h>
+
 #include <string.h>
 
 #define stdout	0
@@ -462,6 +464,7 @@ extern "C" int fork() {
 	return pid;
 }
 
-extern "C" int getpid() {
-	return mlibc::sys_getpid();
+extern "C" void execve(const char* path, char* const argv[], char* const envp[]) {
+	mlibc::sys_execve(path, argv, envp);
+	__builtin_unreachable();
 }
