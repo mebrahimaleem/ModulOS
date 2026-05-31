@@ -456,15 +456,3 @@ int sys_clock_get(int clock, time_t *secs, long *nanos) {
 
 
 } //namespace mlibc
-
-extern "C" int fork() {
-	pid_t pid;
-	mlibc::sys_fork(&pid);
-
-	return pid;
-}
-
-extern "C" void execve(const char* path, char* const argv[], char* const envp[]) {
-	mlibc::sys_execve(path, argv, envp);
-	__builtin_unreachable();
-}

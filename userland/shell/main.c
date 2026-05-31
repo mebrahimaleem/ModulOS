@@ -16,32 +16,20 @@
 */
 
 #include <stdio.h>
-#include <stdlib.h>
-
-extern char** environ;
-
-extern int fork();
-extern void execve(const char* path, char* const argv[], char* const envp[]);
 
 int main(int argc, char** argv) {
 	for (int i = 0; i < argc; i++) {
-		printf("%s\n", argv[i]);
+		printf("%s ", argv[i]);
 	}
 
-	for (int i = 0; environ[i]; i++) {
-		printf("%s\n", environ[i]);
-	}
+	printf("\n");
 
-	if (fork()) {
-		printf("Forked. Exiting...\n");
-	}
-	else {
-		printf("Self executing...\n");
-		char* const a[] = {argv[0], "Test", 0};
-		char* const e[] = {"Callee=US", 0};
-		execve(argv[0], a, e);
-		printf("Fatal\n");
-	}
+	char buf[256];
 
-	return EXIT_SUCCESS;
+	while (1) {
+		printf("$");
+		fflush(stdout);
+		fgets(buf, 256, stdin);
+		printf(">>%s", buf);
+	}
 }
