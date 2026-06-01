@@ -3,6 +3,7 @@
 
 #include <abi-bits/mode_t.h>
 #include <abi-bits/dev_t.h>
+#include <abi-bits/ino_t.h>
 
 #include <bits/size_t.h>
 #include <bits/ansi/time_t.h>
@@ -39,6 +40,9 @@
 
 struct stat {
 	size_t st_size;
+	mode_t st_mode;
+	ino_t st_ino;
+	dev_t st_dev;
 };
 
 #define stat64 stat

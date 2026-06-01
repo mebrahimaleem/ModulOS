@@ -33,7 +33,7 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: libc $(OBJ_DIR)/../userland_files/bin/shell
+build: libc $(OBJ_DIR)/../userland_files/bin/shell $(OBJ_DIR)/../userland_files/bin/ls
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
@@ -61,7 +61,13 @@ libc: $(OBJ_DIR)/mlibc-meson-setup
 $(LIB)/crt1.o $(LIB)/libc.a: libc
 
 $(OBJ_DIR)/shell.o: shell/main.c | $(OBJ_DIR)
-	$(CC) $(U_CFLAGS) -c -o $(OBJ_DIR)/shell.o $<
+	$(CC) $(U_CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/ls.o: ls/main.c | $(OBJ_DIR)
+	$(CC) $(U_CFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o $(LIB)/crt1.o $(LIB)/libc.a | $(OBJ_DIR)/../userland_files/bin/
+	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a
+
+$(OBJ_DIR)/../userland_files/bin/ls: $(OBJ_DIR)/ls.o $(LIB)/crt1.o $(LIB)/libc.a | $(OBJ_DIR)/../userland_files/bin/
 	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a

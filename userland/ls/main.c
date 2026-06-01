@@ -17,25 +17,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 
 int main(int argc, char** argv) {
-	for (int i = 0; i < argc; i++) {
-		printf("%s ", argv[i]);
-	}
+	printf("%s\n", argv[1]);
 
-	printf("\n");
-
-	if (!fork()) {
-		static char* const a[] = {"/bin/ls", ".", 0};
-		static char* const e[] = {0};
-		execve("/bin/ls", a, e);
-		printf("Failure fork\n");
-		return EXIT_FAILURE;
-	}
-
-
-	printf("Success shell\n");
+	printf("Success ls\n");
 
 	return EXIT_SUCCESS;
 }

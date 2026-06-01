@@ -2,6 +2,7 @@
 #define _ABIBITS_SIGNAL_H
 
 #include <abi-bits/pid_t.h>
+#include <abi-bits/sigval.h>
 #include <abi-bits/uid_t.h>
 #include <time.h>
 #include <bits/size_t.h>
@@ -12,8 +13,6 @@
 #define POLL_ERR 4
 #define POLL_PRI 5
 #define POLL_HUP 6
-
-union sigval {};
 
 typedef struct {
 	int si_signo, si_errno, si_code;
@@ -159,7 +158,9 @@ typedef struct {
 #define SS_DISABLE 2
 
 typedef struct __stack {
-	//TODO
+	void *ss_sp;
+	int ss_flags;
+	size_t ss_size;
 } stack_t;
 
 /* constants for sigev_notify of struct sigevent */
@@ -235,6 +236,20 @@ struct sigaction {
 	void (*sa_restorer)(void);
 	sigset_t sa_mask;
 };
+
+typedef struct {
+	unsigned long gregs[NGREG];
+	struct _fpstate *fpregs;
+	unsigned long __reserved1[8];
+} mcontext_t;
+
+typedef struct __ucontext {
+	unsigned long uc_flags;
+	struct __ucontext *uc_link;
+	stack_t uc_stack;
+	mcontext_t uc_mcontext;
+	sigset_t uc_sigmask;
+} ucontext_t;
 
 #define sa_handler __sa_handler.sa_handler
 #define sa_sigaction __sa_handler.sa_sigaction

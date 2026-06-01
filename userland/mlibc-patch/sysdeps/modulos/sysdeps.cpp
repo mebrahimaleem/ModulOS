@@ -78,13 +78,13 @@ pid_t sys_getpid() {
 }
 
 int sys_fork(pid_t *child) {
-	pid_t pid = syscall_0(0, 0, 0, SYSCALL_FORK);
+	uint64_t pid = syscall_0(0, 0, 0, SYSCALL_FORK);
 
 	if (pid == SYSCALL_STS_FAIL) {
 		return ENOMEM;
 	}
 
-	*child = pid;
+	*child = (pid_t)pid;
 	return 0;
 }
 
