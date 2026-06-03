@@ -84,7 +84,7 @@ void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	pcb->init_k_rsp_vaddr = init_rsp_vaddr;
 	pcb->init_k_rsp_paddr = init_rsp_paddr;
 	pcb->sched_cntr = SCHED_SKIP;
-	pcb->fd_table = array_list_alloc(1, 1, 0);
+	pcb->fd_table = 0;
 	pcb->wd = 0;
 	proc_data_get()->current_process = pcb;
 	proc_data_get()->current_process->pid = process_assign_pid();
@@ -141,8 +141,8 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 
 	pcb->pid = process_assign_pid();
 
-	pcb->fd_table = array_list_alloc(1, 1, 0);
-	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
+	pcb->fd_table = 0;
+	pcb->wd = 0;
 
 	return pcb;
 }
@@ -283,7 +283,7 @@ uint64_t process_fork(uint64_t r11, uint64_t rcx, uint64_t rbp) {
 	struct pcb_t* child = kmalloc(sizeof(struct pcb_t));
 
 	if (!child) {
-		return -1uLL;
+		return 0;
 	}
 
 	struct pcb_t* parent = proc_data_get()->current_process;
@@ -316,14 +316,12 @@ uint64_t process_fork(uint64_t r11, uint64_t rcx, uint64_t rbp) {
 	child->cr3 = paging_duplicate_lower(parent->cr3);
 	process_copy_stack(parent->init_k_rsp_vaddr, child->init_k_rsp_vaddr);
 
-	child->rbp = *(uint64_t*)rbp;
+	child->rbp = *(uint64_t*)rbp;  // rbp (on userland stack) stores pointer to rbp
 
 	child->rcx = 0;
 	child->rsi = r11;
 	child->rdi = rcx;
-	child->rdx = rbp + 8;
-
-	process_fork_internal(child);
+	child->rdx = rbp + 8;  // rsp address must be right above rbp (pushed on userland stack)
 
 	scheduler_schedule(child);
 

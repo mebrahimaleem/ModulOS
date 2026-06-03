@@ -37,7 +37,7 @@ static void* get_increase(struct array_list_t* list, size_t index) {
 		return list->buffer[index];
 	}
 
-	void** buffer = kmalloc(sizeof(void*) * list->cap + list->growth);
+	void** buffer = kmalloc(sizeof(void*) * (list->cap + list->growth));
 	kmemcpy(buffer, list->buffer, sizeof(void*) * list->cap);
 
 	for (size_t i = list->cap; i < list->cap + list->growth; i++) {

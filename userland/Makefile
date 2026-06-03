@@ -31,7 +31,7 @@ ifndef DEBUG
 U_CFLAGS := $(U_CFLAGS)
 endif
 
-LIB := $(SYSROOT)/lib
+LIB := $(SYSROOT)/usr/lib
 
 .PHONY: all
 all: build
@@ -40,7 +40,7 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: libc dash
+build: libc shell
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
@@ -65,54 +65,28 @@ libc: $(OBJ_DIR)/mlibc-meson-setup
 	ninja -C $(OBJ_DIR)/libc-build/
 	meson install --only-changed -C $(OBJ_DIR)/libc-build/
 
+$(LIB)/crt1.o: | libc
+$(LIB)/libc.a: | libc
+
 dash/:
 	git clone https://git.kernel.org/pub/scm/utils/dash/dash.git
 	git -C $@ checkout v0.5.13.3
 
-$(OBJ_DIR)/dash-setup: | dash/ $(OBJ_DIR)/dash-build/ $(SYSROOT)/usr/
+$(OBJ_DIR)/dash-setup: $(LIB)/crt1.o $(LIB)/libc.a | dash/ $(OBJ_DIR)/dash-build/ $(SYSROOT)/usr/
+	make -C $(OBJ_DIR)/dash-build/ distclean || true
 	env -C dash/ ./autogen.sh
 	env -C $(OBJ_DIR)/dash-build/ \
 		CC=clang LD=ld.lld \
 		AR=llvm-ar NM=llvm-nm RANLIB=llvm-ranlib OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip AS=llvm-as \
 		CFLAGS="$(U_CFLAGS)" \
-		LDFLAGS="$(U_CLFAGS) -fuse-ld=lld -L$(SYSROOT)/usr/lib/" \
-		LIBS="$(SYSROOT)/usr/lib/crt1.o $(SYSROOT)/usr/lib/libc.a" \
-		ac_cv_func_memrchr=yes \
-		ac_cv_func_strtod=yes \
-		ac_cv_func_killpg=yes \
-		ac_cv_func_readdir64=yes \
-		ac_cv_func_dirent64=yes \
-		ac_cv_header_stdbool_h=yes \
-		ac_cv_header_string_h=yes \
-		ac_cv_header_stdlib_h=yes \
-		ac_cv_func_bsearch=yes \
-		ac_cv_func_faccessat=yes \
-		ac_cv_func_getpwnam=yes \
-		ac_cv_func_getrlimit=yes \
-		ac_cv_func_isalpha=yes \
-		ac_cv_func_killpg=yes \
-		ac_cv_func_memrchr=yes \
-		ac_cv_func_mempcpy=yes \
-		ac_cv_func_stpcpy=yes \
-		ac_cv_func_strchrnul=yes \
-		ac_cv_func_strsignal=yes \
-		ac_cv_func_strtod=yes \
-		ac_cv_func_strtoimax=yes \
-		ac_cv_func_strtoumax=yes \
-		ac_cv_func_sysconf=yes \
-		ac_cv_func_wait3=yes \
-		ac_cv_func_signal=yes \
-		ac_cv_func_bsd_signal=yes \
-		ac_cv_func_stat64=yes \
-		ac_cv_func_glob64=yes \
-		ac_cv_func_open64=yes \
-		ac_cv_func_stat::st_mti=yes \
+		LDFLAGS="$(U_CLFAGS) -fuse-ld=lld -L$(LIB)/" \
+		LIBS="$(LIB)/crt1.o $(LIB)/libc.a" \
 		$(CURDIR)/dash/configure \
 		--prefix $(SYSROOT)/usr/ \
 		--host=x86_64-unkown-modulos-elf
 	touch $@
  
-.PHONY: dash
-dash: mlibc $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
+.PHONY: shell
+shell: $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
 	make -C $(OBJ_DIR)/dash-build/ install
 	ln -f -r -s $(SYSROOT)/usr/bin/dash $(SYSROOT)/bin/sh

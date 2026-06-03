@@ -174,8 +174,9 @@ DECLARE_SYSCALL(fork) {
 	ARGC_0;
 
 	uint64_t pid = process_fork(r11, rcx, rbp);
+	// noreturn for userland
 
-	if (pid == -1uLL) {
+	if (!pid) {
 		return SYSCALL_STS_FAIL;
 	}
 
@@ -332,7 +333,7 @@ DECLARE_SYSCALL(gcwd) {
 
 	fs_path(pcb->wd, (size_t)arg2, (char*)arg1);
 
-	return SYSCALL_STS_FAIL;
+	return SYSCALL_STS_OK;
 }
 
 DECLARE_SYSCALL(ccwd) {

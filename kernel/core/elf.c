@@ -491,13 +491,19 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 	// create auxv
 	uint64_t invoke_addr = INIT_USERLAND_RSP - argv_len;
 	uint64_t env_addr = invoke_addr - envp_len;
+	env_addr -= env_addr % 16;
+	// even number of envp and argv needs to be shifted by another 8, so that rsp is aligned after argc
+	if ((argc + envc) % 2 == 0) {
+		env_addr -= 8;
+	}
+
 	uint64_t random_addr = env_addr - 16;
 	auxv_t* auxv_addr = (auxv_t*)(random_addr - sizeof(default_auxv));
 
 	kmemcpy(auxv_addr, default_auxv, sizeof(default_auxv));
 
-	// leave upper bytes untouched for "randomness"
-	*(volatile uint64_t*)random_addr = time_since_init_fs(); //TODO: better randomization
+	((uint64_t*)random_addr)[0] = time_since_init_fs();
+	((uint64_t*)random_addr)[1] = time_since_init_fs() ^ (argv_len * envp_len); //TODO: better randomization
 
 	auxv_addr[AT_INDEX_PHDR].a_un.a_val = (int64_t)pheaders_base;
 	auxv_addr[AT_INDEX_PHENT].a_un.a_val = header.e_phentsize;

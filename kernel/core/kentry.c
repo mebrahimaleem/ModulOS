@@ -230,8 +230,17 @@ void prepare_userland(void* cntx) {
 	}
 
 	else {
-		const char* const invoker[] = {"/usr/bin/dash", "ModulOS", 0};
-		const char* const env[] = {"USER=root", "PWD=/", 0};
+		const char* const invoker[] = {"/usr/bin/dash", "/", 0};
+		const char* const env[] = {
+			"PATH=/usr/bin:/bin",
+			"HOME=/",
+			"PWD=/",
+			"OLDPWD=/",
+			"USER=ROOT",
+			"LOGNAME=ROOT",
+			"SHELL=/bin/dash",
+			"PS1=$ ",
+			0};
 		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), invoker, env);
 		if (!shell_pcb) {
 			logging_log_error("Failed to load shell file");

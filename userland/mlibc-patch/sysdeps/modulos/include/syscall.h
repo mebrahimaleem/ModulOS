@@ -57,3 +57,11 @@ extern "C" uint64_t syscall_6(uint64_t arg1,
 													uint64_t arg4,
 													uint64_t arg5,
 													uint64_t arg6);
+
+extern "C" uint64_t syscall_6_nr(uint64_t arg1,
+													uint64_t arg2,
+													uint64_t arg3,
+													uint64_t v,
+													uint64_t arg4,
+													uint64_t arg5,
+													uint64_t arg6);

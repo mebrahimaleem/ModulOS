@@ -24,6 +24,9 @@
 #include <abi-bits/fcntl.h>
 #include <abi-bits/seek-whence.h>
 #include <abi-bits/errno.h>
+#include <abi-bits/uid_t.h>
+#include <abi-bits/gid_t.h>
+#include <abi-bits/pid_t.h>
 
 #include <stdlib.h>
 
@@ -73,12 +76,8 @@ int sys_tcb_set(void *pointer) {
 	__builtin_unreachable();
 }
 
-pid_t sys_getpid() {
-	return syscall_0(0, 0, 0, SYSCALL_GETPID);
-}
-
 int sys_fork(pid_t *child) {
-	uint64_t pid = syscall_0(0, 0, 0, SYSCALL_FORK);
+	uint64_t pid = syscall_6_nr(0, 0, 0, SYSCALL_FORK, 0, 0, 0);
 
 	if (pid == SYSCALL_STS_FAIL) {
 		return ENOMEM;
@@ -93,6 +92,32 @@ int sys_execve(const char *path, char *const argv[], char *const envp[]) {
 
 	return EACCES;
 }
+
+pid_t sys_getpid() {
+	return syscall_0(0, 0, 0, SYSCALL_GETPID);
+}
+
+pid_t sys_getppid() {
+	//TODO
+	return 100;
+}
+
+gid_t sys_getgid() {
+	return 0;
+}
+
+gid_t sys_getegid() {
+	return 0;
+}
+
+uid_t sys_getuid() {
+	return 0;
+}
+
+uid_t sys_geteuid() {
+	return 0;
+}
+
 
 // locking
 
@@ -400,6 +425,16 @@ int sys_rename(const char *path, const char *new_path) {
 	return sys_renameat(AT_FDCWD, path, AT_FDCWD, new_path);
 }
 
+int sys_fcntl(int fd, int request, va_list args, int *result) {
+	(void)fd;
+	(void)request;
+	(void)args;
+	*result = 0;
+
+	//TODO
+	return 0;
+}
+
 // working directory 
 
 int sys_getcwd(char *buffer, size_t size) {
@@ -411,7 +446,7 @@ int sys_getcwd(char *buffer, size_t size) {
 }
 
 int sys_fchdir(int fd) {
-	if (syscall_1(fd, 0, 0, SYSCALL_CCWD) SYSCALL_STS_FAIL) {
+	if (syscall_1(fd, 0, 0, SYSCALL_CCWD) == SYSCALL_STS_FAIL) {
 		return ENOTDIR;
 	}
 	

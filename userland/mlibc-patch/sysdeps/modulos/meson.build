@@ -82,6 +82,7 @@ if not no_headers
 
     install_headers('include/syscall.h')
     install_headers('include/syscall_vectors.h')
+    install_headers('include/features.h')
 endif
 
 if not headers_only
