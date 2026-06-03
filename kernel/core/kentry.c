@@ -224,13 +224,13 @@ void prepare_userland(void* cntx) {
 	init_done = 1;
 	lock_release(&prepare_userland_lock);
 
-	struct fs_handle_t* shell = fs_open("/bin/shell", FILE_FLAGS_READ);
+	struct fs_handle_t* shell = fs_open("/usr/bin/dash", FILE_FLAGS_READ);
 	if (!shell) {
 		logging_log_error("Failed to open shell file");
 	}
 
 	else {
-		const char* const invoker[] = {"/bin/shell", "ModulOS", 0};
+		const char* const invoker[] = {"/usr/bin/dash", "ModulOS", 0};
 		const char* const env[] = {"USER=root", "PWD=/", 0};
 		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), invoker, env);
 		if (!shell_pcb) {

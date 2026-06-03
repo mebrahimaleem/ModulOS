@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
+CWARN := -Wall -Wextra -Wpedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
 	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
 	-Wstrict-prototypes -Wundef -Wcast-qual -Wstrict-overflow=5 -Wswitch-enum -Winit-self -Wdouble-promotion \
 	-Wformat=2 -Wnull-dereference -Wpacked -Wvolatile-register-var -Walloca -Wvla -Wframe-larger-than=1024 \

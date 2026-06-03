@@ -19,12 +19,19 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
 OBJ_DIR := $(OBJ_DIR)/userland
 
-U_CFLAGS := -g -fno-pie -static \
-						-nostdlib -nodefaultlibs \
-						-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables \
-						--sysroot=$(OBJ_DIR)/../userland_files/
+SYSROOT := $(abspath $(OBJ_DIR)/../userland_files/)
 
-LIB := $(OBJ_DIR)/../userland_files/usr/lib
+U_CFLAGS := -fno-pie -static \
+						-ffreestanding -nostdlibinc -nostdlib \
+						--sysroot=$(SYSROOT)/ -isystem $(SYSROOT)/usr/include/ \
+						-Wall \
+						$(CDEBUG)
+
+ifndef DEBUG
+U_CFLAGS := $(U_CFLAGS)
+endif
+
+LIB := $(SYSROOT)/lib
 
 .PHONY: all
 all: build
@@ -33,7 +40,7 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: libc $(OBJ_DIR)/../userland_files/bin/shell $(OBJ_DIR)/../userland_files/bin/ls
+build: libc dash
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
@@ -41,11 +48,11 @@ mlibc/:
 	git -C $@ apply ../mlibc-patch/mlibc-v6-3-1-port.patch
 	cp -r mlibc-patch/* mlibc/
 
-$(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
+$(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(SYSROOT)/usr/
 	meson setup \
 		--native-file mlibc/ci/linux-x86_64-clang.cross-file \
 		--cross-file mlibc/ci/modulos.cross-file \
-		--prefix $(abspath $(OBJ_DIR)/../userland_files/usr/) \
+		--prefix $(SYSROOT)/usr/ \
 		--reconfigure \
 		-Ddefault_library=static \
 		$(OBJ_DIR)/libc-build \
@@ -58,16 +65,54 @@ libc: $(OBJ_DIR)/mlibc-meson-setup
 	ninja -C $(OBJ_DIR)/libc-build/
 	meson install --only-changed -C $(OBJ_DIR)/libc-build/
 
-$(LIB)/crt1.o $(LIB)/libc.a: libc
+dash/:
+	git clone https://git.kernel.org/pub/scm/utils/dash/dash.git
+	git -C $@ checkout v0.5.13.3
 
-$(OBJ_DIR)/shell.o: shell/main.c | $(OBJ_DIR)
-	$(CC) $(U_CFLAGS) -c -o $@ $<
-
-$(OBJ_DIR)/ls.o: ls/main.c | $(OBJ_DIR)
-	$(CC) $(U_CFLAGS) -c -o $@ $<
-
-$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o $(LIB)/crt1.o $(LIB)/libc.a | $(OBJ_DIR)/../userland_files/bin/
-	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a
-
-$(OBJ_DIR)/../userland_files/bin/ls: $(OBJ_DIR)/ls.o $(LIB)/crt1.o $(LIB)/libc.a | $(OBJ_DIR)/../userland_files/bin/
-	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a
+$(OBJ_DIR)/dash-setup: | dash/ $(OBJ_DIR)/dash-build/ $(SYSROOT)/usr/
+	env -C dash/ ./autogen.sh
+	env -C $(OBJ_DIR)/dash-build/ \
+		CC=clang LD=ld.lld \
+		AR=llvm-ar NM=llvm-nm RANLIB=llvm-ranlib OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip AS=llvm-as \
+		CFLAGS="$(U_CFLAGS)" \
+		LDFLAGS="$(U_CLFAGS) -fuse-ld=lld -L$(SYSROOT)/usr/lib/" \
+		LIBS="$(SYSROOT)/usr/lib/crt1.o $(SYSROOT)/usr/lib/libc.a" \
+		ac_cv_func_memrchr=yes \
+		ac_cv_func_strtod=yes \
+		ac_cv_func_killpg=yes \
+		ac_cv_func_readdir64=yes \
+		ac_cv_func_dirent64=yes \
+		ac_cv_header_stdbool_h=yes \
+		ac_cv_header_string_h=yes \
+		ac_cv_header_stdlib_h=yes \
+		ac_cv_func_bsearch=yes \
+		ac_cv_func_faccessat=yes \
+		ac_cv_func_getpwnam=yes \
+		ac_cv_func_getrlimit=yes \
+		ac_cv_func_isalpha=yes \
+		ac_cv_func_killpg=yes \
+		ac_cv_func_memrchr=yes \
+		ac_cv_func_mempcpy=yes \
+		ac_cv_func_stpcpy=yes \
+		ac_cv_func_strchrnul=yes \
+		ac_cv_func_strsignal=yes \
+		ac_cv_func_strtod=yes \
+		ac_cv_func_strtoimax=yes \
+		ac_cv_func_strtoumax=yes \
+		ac_cv_func_sysconf=yes \
+		ac_cv_func_wait3=yes \
+		ac_cv_func_signal=yes \
+		ac_cv_func_bsd_signal=yes \
+		ac_cv_func_stat64=yes \
+		ac_cv_func_glob64=yes \
+		ac_cv_func_open64=yes \
+		ac_cv_func_stat::st_mti=yes \
+		$(CURDIR)/dash/configure \
+		--prefix $(SYSROOT)/usr/ \
+		--host=x86_64-unkown-modulos-elf
+	touch $@
+ 
+.PHONY: dash
+dash: mlibc $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
+	make -C $(OBJ_DIR)/dash-build/ install
+	ln -f -r -s $(SYSROOT)/usr/bin/dash $(SYSROOT)/bin/sh

@@ -4,8 +4,14 @@
 #include <abi-bits/mode_t.h>
 #include <abi-bits/dev_t.h>
 #include <abi-bits/ino_t.h>
+#include <abi-bits/gid_t.h>
+#include <abi-bits/uid_t.h>
+#include <abi-bits/nlink_t.h>
+#include <abi-bits/blksize_t.h>
+#include <abi-bits/blkcnt_t.h>
 
 #include <bits/size_t.h>
+#include <bits/off_t.h>
 #include <bits/ansi/time_t.h>
 #include <bits/ansi/timespec.h>
 
@@ -39,10 +45,21 @@
 #define S_IEXEC  S_IXUSR
 
 struct stat {
-	size_t st_size;
-	mode_t st_mode;
-	ino_t st_ino;
 	dev_t st_dev;
+	ino_t st_ino;
+	nlink_t st_nlink;
+	mode_t st_mode;
+	uid_t st_uid;
+	gid_t st_gid;
+	unsigned int __pad0;
+	dev_t st_rdev;
+	off_t st_size;
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	long __unused[3];
 };
 
 #define stat64 stat

@@ -106,7 +106,7 @@ index: cscope.files
 
 .PHONY: clean-full
 clean-full: clean
-	-rm -rdf userland/mlibc/
+	-rm -rdf userland/mlibc/ userland/dash/
 
 .PHONY: clean
 clean:
