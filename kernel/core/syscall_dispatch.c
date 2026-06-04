@@ -34,6 +34,8 @@
 
 #include <lib/kmemset.h>
 #include <lib/array_list.h>
+#include <lib/kstrlen.h>
+#include <lib/kstrcpy.h>
 
 #define ARGC_6 \
 	(void)rbp; \
@@ -65,6 +67,18 @@
 	(void)arg1;
 
 #define USERLAND_AT_FDCWD -100
+
+#define U_F_UNKNOWN 0
+#define U_F_DIR 4
+#define U_F_REG 8
+
+struct u_dirent_t {
+	uint32_t ino;
+	int32_t off;
+	uint16_t len;
+	uint8_t type;
+	char name[];
+};
 
 DECLARE_SYSCALL(exit) {
 	ARGC_1;
@@ -233,12 +247,45 @@ DECLARE_SYSCALL(open_dir) {
 DECLARE_SYSCALL(read_dir) {
 	ARGC_3;
 
-	(void)arg1;
-	(void)arg2;
-	(void)arg3;
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
 
-	//TODO
-	return SYSCALL_STS_FAIL;
+	if (!handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	struct dir_info_t info;
+	size_t bytes = 0;
+
+	while (fs_read_dir(handle, &info) == FILE_OK) {
+		size_t name_len = kstrlen(info.name) + 1;
+
+		if (bytes + name_len + sizeof(struct u_dirent_t) > arg3) {
+			break;
+		}
+
+		struct u_dirent_t* dirent = (struct u_dirent_t*)(arg2 + bytes);
+		dirent->ino = (uint32_t)info.inode_num;
+		dirent->off = (int32_t)info.seek_pos;
+		switch (info.type) {
+			case FILE_INFO_REG:
+				dirent->type = U_F_REG;
+				break;
+			case FILE_INFO_DIR:
+				dirent->type = U_F_DIR;
+				break;
+			default:
+				dirent->type = U_F_UNKNOWN;
+				break;
+		}
+		kstrcpy(dirent->name, info.name);
+		dirent->len = (uint16_t)(name_len + sizeof(struct u_dirent_t));
+
+		bytes += name_len + sizeof(struct u_dirent_t);
+		fs_next_dir(handle);
+	}
+
+	return bytes;
 }
 
 DECLARE_SYSCALL(truncate) {
@@ -393,17 +440,13 @@ DECLARE_SYSCALL(stat) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct userland_stat_t {
-		size_t st_size;
-	};
-
 	struct file_info_t info;
 	if (fs_stat(handle, &info) != FILE_OK) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct userland_stat_t* u_stat = (struct userland_stat_t*)arg2;
-	u_stat->st_size = info.size;
+	struct file_info_t* u_stat = (struct file_info_t*)arg2;
+	*u_stat = info;
 
 	return SYSCALL_STS_OK;
 }

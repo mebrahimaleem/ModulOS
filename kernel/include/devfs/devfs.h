@@ -36,6 +36,7 @@ extern void devfs_delete_final(struct file_handle_t* handle);
 extern enum file_status_t devfs_open_dir(struct file_handle_t* handle);
 
 extern enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct dir_info_t* info);
+extern enum file_status_t devfs_next_dir(struct file_handle_t* handle);
 
 extern enum file_status_t devfs_create_dir(struct file_handle_t* handle, const char* name);
 extern enum file_status_t devfs_delete_dir(struct file_handle_t* handle);

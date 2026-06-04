@@ -27,6 +27,7 @@
 #include <abi-bits/uid_t.h>
 #include <abi-bits/gid_t.h>
 #include <abi-bits/pid_t.h>
+#include <abi-bits/stat.h>
 
 #include <stdlib.h>
 
@@ -40,14 +41,15 @@
 
 extern "C" {
 struct file_info_t {
-	enum {
-		FILE_TYPE_REG,
-		FILE_TYPE_DIR,
-		FILE_TYPE_CHAR
-	} type;
 	uint64_t size;
+	uint8_t type;
 };
 }
+
+#define FILE_INFO_UNK			0
+#define FILE_INFO_REG			1
+#define FILE_INFO_DIR			2
+#define FILE_INFO_CHR			3
 
 namespace mlibc {
 
@@ -269,13 +271,15 @@ int sys_open_dir(const char *path, int *handle) {
 
 int sys_read_entries(int handle, void *buffer, size_t max_size,
 		size_t *bytes_read) {
-	(void)handle;
-	(void)buffer;
-	(void)max_size;
-	(void)bytes_read;
 
-	//TODO
-	return ENOSYS;
+	uint64_t bytes = syscall_3(handle, (uint64_t)buffer, max_size, SYSCALL_READ_DIR);
+
+	if (bytes == SYSCALL_STS_FAIL) {
+		return EACCES;
+	}
+
+	*bytes_read = bytes;
+	return 0;
 }
 
 int sys_isatty(int fd) {
@@ -313,10 +317,12 @@ int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags,
 			if ((sts = sys_open(path, flags, 0, &f))) {
 				return sts;
 			}
+			break;
 		case fsfd_target::fd_path:
 			if ((sts = sys_openat(fd, path, flags, 0, &f))) {
 				return sts;
 			}
+			break;
 		default:
 			return ENOSYS;
 
@@ -329,7 +335,31 @@ int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags,
 		return EACCES;
 	}
 
+	//TODO
+	statbuf->st_dev = 0;
+	statbuf->st_ino = 0;
+	statbuf->st_mode = 0;
+	statbuf->st_nlink = 1;
+	statbuf->st_uid = 0;
+	statbuf->st_gid = 0;
+	statbuf->st_rdev = 0;
 	statbuf->st_size = buf.size;
+	statbuf->st_blksize = 4096;
+	statbuf->st_blocks = statbuf->st_size / statbuf->st_blksize + 1;
+
+	switch (buf.type) {
+		case FILE_INFO_REG:
+			statbuf->st_mode |= S_IFREG;
+			break;
+		case FILE_INFO_DIR:
+			statbuf->st_mode |= S_IFDIR;
+			break;
+		case FILE_INFO_CHR:
+			statbuf->st_mode |= S_IFCHR;
+			break;
+		default:
+			break;
+	}
 
 	return 0;
 }

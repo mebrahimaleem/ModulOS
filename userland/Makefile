@@ -25,7 +25,7 @@ U_CFLAGS := -fno-pie -static \
 						-ffreestanding -nostdlibinc -nostdlib \
 						--sysroot=$(SYSROOT)/ -isystem $(SYSROOT)/usr/include/ \
 						-Wall \
-						$(CDEBUG)
+						$(CDEBUG) -UDEBUG
 
 ifndef DEBUG
 U_CFLAGS := $(U_CFLAGS)

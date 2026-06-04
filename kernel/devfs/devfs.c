@@ -83,7 +83,7 @@ enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_info_t* 
 
 	switch (dev_handle->type) {
 		case DEV_TYPE_TTY:
-			info->type = FILE_TYPE_CHAR;
+			info->type = FILE_INFO_CHR;
 			info->size = TTY_READ_BUFFER_SIZE;
 			return FILE_OK;
 	}
@@ -157,6 +157,11 @@ enum file_status_t devfs_open_dir(struct file_handle_t* handle) {
 enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
 	(void)handle;
 	(void)info;
+	return FILE_NO_SUPPORT;
+}
+
+enum file_status_t devfs_next_dir(struct file_handle_t* handle) {
+	(void)handle;
 	return FILE_NO_SUPPORT;
 }
 

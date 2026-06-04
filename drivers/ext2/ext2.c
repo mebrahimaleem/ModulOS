@@ -178,6 +178,7 @@ struct ext2_inode_handle_t {
 	uint64_t seek;
 	uint64_t seek_block;
 	uint8_t ext2_mode;
+	uint64_t next_seek;
 };
 
 enum ext2_block_state_t {
@@ -835,10 +836,10 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 	}
 
 	if (inode.i_mode & EXT2_S_IFREG) {
-		info->type = FILE_TYPE_REG;
+		info->type = FILE_INFO_REG;
 	}
 	else if (inode.i_mode & EXT2_S_IFDIR) {
-		info->type = FILE_TYPE_DIR;
+		info->type = FILE_INFO_DIR;
 	}
 	else {
 		return FILE_NO_SUPPORT;
@@ -857,7 +858,7 @@ static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 		return FILE_ERROR;
 	}
 
-	if (info.type != FILE_TYPE_DIR) {
+	if (info.type != FILE_INFO_DIR) {
 		return FILE_NOT_DIR;
 	}
 
@@ -874,6 +875,19 @@ static void ext2_reset_dir(struct file_handle_t* handle) {
 	inode_handle->seek = 0;
 	inode_handle->seek_block = 0;
 	inode_handle->ext2_mode &= ~MODE_DIR;
+}
+
+static enum file_status_t ext2_next_dir(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+
+	inode_handle->seek = inode_handle->next_seek;
+
+	if (inode_handle->seek >= inode_handle->ext2->block_size) {
+		inode_handle->seek_block++;
+		inode_handle->seek = 0;
+	}
+
+	return FILE_OK;
 }
 
 static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
@@ -908,11 +922,7 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 
 				struct ext2_ll_dir_entry_t* entry = (struct ext2_ll_dir_entry_t*)((uint64_t)buffer + inode_handle->seek);
 
-				inode_handle->seek += entry->rec_len;
-				if (inode_handle->seek >= inode_handle->ext2->block_size) {
-					inode_handle->seek_block++;
-					inode_handle->seek = 0;
-				}
+				inode_handle->next_seek = inode_handle->seek + entry->rec_len;
 
 				if (entry->inode != 0) {
 					info->inode_num = entry->inode;
@@ -938,6 +948,8 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 				}
 
 				kfree(buffer);
+
+				ext2_next_dir(handle);
 				continue;
 			case BLOCK_SPARSE:
 				inode_handle->seek_block++;
@@ -949,6 +961,13 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 	}
 }
 
+static enum file_status_t ext2_read_dir_next(struct file_handle_t* handle, struct dir_info_t* info) {
+	enum file_status_t sts = ext2_read_dir(handle, info);
+	if (sts != FILE_OK) {
+		return sts;
+	}
+	return ext2_next_dir(handle);
+}
 
 static struct ext2_inode_handle_t* ext2_duplicate(struct ext2_inode_handle_t* handle) {
 	struct ext2_inode_handle_t* dup = kmalloc(sizeof(struct ext2_inode_handle_t));
@@ -984,7 +1003,7 @@ static const char* reduce_path(struct ext2_t* ext2, const char* path, struct ext
 		path_len = path_entry_len(path);
 
 		cntrl = 1;
-		while (ext2_read_dir((struct file_handle_t*)handle, &info) == FILE_OK) {
+		while (ext2_read_dir_next((struct file_handle_t*)handle, &info) == FILE_OK) {
 			if (path_len == kstrlen(info.name) && kmemcmp(path, info.name, path_len) == 0) {
 				cntrl = 0;
 				ext2_reset_dir((struct file_handle_t*)handle);
@@ -1038,7 +1057,7 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 		return sts;
 	}
 
-	if (info.type != FILE_TYPE_DIR) {
+	if (info.type != FILE_INFO_DIR) {
 		return FILE_NO_SUPPORT;
 	}
 
@@ -1049,7 +1068,7 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 
 	ext2_open_dir((struct file_handle_t*)inode_handle);
 
-	while (ext2_read_dir((struct file_handle_t*)inode_handle, &dir_info) == FILE_OK) {
+	while (ext2_read_dir_next((struct file_handle_t*)inode_handle, &dir_info) == FILE_OK) {
 		if (kstrcmp(dir_info.name, name) == 0) {
 			ext2_reset_dir((struct file_handle_t*)inode_handle);
 
@@ -1451,7 +1470,8 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 					ext2_truncate,
 					ext2_link,
 					ext2_unlink,
-					ext2_dup
+					ext2_dup,
+					ext2_next_dir
 					) != FILE_OK) {
 			logging_log_error("Failed to mount rootfs");
 			panic(PANIC_STATE);

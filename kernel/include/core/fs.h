@@ -29,6 +29,7 @@
 #define FILE_INFO_UNK			0
 #define FILE_INFO_REG			1
 #define FILE_INFO_DIR			2
+#define FILE_INFO_CHR			3
 
 struct mount_cntx_t;
 
@@ -47,12 +48,8 @@ enum file_status_t {
 };
 
 struct file_info_t {
-	enum {
-		FILE_TYPE_REG,
-		FILE_TYPE_DIR,
-		FILE_TYPE_CHAR
-	} type;
 	uint64_t size;
+	uint8_t type;
 };
 
 struct dir_info_t {
@@ -76,6 +73,7 @@ typedef void (*fs_delete_final_t)(struct file_handle_t*);
 typedef enum file_status_t (*fs_open_dir_t)(struct file_handle_t*);
 
 typedef enum file_status_t (*fs_read_dir_t)(struct file_handle_t*, struct dir_info_t*);
+typedef enum file_status_t (*fs_next_dir_t)(struct file_handle_t*);
 
 typedef enum file_status_t (*fs_create_dir_t)(struct file_handle_t*);
 typedef enum file_status_t (*fs_delete_dir_t)(struct file_handle_t*);
@@ -108,7 +106,8 @@ enum file_status_t fs_mount(
 		fs_truncate_t truncate,
 		fs_link_t link,
 		fs_unlink_t unlink,
-		fs_dup_t dup
+		fs_dup_t dup,
+		fs_next_dir_t next_dir
 		);
 
 extern struct fs_handle_t* fs_open_mode(const char* path, uint32_t flags, uint32_t mode);
@@ -126,6 +125,7 @@ extern size_t fs_write(struct fs_handle_t* handle, const void* buffer, size_t co
 extern struct fs_handle_t* fs_open_dir(struct fs_handle_t* handle); // invalidates old handle
 
 extern enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* info);
+extern enum file_status_t fs_next_dir(struct fs_handle_t* handle);
 
 extern enum file_status_t fs_create_dir(struct fs_handle_t* handle);
 extern enum file_status_t fs_delete_dir(struct fs_handle_t* handle);

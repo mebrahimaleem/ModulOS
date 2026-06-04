@@ -36,22 +36,6 @@
 
 #define OPEN_TABLE_BUCKETS		100
 
-/*
- * Locking conventions:
- *
- * The vfs layer guarantees non concurrent access to the same file, up to absolute paths.
- * The vfs layer does not guarnatee non concurrent access to directory creation, file creation,
- * multiple references to the same file via hard links, or atomic operations for multiple step
- * calls (e.g. directory listing).
- *
- * In other words, the vfs is only responsible for ensuring that no two access are made to the
- * inode at the same time. It is the actual fs driver's responsibility to ensure consistent access
- * to filesystem metadata such as inode tables and journals
- *
- * Internally, the vfs must guarantee locked access to the open_table via the fs_lock. The vfs must
- * also guarantee locked access to the vfs tree.
- */
-
 static struct semaphore_t* fs_sem;
 
 struct vfs_mount_t {
@@ -74,6 +58,7 @@ struct vfs_mount_t {
 	fs_link_t link;
 	fs_unlink_t unlink;
 	fs_dup_t dup;
+	fs_next_dir_t next_dir;
 };
 
 struct vfs_open_file_t {
@@ -121,7 +106,8 @@ static struct vfs_mount_t dev_mount = {
 	.truncate = devfs_truncate,
 	.link = devfs_link,
 	.unlink = devfs_unlink,
-	.dup = devfs_dup
+	.dup = devfs_dup,
+	.next_dir = devfs_next_dir
 };
 
 static uint8_t fs_not_interactive(struct file_handle_t* handle) {
@@ -232,7 +218,8 @@ enum file_status_t fs_mount(
 		fs_truncate_t truncate,
 		fs_link_t link,
 		fs_unlink_t unlink,
-		fs_dup_t dup
+		fs_dup_t dup,
+		fs_next_dir_t next_dir
 		) {
 
 	if (kstrcmp(mountpoint, "") && !vfs_root.mount) {
@@ -260,6 +247,7 @@ enum file_status_t fs_mount(
 		vfs_root.mount->link = link;
 		vfs_root.mount->unlink = unlink;
 		vfs_root.mount->dup = dup;
+		vfs_root.mount->next_dir = next_dir;
 
 		vfs_root.mount->is_interactive = fs_not_interactive;
 
@@ -523,6 +511,16 @@ enum file_status_t fs_read_dir(struct fs_handle_t* handle, struct dir_info_t* in
 
 	lock_acquire(&handle->shared->lock);
 	sts = handle->mount->read_dir(handle->handle, info);
+	lock_release(&handle->shared->lock);
+
+	return sts;
+}
+
+enum file_status_t fs_next_dir(struct fs_handle_t* handle) {
+	enum file_status_t sts;
+
+	lock_acquire(&handle->shared->lock);
+	sts = handle->mount->next_dir(handle->handle);
 	lock_release(&handle->shared->lock);
 
 	return sts;
