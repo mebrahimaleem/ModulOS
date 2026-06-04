@@ -257,14 +257,12 @@ int sys_open_dir(const char *path, int *handle) {
 		return sts;
 	}
 
-	uint64_t dfd = syscall_1(fd, 0, 0, SYSCALL_OPEN_DIR);
-
-	if (dfd == SYSCALL_STS_FAIL) {
+	if (syscall_1(fd, 0, 0, SYSCALL_OPEN_DIR) == SYSCALL_STS_FAIL) {
 		sys_close(fd);
 		return ENOTDIR;
 	}
 
-	*handle = (int)dfd;
+	*handle = (int)fd;
 
 	return 0;
 }

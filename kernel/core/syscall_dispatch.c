@@ -74,7 +74,7 @@
 
 struct u_dirent_t {
 	uint32_t ino;
-	int32_t off;
+	int64_t off;
 	uint16_t len;
 	uint8_t type;
 	char name[];
@@ -241,7 +241,7 @@ DECLARE_SYSCALL(open_dir) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	return (uint64_t)fs_open_dir(handle);
+	return fs_open_dir(handle) ? SYSCALL_STS_OK : SYSCALL_STS_FAIL;
 }
 
 DECLARE_SYSCALL(read_dir) {
