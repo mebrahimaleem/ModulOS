@@ -223,7 +223,8 @@ static void execve_transfer(struct pcb_t* pcb) {
 DECLARE_SYSCALL(execve) {
 	ARGC_3;
 
-	struct fs_handle_t* handle = fs_open((const char*)arg1, FILE_FLAGS_READ);
+	struct pcb_t* pcb = proc_data_get()->current_process;
+	struct fs_handle_t* handle = fs_openat((const char*)arg1, FILE_FLAGS_READ, pcb->wd, 0);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -234,8 +235,6 @@ DECLARE_SYSCALL(execve) {
 	if (!e) {
 		return SYSCALL_STS_FAIL;
 	}
-
-	struct pcb_t* pcb = proc_data_get()->current_process;
 
 	pcb->meta[0] = e;
 	pcb->sleep_state.callback = execve_transfer;
@@ -520,4 +519,16 @@ DECLARE_SYSCALL(waitpid) {
 	*(uint32_t*)arg2 = (uint32_t)(ec & 0xFF) << 8;
 	*(uint32_t*)arg4 = (uint32_t)arg1;
 	return SYSCALL_STS_OK;
+}
+
+DECLARE_SYSCALL(getppid) {
+	ARGC_0;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	if (pcb->parent) {
+		return pcb->parent->pid;
+	}
+
+	return 1;
 }

@@ -91,6 +91,7 @@ syscall_handlers:
 .quad syscall_dispatch_stat
 .quad syscall_dispatch_getpid
 .quad syscall_dispatch_waitpid
+.quad syscall_dispatch_getppid
 
 .set num_entries, . - syscall_handlers
 .if num_entries != SYSCALL_MAX * 8

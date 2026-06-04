@@ -72,5 +72,6 @@ extern DECLARE_SYSCALL(unlink);
 extern DECLARE_SYSCALL(stat);
 extern DECLARE_SYSCALL(getpid);
 extern DECLARE_SYSCALL(waitpid);
+extern DECLARE_SYSCALL(getppid);
 
 #endif /* KERNEL_CORE_SYSCALL_DISPATCH_H */

@@ -195,4 +195,9 @@
  */
 #define SYSCALL_WAITPID			23
 
-#define SYSCALL_MAX					24
+/*
+ * ret: parent pid (pid_t)
+ */
+#define SYSCALL_GETPPID			24
+
+#define SYSCALL_MAX					25

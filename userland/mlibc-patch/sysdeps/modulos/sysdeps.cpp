@@ -100,8 +100,7 @@ pid_t sys_getpid() {
 }
 
 pid_t sys_getppid() {
-	//TODO
-	return 100;
+	return syscall_0(0, 0, 0, SYSCALL_GETPPID);
 }
 
 gid_t sys_getgid() {

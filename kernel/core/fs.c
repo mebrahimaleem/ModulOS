@@ -391,10 +391,11 @@ struct fs_handle_t* fs_openat(const char* path, uint32_t flags, struct fs_handle
 	else {
 		size_t prefix_len = kstrlen(at->shared->path);
 		size_t suffix_len = kstrlen(path);
-		char* full_path = kmalloc(prefix_len + suffix_len + 1);
+		char* full_path = kmalloc(prefix_len + suffix_len + 2);
 		kmemcpy(full_path, at->shared->path, prefix_len);
-		kmemcpy(full_path + prefix_len, path, suffix_len);
-		full_path[prefix_len + suffix_len] = 0;
+		full_path[prefix_len] = '/';
+		kmemcpy(full_path + prefix_len + 1, path, suffix_len);
+		full_path[prefix_len + suffix_len + 1] = 0;
 		struct fs_handle_t* ret = fs_open_mode(full_path, flags, mode);
 		kfree(full_path);
 		return ret;
