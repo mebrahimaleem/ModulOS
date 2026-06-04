@@ -6,6 +6,8 @@
 #define HOST_NAME_MAX 64
 #define NAME_MAX 255
 #define OPEN_MAX 256
+#define _POSIX_PATH_MAX 256
+#define PATH_MAX 4096
 
 #endif /*_ABIBITS_LIMITS_H */
 

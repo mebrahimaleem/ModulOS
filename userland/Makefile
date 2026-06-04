@@ -40,7 +40,7 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: libc shell
+build: libc shell utils
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
@@ -90,3 +90,34 @@ $(OBJ_DIR)/dash-setup: $(LIB)/crt1.o $(LIB)/libc.a | dash/ $(OBJ_DIR)/dash-build
 shell: $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
 	make -C $(OBJ_DIR)/dash-build/ install
 	ln -f -r -s $(SYSROOT)/usr/bin/dash $(SYSROOT)/bin/sh
+
+sbase/:
+	git clone git://git.suckless.org/sbase
+	git -C $@ checkout c546c3a5724c81cee9a11d816a38ccdf17472129
+
+$(OBJ_DIR)/utils-setup: $(LIB)/crt1.o $(LIB)/libc.a | sbase/ $(OBJ_DIR)/utils-build/ $(SYSROOT)/usr/share/man/
+	make -C $(OBJ_DIR)/utils-build/ clean || true
+	rsync -a --exclude='.git' sbase/ $(OBJ_DIR)/utils-build/
+	sed -i \
+			-e 's|^PREFIX = .*|PREFIX = $(SYSROOT)/usr/|' \
+			-e 's|^#CC =.*|CC = clang|' \
+			-e 's|^#AR =.*|AR = llvm-ar|' \
+			-e 's|^RANLIB = .*|RANLIB = llvm-ranlib|' \
+			-e '/^# tools/a \
+	LD = ld.lld\nNM = llvm-nm\nOBJCOPY = llvm-objcopy\nOBJDUMP = llvm-objdump\nSTRIP = llvm-strip\nAS = llvm-as' \
+			-e 's|^# CFLAGS .*|CFLAGS = $(U_CFLAGS)|' \
+			-e 's|^# LDFLAGS .*|LDFLAGS = $(U_CFLAGS) -fuse-ld=lld -L$(LIB)/|' \
+			$(OBJ_DIR)/utils-build/config.mk
+	sed -i \
+			-e 's|-o \$$@ \$$< \$$(LIB)|-o $$@ $$< $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e 's|-o \$$@ bc\.c \$$(LIB)|-o $$@ bc.c $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e 's|-o \$$@ \$$(MAKEOBJ) \$$(LIB)|-o $$@ $$(MAKEOBJ) $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e 's|-o \$$@ build/\*\.c \$$(LIB)|-o $$@ build/*.c $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e '/\$$(RANLIB) \$$@/a \
+		$$(OBJCOPY) --weaken $$@' \
+			$(OBJ_DIR)/utils-build/Makefile
+	touch $@
+
+.PHONY: utils
+utils: $(OBJ_DIR)/utils-setup
+	make -C $(OBJ_DIR)/utils-build/ install

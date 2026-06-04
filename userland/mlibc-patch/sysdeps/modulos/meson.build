@@ -80,8 +80,10 @@ if not no_headers
 		follow_symlinks: true
     )
 
-    install_headers('include/syscall.h')
-    install_headers('include/syscall_vectors.h')
+    install_headers('include/sys/syscall.h', subdir: 'sys')
+    install_headers('include/sys/syscall_vectors.h', subdir: 'sys')
+
+    install_headers('include/sys/sysmacros.h', subdir: 'sys')
     install_headers('include/features.h')
 endif
 

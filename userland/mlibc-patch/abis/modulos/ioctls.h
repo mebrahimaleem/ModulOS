@@ -1,8 +1,13 @@
 #ifndef _ABIBITS_IOCTLS_H
 #define _ABIBITS_IOCTLS_H
 
+#include <bits/winsize.h>
+
 #define TIOCEXCL 0x540C
 #define TIOCNXCL 0x540D
+
+#define TIOCGWINSZ 0x5413
+#define TIOCSWINSZ 0x5414
 
 #define SIOCPROTOPRIVATE 0x89E0
 #define SIOCGSTAMP 0x8906

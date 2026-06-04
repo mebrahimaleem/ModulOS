@@ -15,8 +15,8 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <syscall.h>
-#include <syscall_vectors.h>
+#include <sys/syscall.h>
+#include <sys/syscall_vectors.h>
 
 #include <mlibc/all-sysdeps.hpp>
 #include <mlibc/fsfd_target.hpp>
