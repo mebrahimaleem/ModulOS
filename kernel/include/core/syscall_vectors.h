@@ -186,4 +186,13 @@
  */
 #define SYSCALL_GETPID			22
 
-#define SYSCALL_MAX					23
+/*
+ * rdi: pid (pid_t)
+ * rsi: status (int*)
+ * rdx: flags (int)
+ * r8 : out pid (pid_t*)
+ * ret: child pid (pid_t)
+ */
+#define SYSCALL_WAITPID			23
+
+#define SYSCALL_MAX					24

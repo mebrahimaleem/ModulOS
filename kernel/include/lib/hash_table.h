@@ -41,5 +41,7 @@ extern void hash_table_resize(struct hash_table_t* table, size_t buckets);
 
 extern size_t hash_table_count(struct hash_table_t* table);
 
+extern uint8_t hash_table_get_any(struct hash_table_t* table, uint64_t* out_key, void** out_val);
+
 #endif /* KERNEL_LIB_HASH_TABLE_H */
 

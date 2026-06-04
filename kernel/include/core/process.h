@@ -26,8 +26,9 @@
 #include <kernel/core/signal.h>
 
 #include <kernel/lib/array_list.h>
+#include <kernel/lib/hash_table.h>
 
-#define MAX_META		1
+#define MAX_META		2
 
 struct pcb_t;
 
@@ -76,6 +77,10 @@ struct pcb_t {
 
 	uint8_t fxdata[512] __attribute__((aligned(16)));
 
+	struct hash_table_t* child_table;
+	struct pcb_t* parent;
+	struct signal_wait_t* monitor;
+
 	union {
 		uint64_t wake_time;
 		void (*callback)(struct pcb_t*);
@@ -89,8 +94,11 @@ struct pcb_t {
 		SCHED_SKIP,
 		SCHED_SLEEP,
 		SCHED_CALLBACK,
-		SCHED_SIGNAL_READY
+		SCHED_SIGNAL_READY,
+		SCHED_ZOMBIE
 	} sched_cntr;
+
+	uint8_t plock;
 };
 
 struct preempt_frame_t {
@@ -148,5 +156,13 @@ extern void process_set_callback(void (*callback)(struct pcb_t*));
 extern uint64_t process_fork(uint64_t r11, uint64_t rcx, uint64_t rbp);
 
 extern void process_init_reaper(void);
+
+extern uint64_t process_reap_child(struct pcb_t* pcb);
+
+extern void process_pause_reaping(void);
+
+extern void process_resume_reaping(void);
+
+extern uint64_t process_find_stack_top(uint64_t vaddr_base);
 
 #endif /* KERNEL_CORE_PROCESS_H */

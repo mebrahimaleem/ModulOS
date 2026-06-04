@@ -29,6 +29,8 @@
 #include <core/cpu_instr.h>
 #include <core/proc_data.h>
 #include <core/time.h>
+#include <core/signal.h>
+#include <core/lock.h>
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemset.h>
@@ -36,6 +38,7 @@
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
 #include <lib/array_list.h>
+#include <lib/hash_table.h>
 
 #define EI_MAG0				0
 #define EI_CLASS			4
@@ -112,6 +115,8 @@
 
 #define FD_INIT_SIZE		4
 #define FD_GROWTH				8
+
+#define CHILD_BUCKETS		4
 
 enum at_index_t {
 	AT_INDEX_PHDR,
@@ -283,6 +288,8 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 	pcb->sched_cntr = SCHED_READY;
 
 	cpu_save_fx(pcb->fxdata);
+
+	lock_init(&pcb->plock);
 
 	Elf64_Phdr pheader;
 
@@ -580,6 +587,9 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* const
 
 	pcb->pid = pid;
 	
+	pcb->parent = 0;
+	pcb->child_table = hash_table_alloc(CHILD_BUCKETS);
+	pcb->monitor = signal_wait_alloc();
 
 	pcb->fd_table = array_list_alloc(FD_INIT_SIZE, FD_GROWTH, 0);
 	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
@@ -639,15 +649,22 @@ struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker
 
 	pcb->init_k_rsp_paddr = cpcb->init_k_rsp_paddr;
 	pcb->init_k_rsp_vaddr = cpcb->init_k_rsp_vaddr;
-	pcb->rsp = (uint64_t)cpcb->k_rsp_lo | ((uint64_t)cpcb->k_rsp_hi >> 32);
 
-	pcb->k_rsp_lo = cpcb->k_rsp_lo;
-	pcb->k_rsp_hi = cpcb->k_rsp_hi;
+	uint64_t rsp = process_find_stack_top(pcb->init_k_rsp_vaddr);
+
+	pcb->rsp = rsp;
+
+	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
+	pcb->k_rsp_hi = rsp >> 32;
 
 	pcb->pid = cpcb->pid;
 	
 	pcb->fd_table = cpcb->fd_table;
 	pcb->wd = cpcb->wd;
+
+	pcb->parent = cpcb->parent;
+	pcb->child_table = cpcb->child_table;
+	pcb->monitor = cpcb->monitor;
 
 	proc_data_get()->current_process->cr3 = old_cr3;
 	cpu_set_cr3(old_cr3);

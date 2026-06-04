@@ -66,7 +66,7 @@ void sys_libc_log(const char *message) {
 	sys_exit(-1);
 }
 
-// proccess
+// process
 
 int sys_tcb_set(void *pointer) {
 	asm volatile ("wrfsbaseq %0" : : "r"(pointer) : "memory");
@@ -120,6 +120,20 @@ uid_t sys_geteuid() {
 	return 0;
 }
 
+int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
+	(void)ru;
+
+	uint64_t p;
+	uint64_t sts = syscall_4(pid, (uint64_t)status, flags, SYSCALL_WAITPID, (uint64_t)&p);
+
+	if (sts == SYSCALL_STS_FAIL) {
+		return ECHILD;
+	}
+
+	*ret_pid = p;
+
+	return 0;
+}
 
 // locking
 

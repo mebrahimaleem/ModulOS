@@ -36,6 +36,7 @@
 #include <lib/array_list.h>
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
+#include <lib/hash_table.h>
 
 #define ARGC_6 \
 	(void)rbp; \
@@ -71,6 +72,8 @@
 #define U_F_UNKNOWN 0
 #define U_F_DIR 4
 #define U_F_REG 8
+
+#define U_WNOHANG	1
 
 struct u_dirent_t {
 	uint32_t ino;
@@ -198,13 +201,23 @@ DECLARE_SYSCALL(fork) {
 }
 
 static void execve_transfer(struct pcb_t* pcb) {
-	scheduler_schedule(pcb->meta[0]);
+	struct pcb_t* other = pcb->meta[0];
+	struct pcb_t old_pcb;
 
-	pcb->init_k_rsp_vaddr = 0;
-	pcb->fd_table = 0;
-	pcb->wd = 0;
+	old_pcb = *pcb;
+	*pcb = *other;
+	*other = old_pcb;
 
-	process_discard(pcb);
+	scheduler_schedule(pcb);
+
+	other->init_k_rsp_vaddr = 0;
+	other->fd_table = 0;
+	other->wd = 0;
+	other->child_table = 0;
+	other->parent = 0;
+	other->monitor = 0;
+
+	process_discard(other);
 }
 
 DECLARE_SYSCALL(execve) {
@@ -393,7 +406,8 @@ DECLARE_SYSCALL(ccwd) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	pcb->wd = handle;
+	fs_close(pcb->wd);
+	pcb->wd = fs_dup(handle);
 
 	return SYSCALL_STS_OK;
 }
@@ -457,4 +471,53 @@ DECLARE_SYSCALL(getpid) {
 	struct pcb_t* pcb = proc_data_get()->current_process;
 
 	return pcb->pid;
+}
+
+DECLARE_SYSCALL(waitpid) {
+	ARGC_4;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	uint64_t ec = 0;
+
+	void* child;
+
+	if (arg3 & U_WNOHANG) {
+		if (arg1 == -1uLL) {
+			// TODO: implement
+			ec = 0;
+			arg1 = 0;
+		}
+		else {
+			if (!hash_table_get(pcb->child_table, arg1, &child)) {
+				return SYSCALL_STS_FAIL;
+			}
+
+			if (((struct pcb_t*)child)->sched_cntr == SCHED_ZOMBIE) {
+				ec = process_reap_child(child);
+			}
+			else {
+				ec = 0;
+				arg1 = 0;
+			}
+		}
+	}
+	else {
+		if (arg1 == -1uLL) {
+			if (!hash_table_get_any(pcb->child_table, &arg1, &child)) {
+				return SYSCALL_STS_FAIL;
+			}
+		}
+		else {
+			if (!hash_table_get(pcb->child_table, arg1, &child)) {
+				return SYSCALL_STS_FAIL;
+			}
+		}
+
+		ec = process_reap_child(child);
+	}
+
+	*(uint32_t*)arg2 = (uint32_t)(ec & 0xFF) << 8;
+	*(uint32_t*)arg4 = (uint32_t)arg1;
+	return SYSCALL_STS_OK;
 }

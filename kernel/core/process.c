@@ -43,6 +43,8 @@
 #define INIT_STACK_SIZE 0x4000
 #define REAP_DELAY_MS		1000
 
+#define CHILD_BUCKETS		4
+
 // change manual paging map when adjusting stack size
 
 static uint64_t next_pid;
@@ -86,9 +88,13 @@ void process_init_ap(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
 	pcb->sched_cntr = SCHED_SKIP;
 	pcb->fd_table = 0;
 	pcb->wd = 0;
+	pcb->parent = 0;
+	pcb->child_table = 0;
+	pcb->monitor = 0;
 	proc_data_get()->current_process = pcb;
 	proc_data_get()->current_process->pid = process_assign_pid();
 	proc_data_get()->current_process->cr3 = 0;
+	lock_init(&pcb->plock);
 }
 
 struct pcb_t* process_from_vaddr(uint64_t vaddr) {
@@ -143,6 +149,10 @@ struct pcb_t* process_from_vaddr(uint64_t vaddr) {
 
 	pcb->fd_table = 0;
 	pcb->wd = 0;
+	pcb->parent = 0;
+	pcb->child_table = 0;
+	pcb->monitor = 0;
+	lock_init(&pcb->plock);
 
 	return pcb;
 }
@@ -245,7 +255,7 @@ uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr,
 
 	*init_vaddr = stack_vaddr;
 	*init_paddr = stack_paddr;
-	*stack = stack_vaddr + PAGE_SIZE_4K * 5;
+	*stack = process_find_stack_top(stack_vaddr);
 
 	return 0;
 }
@@ -316,6 +326,11 @@ uint64_t process_fork(uint64_t r11, uint64_t rcx, uint64_t rbp) {
 	child->cr3 = paging_duplicate_lower(parent->cr3);
 	process_copy_stack(parent->init_k_rsp_vaddr, child->init_k_rsp_vaddr);
 
+	child->parent = parent;
+	child->child_table = hash_table_alloc(CHILD_BUCKETS);
+	child->monitor = signal_wait_alloc();
+	lock_init(&child->plock);
+
 	child->rbp = *(uint64_t*)rbp;  // rbp (on userland stack) stores pointer to rbp
 
 	child->rcx = 0;
@@ -325,7 +340,75 @@ uint64_t process_fork(uint64_t r11, uint64_t rcx, uint64_t rbp) {
 
 	scheduler_schedule(child);
 
+	hash_table_insert(parent->child_table, child->pid, child);
+
 	return child->pid;
+}
+
+static void reap_final(struct pcb_t* pcb);
+
+static void orphan_children(void* child) {
+	struct pcb_t* pcb = child;
+
+	pcb->parent = 0;
+
+	if (pcb->sched_cntr == SCHED_ZOMBIE) {
+		reap_final(pcb);
+	}
+
+	if (pcb->monitor) {
+		signal_free(pcb->monitor);
+	}
+}
+
+static void reap_final(struct pcb_t* pcb) {
+	if (pcb->parent) {
+		void* ign;
+		hash_table_remove(pcb->parent->child_table, pcb->pid, &ign);
+	}
+
+	kfree(pcb);
+}
+
+static void reap_early(struct pcb_t* pcb) {
+	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
+	if (pcb->init_k_rsp_vaddr) {
+		paging_unmap(pcb->init_k_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
+		paging_unmap(pcb->init_k_rsp_vaddr + 2 * PAGE_SIZE_4K, PAGE_4K);
+		paging_unmap(pcb->init_k_rsp_vaddr + 3 * PAGE_SIZE_4K, PAGE_4K);
+		paging_unmap(pcb->init_k_rsp_vaddr + 4 * PAGE_SIZE_4K, PAGE_4K);
+		paging_remove_guard(pcb->init_k_rsp_vaddr);
+
+		mm_free_p(pcb->init_k_rsp_paddr, INIT_STACK_SIZE);
+		mm_free_v(pcb->init_k_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
+	}
+
+	if (pcb->cr3) {
+		paging_free_userspace((uint64_t*)pcb->cr3);
+	}
+
+	if (pcb->fd_table) {
+		array_list_free(pcb->fd_table, close_fd);
+	}
+
+	if (pcb->wd) {
+		fs_close(pcb->wd);
+	}
+
+	if (pcb->child_table) {
+		// orphan all children
+		hash_table_free(pcb->child_table, orphan_children);
+	}
+
+	// only fully reap orphans
+	if (pcb->parent == 0) {
+		reap_final(pcb);
+	}
+	else {
+		lock_acquire(&pcb->plock);
+		pcb->sched_cntr = SCHED_ZOMBIE;
+		signal_awake_locked(pcb->monitor, &pcb->plock);
+	}
 }
 
 __attribute__((noreturn)) static void process_reap(void* _ign) {
@@ -348,31 +431,7 @@ __attribute__((noreturn)) static void process_reap(void* _ign) {
 		for (; pcb; pcb = next) {
 			next = pcb->next;
 
-			_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
-			if (pcb->init_k_rsp_vaddr) {
-				paging_unmap(pcb->init_k_rsp_vaddr + 1 * PAGE_SIZE_4K, PAGE_4K);
-				paging_unmap(pcb->init_k_rsp_vaddr + 2 * PAGE_SIZE_4K, PAGE_4K);
-				paging_unmap(pcb->init_k_rsp_vaddr + 3 * PAGE_SIZE_4K, PAGE_4K);
-				paging_unmap(pcb->init_k_rsp_vaddr + 4 * PAGE_SIZE_4K, PAGE_4K);
-				paging_remove_guard(pcb->init_k_rsp_vaddr);
-
-				mm_free_p(pcb->init_k_rsp_paddr, INIT_STACK_SIZE);
-				mm_free_v(pcb->init_k_rsp_vaddr, INIT_STACK_SIZE + PAGE_SIZE_4K);
-			}
-
-			if (pcb->cr3) {
-				paging_free_userspace((uint64_t*)pcb->cr3);
-			}
-
-			if (pcb->fd_table) {
-				array_list_free(pcb->fd_table, close_fd);
-			}
-
-			if (pcb->wd) {
-				fs_close(pcb->wd);
-			}
-
-			kfree(pcb);
+			reap_early(pcb);
 		}
 	}
 }
@@ -380,4 +439,35 @@ __attribute__((noreturn)) static void process_reap(void* _ign) {
 void process_init_reaper(void) {
 	struct pcb_t* reaper = process_from_func(process_reap, 0);
 	scheduler_schedule(reaper);
+}
+
+uint64_t process_reap_child(struct pcb_t* pcb) {
+	while (1) {
+		lock_acquire(&pcb->plock);
+
+		if (pcb->sched_cntr == SCHED_ZOMBIE) {
+			break;
+		}
+		signal_wait_locked(pcb->monitor, &pcb->plock);
+	}
+	lock_release(&pcb->plock);
+
+	uint64_t ret = pcb->exit_code;
+
+	reap_final(pcb);
+
+	return ret;
+}
+
+void process_pause_reaping(void) {
+	lock_acquire(&lock_reap);
+}
+
+void process_resume_reaping(void) {
+	lock_release(&lock_reap);
+}
+
+extern uint64_t process_find_stack_top(uint64_t vaddr_base) {
+	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be four pages (16KiB)");
+	return vaddr_base + PAGE_SIZE_4K * 5;
 }

@@ -22,3 +22,7 @@ struct signal_wait_t;
 extern struct signal_wait_t* signal_wait_alloc(void);
 extern void signal_wait(struct signal_wait_t* wait);
 extern void signal_awake(struct signal_wait_t* wait);
+extern void signal_free(struct signal_wait_t* wait);
+
+extern void signal_wait_locked(struct signal_wait_t* wait, uint8_t* rlock);
+extern void signal_awake_locked(struct signal_wait_t* wait, uint8_t* rlock);

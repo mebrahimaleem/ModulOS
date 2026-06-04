@@ -96,6 +96,9 @@ void scheduler_run(void) {
 			case SCHED_SIGNAL_READY:
 				scheduler_schedule(current_pcb);
 				break;
+			case SCHED_ZOMBIE:
+				logging_log_warning("Zombie process still running");
+				break;
 		}
 	}
 
