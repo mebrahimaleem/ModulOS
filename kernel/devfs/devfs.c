@@ -35,7 +35,9 @@ struct dev_handle_t {
 	} type;
 };
 
-struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path, uint32_t flags, uint32_t mode) {
+static struct fs_mount_t* dev_mount;
+
+static struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path, uint32_t flags, uint32_t mode) {
 	(void)cntx;
 	(void)flags;
 	(void)mode;
@@ -59,7 +61,7 @@ struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path, ui
 	return 0;
 }
 
-void devfs_close(struct file_handle_t* handle) {
+static void devfs_close(struct file_handle_t* handle) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 	if (!dev_handle) {
 	 return;
@@ -73,7 +75,7 @@ void devfs_close(struct file_handle_t* handle) {
 	kfree(dev_handle);
 }
 
-enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_info_t* info) {
+static enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_info_t* info) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 
 	if (!dev_handle) {
@@ -88,7 +90,7 @@ enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_info_t* 
 	}
 }
 
-size_t devfs_read(struct file_handle_t* handle, void* buffer, size_t count) {
+static size_t devfs_read(struct file_handle_t* handle, void* buffer, size_t count) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 
 	if (!dev_handle) {
@@ -101,36 +103,7 @@ size_t devfs_read(struct file_handle_t* handle, void* buffer, size_t count) {
 	}
 }
 
-uint64_t devfs_get_seek(struct file_handle_t* handle) {
-	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
-
-	if (!dev_handle) {
-		return FILE_ERROR;
-	}
-
-	switch (dev_handle->type) {
-		case DEV_TYPE_TTY:
-			return 0;
-	}
-}
-
-
-enum file_status_t devfs_seek(struct file_handle_t* handle, uint64_t seek) {
-	(void)seek;
-
-	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
-
-	if (!dev_handle) {
-		return FILE_ERROR;
-	}
-
-	switch (dev_handle->type) {
-		case DEV_TYPE_TTY:
-			return FILE_NO_SUPPORT;
-	}
-}
-
-size_t devfs_write(struct file_handle_t* handle, const void* buffer, size_t count) {
+static size_t devfs_write(struct file_handle_t* handle, const void* buffer, size_t count) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 
 	if (!dev_handle) {
@@ -144,60 +117,7 @@ size_t devfs_write(struct file_handle_t* handle, const void* buffer, size_t coun
 	}
 }
 
-void devfs_delete_final(struct file_handle_t* handle) {
-	(void)handle;
-}
-
-enum file_status_t devfs_open_dir(struct file_handle_t* handle) {
-	(void)handle;
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
-	(void)handle;
-	(void)info;
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_next_dir(struct file_handle_t* handle) {
-	(void)handle;
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_create_dir(struct file_handle_t* handle, const char* name) {
-	(void)handle;
-	(void)name;
-
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_delete_dir(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_truncate(struct file_handle_t* handle, size_t size) {
-	(void)handle;
-	(void)size;
-
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_link(struct file_handle_t* handle, struct file_handle_t* replace) {
-	(void)handle;
-	(void)replace;
-
-	return FILE_NO_SUPPORT;
-}
-
-enum file_status_t devfs_unlink(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
-uint8_t devfs_is_interactive(struct file_handle_t* handle) {
+static uint8_t devfs_is_interactive(struct file_handle_t* handle) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 
 	if (!dev_handle) {
@@ -210,7 +130,7 @@ uint8_t devfs_is_interactive(struct file_handle_t* handle) {
 	}
 }
 
-struct file_handle_t* devfs_dup(struct file_handle_t* handle) {
+static struct file_handle_t* devfs_dup(struct file_handle_t* handle) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
 
 	if (!dev_handle) {
@@ -228,4 +148,16 @@ struct file_handle_t* devfs_dup(struct file_handle_t* handle) {
 	}
 
 	return (struct file_handle_t*)dev_handle2;
+}
+
+void devfs_init(void) {
+	dev_mount = fs_mount("/dev", 0);
+
+	fs_mount_assign_open(dev_mount, devfs_open);	
+	fs_mount_assign_close(dev_mount, devfs_close);	
+	fs_mount_assign_stat(dev_mount, devfs_stat);	
+	fs_mount_assign_read(dev_mount, devfs_read);	
+	fs_mount_assign_write(dev_mount, devfs_write);	
+	fs_mount_assign_is_interactive(dev_mount, devfs_is_interactive);	
+	fs_mount_assign_dup(dev_mount, devfs_dup);	
 }

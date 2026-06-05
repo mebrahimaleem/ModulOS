@@ -1368,42 +1368,6 @@ update_inode:
 	return written;
 }
 
-static void ext2_delete_final(struct file_handle_t* handle) {
-	(void)handle;
-}
-
-static enum file_status_t ext2_create_dir(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_delete_dir(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_truncate(struct file_handle_t* handle, size_t size) {
-	(void)handle;
-	(void)size;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_link(struct file_handle_t* handle, struct file_handle_t* replace) {
-	(void)handle;
-	(void)replace;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_unlink(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
 	struct ext2_bg_desc_t* bgdt;
@@ -1452,30 +1416,19 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 			(uint64_t)(1024u << superblock->s_log_block_size) * (uint64_t)superblock->s_blocks_count);
 
 	if (!kmemcmp(label_rootfs, superblock->s_volume_name, sizeof(superblock->s_volume_name))) {
-		if (fs_mount(
-					"/",
-					(struct mount_cntx_t*)ext2,
-					ext2_open,
-					ext2_close,
-					ext2_stat,
-					ext2_read,
-					ext2_get_seek,
-					ext2_seek,
-					ext2_write,
-					ext2_delete_final,
-					ext2_open_dir,
-					ext2_read_dir,
-					ext2_create_dir,
-					ext2_delete_dir,
-					ext2_truncate,
-					ext2_link,
-					ext2_unlink,
-					ext2_dup,
-					ext2_next_dir
-					) != FILE_OK) {
-			logging_log_error("Failed to mount rootfs");
-			panic(PANIC_STATE);
-		}
+		struct fs_mount_t* mount = fs_mount("/", (struct mount_cntx_t*)ext2);
+
+		fs_mount_assign_open(mount, ext2_open);
+		fs_mount_assign_close(mount, ext2_close);
+		fs_mount_assign_stat(mount, ext2_stat);
+		fs_mount_assign_read(mount, ext2_read);
+		fs_mount_assign_get_seek(mount, ext2_get_seek);
+		fs_mount_assign_seek(mount, ext2_seek);
+		fs_mount_assign_write(mount, ext2_write);
+		fs_mount_assign_open_dir(mount, ext2_open_dir);
+		fs_mount_assign_read_dir(mount, ext2_read_dir);
+		fs_mount_assign_next_dir(mount, ext2_next_dir);
+		fs_mount_assign_dup(mount, ext2_dup);
 
 		scheduler_schedule(process_from_func(prepare_userland, 0));
 	}
