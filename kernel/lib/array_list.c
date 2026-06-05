@@ -32,22 +32,25 @@ struct array_list_t {
 	size_t hint;
 };
 
-static void* get_increase(struct array_list_t* list, size_t index) {
-	if (index < list->cap) {
-		return list->buffer[index];
-	}
-
-	void** buffer = kmalloc(sizeof(void*) * (list->cap + list->growth));
+static void extend(struct array_list_t* list, size_t growth) {
+	void** buffer = kmalloc(sizeof(void*) * (list->cap + growth));
 	kmemcpy(buffer, list->buffer, sizeof(void*) * list->cap);
 
-	for (size_t i = list->cap; i < list->cap + list->growth; i++) {
+	for (size_t i = list->cap; i < list->cap + growth; i++) {
 		buffer[i] = list->null;
 	}
 
 	kfree(list->buffer);
 	list->buffer = buffer;
-	list->cap += list->growth;
+	list->cap += growth;
+}
 
+static void* get_increase(struct array_list_t* list, size_t index) {
+	if (index < list->cap) {
+		return list->buffer[index];
+	}
+
+	extend(list, list->growth);
 	return list->null;
 }
 
@@ -84,6 +87,16 @@ void* array_list_get(struct array_list_t* list, uint64_t index) {
 	}
 
 	return list->buffer[index];
+}
+
+void* array_list_set(struct array_list_t* list, uint64_t index, void* value) {
+	if (index >= list->cap) {
+		extend(list, index - list->cap + 1);
+	}
+
+	void* old = list->buffer[index];
+	list->buffer[index] = value;
+	return old;
 }
 
 void* array_list_remove(struct array_list_t* list, uint64_t index) {

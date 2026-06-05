@@ -174,9 +174,11 @@ static uint8_t lookup_close(struct vfs_open_file_t* file) {
 		return 0;
 	}
 
-	kfree(file->path);
-	void* ign;
-	hash_table_remove(open_table, file->key, &ign);
+	if (file->path) {
+		kfree(file->path);
+		void* ign;
+		hash_table_remove(open_table, file->key, &ign);
+	}
 
 	uint8_t pending_delete = file->pending_delete;
 
@@ -378,6 +380,22 @@ struct fs_handle_t* fs_open_mode(const char* path, uint32_t flags, uint32_t mode
 	return fs_handle;
 }
 
+struct fs_handle_t* fs_anon_dev(struct file_handle_t* handle, uint32_t flags) {
+	struct vfs_open_file_t* open_file = kmalloc(sizeof(struct vfs_open_file_t));
+
+	open_file->path = 0;
+	open_file->pending_delete = 0;
+	open_file->refs = 1;
+	lock_init(&open_file->lock);
+
+	struct fs_handle_t* fs_handle = kmalloc(sizeof(struct fs_handle_t));
+	fs_handle->handle = handle;
+	fs_handle->mount = &dev_mount;
+	fs_handle->shared = open_file;
+	fs_handle->flags = flags;
+	return fs_handle;
+}
+
 struct fs_handle_t* fs_open(const char* path, uint32_t flags) {
 	return fs_open_mode(path, flags, 0);
 }
@@ -389,6 +407,10 @@ struct fs_handle_t* fs_openat(const char* path, uint32_t flags, struct fs_handle
 		return fs_open_mode(path, flags, mode);
 	}
 	else {
+		if (!at->shared->path) {
+			return 0;
+		}
+
 		size_t prefix_len = kstrlen(at->shared->path);
 		size_t suffix_len = kstrlen(path);
 		char* full_path = kmalloc(prefix_len + suffix_len + 2);
@@ -563,6 +585,11 @@ enum file_status_t fs_unlink(struct fs_handle_t* handle) {
 }
 
 void fs_path(struct fs_handle_t* handle, size_t max_len, char* buf) {
+	if (!handle->shared->path) {
+		*buf = 0;
+		return;
+	}
+
 	kstrncpy(buf, handle->shared->path, max_len);
 }
 

@@ -56,9 +56,7 @@ namespace mlibc {
 // misc
 
 void sys_libc_log(const char *message) {
-	ssize_t _ign;
-	sys_write(stderr, message, strlen(message), &_ign);
-	sys_write(stderr, "\n", 1, &_ign);
+	(void)message;
 }
 
 [[noreturn]] void sys_libc_panic() {
@@ -92,7 +90,7 @@ int sys_fork(pid_t *child) {
 int sys_execve(const char *path, char *const argv[], char *const envp[]) {
 	syscall_3((uint64_t)path, (uint64_t)argv, (uint64_t)envp, SYSCALL_EXECVE);
 
-	return EACCES;
+	return ENOENT;
 }
 
 pid_t sys_getpid() {
@@ -193,7 +191,7 @@ int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
 	uint64_t f = syscall_4((uint64_t)path, flags, dirfd, SYSCALL_OPENAT, mode);
 
 	if (f == SYSCALL_STS_FAIL) {
-		return EACCES;
+		return ENOENT;
 	}
 	
 	*fd = f;
@@ -210,23 +208,27 @@ int sys_close(int fd) {
 }
 
 int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
-	off_t new_off;
+	uint64_t new_off;
 	switch (whence) {
 		case SEEK_END:
 			struct stat statbuf;
 			if (sys_stat(fsfd_target::fd, fd, nullptr, 0, &statbuf)) {
-				return EACCES;
+				return EBADF;
 			}
 			offset += statbuf.st_size;
 			goto set;
 		case SEEK_CUR:
-			offset += syscall_1(fd, 0, 0, SYSCALL_TELL);
+			new_off = syscall_1(fd, 0, 0, SYSCALL_TELL);
+			if (new_off == SYSCALL_STS_FAIL) {
+				return EBADF;
+			}
+			offset += new_off;
 			goto set;
 		case SEEK_SET:
 set:
 			new_off = syscall_2(fd, (uint64_t)offset, 0, SYSCALL_SEEK);
-			if ((uint64_t)*new_offset == SYSCALL_STS_FAIL) {
-				return EACCES;
+			if (new_off == SYSCALL_STS_FAIL) {
+				return EBADF;
 			}
 
 			*new_offset = new_off;
@@ -242,7 +244,7 @@ int sys_ftruncate(int fd, size_t size) {
 	(void)size;
 
 	if (syscall_2(fd, size, 0, SYSCALL_TRUNCATE) == SYSCALL_STS_FAIL) {
-		return EACCES;
+		return ENOENT;
 	}
 	return 0;
 }
@@ -286,7 +288,7 @@ int sys_read_entries(int handle, void *buffer, size_t max_size,
 	uint64_t bytes = syscall_3(handle, (uint64_t)buffer, max_size, SYSCALL_READ_DIR);
 
 	if (bytes == SYSCALL_STS_FAIL) {
-		return EACCES;
+		return ENOTDIR;
 	}
 
 	*bytes_read = bytes;
@@ -391,7 +393,7 @@ int sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new
 	uint64_t res = syscall_2(old_f, new_f, 0, SYSCALL_LINK);
 
 	if (res == SYSCALL_STS_FAIL) {
-		return EACCES;
+		return ENOENT;
 	}
 
 	return 0;
@@ -414,7 +416,7 @@ int sys_unlinkat(int fd, const char *path, int flags) {
 	uint64_t res = syscall_1(f, 0, 0, SYSCALL_UNLINK);
 
 	if (res == SYSCALL_STS_FAIL) {
-		return EACCES;
+		return ENOENT;
 	}
 
 	return 0;
@@ -443,7 +445,7 @@ int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
 
 	if (sts) {
 		sys_unlinkat(dirfd, path, 0);
-		return EACCES;
+		return ENOENT;
 	}
 
 	return 0;
@@ -476,11 +478,36 @@ int sys_fcntl(int fd, int request, va_list args, int *result) {
 	return 0;
 }
 
+int sys_dup(int fd, int flags, int *newfd) {
+	(void)flags;
+
+	uint64_t sts = syscall_1(fd, 0, 0, SYSCALL_DUP);
+
+	if (sts == SYSCALL_STS_FAIL) {
+		return EBADF;
+	}
+
+	*newfd = sts;
+	return 0;
+}
+
+int sys_dup2(int fd, int flags, int newfd) {
+	(void)flags;
+
+	uint64_t sts = syscall_1(fd, newfd, 0, SYSCALL_DUP2);
+
+	if (sts == SYSCALL_STS_FAIL) {
+		return EBADF;
+	}
+
+	return 0;
+}
+
 // working directory 
 
 int sys_getcwd(char *buffer, size_t size) {
 	if (syscall_2((uint64_t)buffer, size, 0, SYSCALL_GCWD) == SYSCALL_STS_FAIL) {
-		return EACCES;
+		return EINVAL;
 	}
 
 	return 0;
@@ -488,7 +515,7 @@ int sys_getcwd(char *buffer, size_t size) {
 
 int sys_fchdir(int fd) {
 	if (syscall_1(fd, 0, 0, SYSCALL_CCWD) == SYSCALL_STS_FAIL) {
-		return ENOTDIR;
+		return EBADF;
 	}
 	
 	return 0;

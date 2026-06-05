@@ -200,4 +200,17 @@
  */
 #define SYSCALL_GETPPID			24
 
-#define SYSCALL_MAX					25
+/*
+ * rdi: old fd (int)
+ * ret: new fd (int)
+ */
+#define SYSCALL_DUP					25
+
+/*
+ * rdi: old fd (int)
+ * rsi: new fd (int)
+ * ret: new fd (int(
+ */
+#define SYSCALL_DUP2				26
+
+#define SYSCALL_MAX					27

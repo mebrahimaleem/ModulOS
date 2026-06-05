@@ -31,7 +31,7 @@ struct dev_handle_t {
 		struct tty_handle_t* tty;
 	} dev_handle;
 	enum {
-		DEV_TYPE_TTY
+		DEV_TYPE_TTY,
 	} type;
 };
 
@@ -61,9 +61,8 @@ struct file_handle_t* devfs_open(struct mount_cntx_t* cntx, const char* path, ui
 
 void devfs_close(struct file_handle_t* handle) {
 	struct dev_handle_t* dev_handle = (struct dev_handle_t*)handle;
-
 	if (!dev_handle) {
-		return;
+	 return;
 	}
 
 	switch (dev_handle->type) {
@@ -224,10 +223,9 @@ struct file_handle_t* devfs_dup(struct file_handle_t* handle) {
 
 	switch (dev_handle->type) {
 		case DEV_TYPE_TTY:
-			dev_handle2->dev_handle = dev_handle->dev_handle;
+			dev_handle2->dev_handle.tty = dev_handle->dev_handle.tty;
 			break;
 	}
-
 
 	return (struct file_handle_t*)dev_handle2;
 }

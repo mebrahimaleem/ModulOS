@@ -532,3 +532,49 @@ DECLARE_SYSCALL(getppid) {
 
 	return 1;
 }
+
+DECLARE_SYSCALL(dup) {
+	ARGC_1;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	struct fs_handle_t* old_handle = array_list_get(pcb->fd_table, arg1);
+
+	if (!old_handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	struct fs_handle_t* new_handle = fs_dup(old_handle);
+
+	if (!new_handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	return array_list_push(pcb->fd_table, new_handle);
+}
+
+DECLARE_SYSCALL(dup2) {
+	ARGC_2;
+
+	struct pcb_t* pcb = proc_data_get()->current_process;
+
+	struct fs_handle_t* old_handle = array_list_get(pcb->fd_table, arg1);
+
+	if (!old_handle) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	struct fs_handle_t* dupped = fs_dup(old_handle);
+
+	if (!dupped) {
+		return SYSCALL_STS_FAIL;
+	}
+
+	struct fs_handle_t* old_new_handle = array_list_set(pcb->fd_table, arg2, dupped);
+
+	if (old_new_handle) {
+		fs_close(old_new_handle);
+	}
+
+	return arg2;
+}

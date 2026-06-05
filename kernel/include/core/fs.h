@@ -114,6 +114,8 @@ extern struct fs_handle_t* fs_open_mode(const char* path, uint32_t flags, uint32
 extern struct fs_handle_t* fs_open(const char* path, uint32_t flags);
 extern void fs_close(struct fs_handle_t* handle);
 
+extern struct fs_handle_t* fs_anon_dev(struct file_handle_t* handle, uint32_t flags);
+
 extern struct fs_handle_t* fs_openat(const char* path, uint32_t flags, struct fs_handle_t* at, uint32_t mode);
 
 extern enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
