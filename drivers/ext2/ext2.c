@@ -846,6 +846,8 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 	}
 
 	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	info->inode = inode_handle->inode_index;
+	info->mode = inode.i_mode;
 
 	return FILE_OK;
 }

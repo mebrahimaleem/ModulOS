@@ -36,6 +36,19 @@
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
 
+#include <abi/at.h>
+#include <abi/wait_opt.h>
+#include <abi/dev_t.h>
+#include <abi/ino_t.h>
+#include <abi/limits.h>
+#include <abi/nlink_t.h>
+#include <abi/mode_t.h>
+#include <abi/uid_t.h>
+#include <abi/gid_t.h>
+#include <abi/blkcnt_t.h>
+#include <abi/blksize_t.h>
+#include <abi/stat_opt.h>
+
 #define ARGC_6 \
 	(void)rbp; \
 	(void)rcx; \
@@ -65,20 +78,52 @@
 	ARGC_1 \
 	(void)arg1;
 
-#define USERLAND_AT_FDCWD -100
+//TODO: include these from mlibc
 
-#define U_F_UNKNOWN 0
-#define U_F_DIR 4
-#define U_F_REG 8
+#define DT_UNKNOWN 0
+#define DT_FIFO 1
+#define DT_CHR 2
+#define DT_DIR 4
+#define DT_BLK 6
+#define DT_REG 8
+#define DT_LNK 10
+#define DT_SOCK 12
+#define DT_WHT 14
 
-#define U_WNOHANG	1
+typedef int64_t off_t;
+typedef unsigned short reclen_t;
 
-struct u_dirent_t {
-	uint32_t ino;
-	int64_t off;
-	uint16_t len;
-	uint8_t type;
-	char name[];
+typedef long time_t;
+
+struct timespec {
+	time_t tv_sec;
+	long tv_nsec;
+};
+
+struct dirent {
+	ino_t d_ino;
+	off_t d_off;
+	reclen_t d_reclen;
+	unsigned char d_type;
+	char d_name[__MLIBC_NAME_MAX+1];
+};
+
+struct stat {
+	dev_t st_dev;
+	ino_t st_ino;
+	nlink_t st_nlink;
+	mode_t st_mode;
+	uid_t st_uid;
+	gid_t st_gid;
+	unsigned int __pad0;
+	dev_t st_rdev;
+	off_t st_size;
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	long __unused[3];
 };
 
 DECLARE_SYSCALL(exit) {
@@ -92,7 +137,7 @@ DECLARE_SYSCALL(openat) {
 
 	struct fs_handle_t* at;
 
-	if ((int32_t)arg3 == USERLAND_AT_FDCWD) {
+	if ((int32_t)arg3 == AT_FDCWD) {
 		at = process_get_wd();
 	}
 	else {
@@ -245,28 +290,28 @@ DECLARE_SYSCALL(read_dir) {
 	while (fs_read_dir(handle, &info) == FILE_OK) {
 		size_t name_len = kstrlen(info.name) + 1;
 
-		if (bytes + name_len + sizeof(struct u_dirent_t) > arg3) {
+		if (bytes + name_len + sizeof(struct dirent) > arg3) {
 			break;
 		}
 
-		struct u_dirent_t* dirent = (struct u_dirent_t*)(arg2 + bytes);
-		dirent->ino = (uint32_t)info.inode_num;
-		dirent->off = (int32_t)info.seek_pos;
+		struct dirent* ent = (struct dirent*)(arg2 + bytes);
+		ent->d_ino = (uint32_t)info.inode_num;
+		ent->d_off = (int32_t)info.seek_pos;
 		switch (info.type) {
 			case FILE_INFO_REG:
-				dirent->type = U_F_REG;
+				ent->d_type = DT_REG;
 				break;
 			case FILE_INFO_DIR:
-				dirent->type = U_F_DIR;
+				ent->d_type = DT_DIR;
 				break;
 			default:
-				dirent->type = U_F_UNKNOWN;
+				ent->d_type = DT_UNKNOWN;
 				break;
 		}
-		kstrcpy(dirent->name, info.name);
-		dirent->len = (uint16_t)(name_len + sizeof(struct u_dirent_t));
+		kstrcpy(ent->d_name, info.name);
+		ent->d_reclen = (uint16_t)(name_len + sizeof(struct dirent));
 
-		bytes += name_len + sizeof(struct u_dirent_t);
+		bytes += name_len + sizeof(struct dirent);
 		fs_next_dir(handle);
 	}
 
@@ -419,8 +464,12 @@ DECLARE_SYSCALL(stat) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct file_info_t* u_stat = (struct file_info_t*)arg2;
-	*u_stat = info;
+	struct stat* u_stat = (struct stat*)arg2;
+
+	kmemset(u_stat, 0, sizeof(struct stat));
+	u_stat->st_size = (off_t)info.size;
+	u_stat->st_mode = info.mode;
+	u_stat->st_ino = (ino_t)info.inode;
 
 	return SYSCALL_STS_OK;
 }
@@ -436,7 +485,7 @@ DECLARE_SYSCALL(waitpid) {
 
 	uint64_t ec;
 
-	if (!process_wait_pid(arg1, arg3 & U_WNOHANG, &ec)) {
+	if (!process_wait_pid(arg1, arg3 & WNOHANG, &ec)) {
 		return SYSCALL_STS_FAIL;
 	}
 

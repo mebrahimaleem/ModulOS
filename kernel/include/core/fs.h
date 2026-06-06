@@ -51,7 +51,9 @@ enum file_status_t {
 
 struct file_info_t {
 	uint64_t size;
-	uint8_t type;
+	uint64_t inode;
+	uint16_t mode;
+	uint8_t type;  // TODO: replace with mode
 };
 
 struct dir_info_t {

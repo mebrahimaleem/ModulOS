@@ -39,18 +39,6 @@
 
 #define SECONDS_PER_NANO	0x10000000000		
 
-extern "C" {
-struct file_info_t {
-	uint64_t size;
-	uint8_t type;
-};
-}
-
-#define FILE_INFO_UNK			0
-#define FILE_INFO_REG			1
-#define FILE_INFO_DIR			2
-#define FILE_INFO_CHR			3
-
 namespace mlibc {
 
 // misc
@@ -341,39 +329,14 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 
 	}
 
-	struct file_info_t buf;
-	uint64_t res = syscall_2(f, (uint64_t)&buf, 0, SYSCALL_STAT);
+	struct stat temp;
+	uint64_t res = syscall_2(f, (uint64_t)&temp, 0, SYSCALL_STAT);
 
 	if (res == SYSCALL_STS_FAIL) {
 		return EACCES;
 	}
 
-	//TODO
-	statbuf->st_dev = 0;
-	statbuf->st_ino = 0;
-	statbuf->st_mode = 0;
-	statbuf->st_nlink = 1;
-	statbuf->st_uid = 0;
-	statbuf->st_gid = 0;
-	statbuf->st_rdev = 0;
-	statbuf->st_size = buf.size;
-	statbuf->st_blksize = 4096;
-	statbuf->st_blocks = statbuf->st_size / statbuf->st_blksize + 1;
-
-	switch (buf.type) {
-		case FILE_INFO_REG:
-			statbuf->st_mode |= S_IFREG;
-			break;
-		case FILE_INFO_DIR:
-			statbuf->st_mode |= S_IFDIR;
-			break;
-		case FILE_INFO_CHR:
-			statbuf->st_mode |= S_IFCHR;
-			break;
-		default:
-			break;
-	}
-
+	*statbuf = temp;
 	return 0;
 }
 

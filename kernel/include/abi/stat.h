@@ -13,14 +13,7 @@
 #include <bits/ansi/time_t.h>
 #include <bits/ansi/timespec.h>
 
-#define S_IFMT 0x0F000
-#define S_IFBLK 0x06000
-#define S_IFCHR 0x02000
-#define S_IFIFO 0x01000
-#define S_IFREG 0x08000
-#define S_IFDIR 0x04000
-#define S_IFLNK 0x0A000
-#define S_IFSOCK 0x0C000
+#include <abi-bits/stat_opt.h>
 
 #define S_IRWXU 0700
 #define S_IRUSR 0400
@@ -46,8 +39,6 @@
 extern "C" {
 #endif
 
-#if defined(__x86_64__)
-
 struct stat {
 	dev_t st_dev;
 	ino_t st_ino;
@@ -65,71 +56,6 @@ struct stat {
 	struct timespec st_ctim;
 	long __unused[3];
 };
-
-#elif (defined(__riscv) && __riscv_xlen == 64) || defined (__aarch64__) || defined(__loongarch64)
-
-struct stat {
-	dev_t st_dev;
-	ino_t st_ino;
-	mode_t st_mode;
-	nlink_t st_nlink;
-	uid_t st_uid;
-	gid_t st_gid;
-	dev_t st_rdev;
-	dev_t __pad1;
-	off_t st_size;
-	blksize_t st_blksize;
-	int __pad2;
-	blkcnt_t st_blocks;
-	struct timespec st_atim;
-	struct timespec st_mtim;
-	struct timespec st_ctim;
-	int __pad3[2];
-};
-
-#elif defined(__i386__)
-
-struct stat {
-	dev_t st_dev;
-	unsigned short int __st_dev_padding;
-	long __st_ino_truncated;
-	mode_t st_mode;
-	nlink_t st_nlink;
-	uid_t st_uid;
-	gid_t st_gid;
-	dev_t st_rdev;
-	unsigned short int __st_rdev_padding;
-	off64_t st_size;
-	blksize_t st_blksize;
-	blkcnt_t st_blocks;
-	struct timespec st_atim;
-	struct timespec st_mtim;
-	struct timespec st_ctim;
-	ino64_t st_ino;
-};
-
-#elif defined (__m68k__)
-
-struct stat {
-	dev_t st_dev;
-	unsigned char __st_dev_padding[2];
-	unsigned long __st_ino;
-	mode_t st_mode;
-	nlink_t st_nlink;
-	uid_t st_uid;
-	gid_t st_gid;
-	dev_t st_rdev;
-	unsigned char __st_rdev_padding;
-	long long st_size; /* TODO: off64_t? */
-	blksize_t st_blksize;
-	blkcnt_t st_blocks;
-	struct timespec st_atim;
-	struct timespec st_mtim;
-	struct timespec st_ctim;
-	ino_t st_ino;
-};
-
-#endif
 
 #if defined(_DEFAULT_SOURCE) || defined(_LARGEFILE64_SOURCE)
 #define stat64 stat
