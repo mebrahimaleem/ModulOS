@@ -59,6 +59,7 @@ build: $(OBJ_DIR)/../drivers.a $(LDS) \
 $(OBJ_DIR)/drivers.a: $(TARGETS) | $(BUILD_DIRS)
 	rm -f $@
 	$(AR) rcs $@ $(TARGETS)
+	$(RANLIB) $@
 
 $(OBJ_DIR)/driver_list.txt:
 	echo drivers > $@

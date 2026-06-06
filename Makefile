@@ -57,6 +57,7 @@ export OBJ_DIR = build
 
 export CC := clang
 export AR := llvm-ar
+export RANLIB = llvm-ranlib
 export STRIP := llvm-strip
 
 SUBDIRS := kernel boot drivers test userland

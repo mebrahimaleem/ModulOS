@@ -33,10 +33,8 @@
 #include <core/scheduler.h>
 
 #include <lib/kmemset.h>
-#include <lib/array_list.h>
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
-#include <lib/hash_table.h>
 
 #define ARGC_6 \
 	(void)rbp; \
@@ -86,23 +84,19 @@ struct u_dirent_t {
 DECLARE_SYSCALL(exit) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	pcb->exit_code = arg1;
-
-	process_kill_current();
+	process_exit(arg1);
 }
 
 DECLARE_SYSCALL(openat) {
 	ARGC_4;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
 	struct fs_handle_t* at;
 
 	if ((int32_t)arg3 == USERLAND_AT_FDCWD) {
-		at = pcb->wd;
+		at = process_get_wd();
 	}
 	else {
-		at = array_list_get(pcb->fd_table, arg1);
+		at = process_resolve_fd(arg3);
 	}
 
 	if (!at) {
@@ -114,21 +108,20 @@ DECLARE_SYSCALL(openat) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	return array_list_push(pcb->fd_table, handle);
+	return process_register_fd(handle);
 }
 
 DECLARE_SYSCALL(close) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
 	}
 
 	fs_close(handle);
-	array_list_remove(pcb->fd_table, arg1);
+	process_remove_fd(arg1);
 
 	return SYSCALL_STS_OK;
 }
@@ -136,8 +129,7 @@ DECLARE_SYSCALL(close) {
 DECLARE_SYSCALL(read) {
 	ARGC_3;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -149,8 +141,7 @@ DECLARE_SYSCALL(read) {
 DECLARE_SYSCALL(write) {
 	ARGC_3;
 	
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -166,23 +157,23 @@ DECLARE_SYSCALL(alloc) {
 		arg1 += PAGE_SIZE_4K - (arg1 % PAGE_SIZE_4K);
 	}
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
 	uint64_t paddr = mm_alloc_p(arg1);
 
 	if (!paddr) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	uint64_t vaddr = pcb->mem_top;
+	const uint64_t vaddr = process_get_mem_top();
+	uint64_t* cr3 = (uint64_t*)process_get_cr3();
 
 	for (uint64_t i = 0; i < arg1; i += PAGE_SIZE_4K) {
 		paging_map_proc(vaddr + i,
 										paddr + i,
 										PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K,
-										(uint64_t*)proc_data_get()->current_process->cr3);
+										cr3);
 	}
 
-	pcb->mem_top += arg1;
+	process_set_mem_top(vaddr + arg1);
 
 	return vaddr;
 }
@@ -201,30 +192,15 @@ DECLARE_SYSCALL(fork) {
 }
 
 static void execve_transfer(struct pcb_t* pcb) {
-	struct pcb_t* other = pcb->meta[0];
-	struct pcb_t old_pcb;
+	struct pcb_t* other = process_get_meta(pcb, 1)[0];
 
-	old_pcb = *pcb;
-	*pcb = *other;
-	*other = old_pcb;
-
-	scheduler_schedule(pcb);
-
-	other->init_k_rsp_vaddr = 0;
-	other->fd_table = 0;
-	other->wd = 0;
-	other->child_table = 0;
-	other->parent = 0;
-	other->monitor = 0;
-
-	process_discard(other);
+	process_execve(pcb, other);
 }
 
 DECLARE_SYSCALL(execve) {
 	ARGC_3;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = fs_openat((const char*)arg1, FILE_FLAGS_READ, pcb->wd, 0);
+	struct fs_handle_t* handle = fs_openat((const char*)arg1, FILE_FLAGS_READ, process_get_wd(), 0);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -236,9 +212,8 @@ DECLARE_SYSCALL(execve) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	pcb->meta[0] = e;
-	pcb->sleep_state.callback = execve_transfer;
-	pcb->sched_cntr = SCHED_CALLBACK;
+	process_get_meta(proc_data_get()->current_process, 1)[0] = e;
+	process_set_callback(execve_transfer);
 
 	cpu_wait_loop();
 }
@@ -246,8 +221,7 @@ DECLARE_SYSCALL(execve) {
 DECLARE_SYSCALL(open_dir) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -259,8 +233,7 @@ DECLARE_SYSCALL(open_dir) {
 DECLARE_SYSCALL(read_dir) {
 	ARGC_3;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -303,8 +276,7 @@ DECLARE_SYSCALL(read_dir) {
 DECLARE_SYSCALL(truncate) {
 	ARGC_2;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -316,8 +288,7 @@ DECLARE_SYSCALL(truncate) {
 DECLARE_SYSCALL(seek) {
 	ARGC_2;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -330,8 +301,7 @@ DECLARE_SYSCALL(seek) {
 DECLARE_SYSCALL(tell) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -343,8 +313,7 @@ DECLARE_SYSCALL(tell) {
 DECLARE_SYSCALL(create_dir) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -356,8 +325,7 @@ DECLARE_SYSCALL(create_dir) {
 DECLARE_SYSCALL(delete_dir) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -375,8 +343,7 @@ DECLARE_SYSCALL(epoch_time) {
 DECLARE_SYSCALL(is_a_tty) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -388,9 +355,7 @@ DECLARE_SYSCALL(is_a_tty) {
 DECLARE_SYSCALL(gcwd) {
 	ARGC_2;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-
-	fs_path(pcb->wd, (size_t)arg2, (char*)arg1);
+	fs_path(process_get_wd(), (size_t)arg2, (char*)arg1);
 
 	return SYSCALL_STS_OK;
 }
@@ -398,15 +363,14 @@ DECLARE_SYSCALL(gcwd) {
 DECLARE_SYSCALL(ccwd) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	fs_close(pcb->wd);
-	pcb->wd = fs_dup(handle);
+	fs_close(process_get_wd());
+	process_set_wd(fs_dup(handle));
 
 	return SYSCALL_STS_OK;
 }
@@ -414,14 +378,13 @@ DECLARE_SYSCALL(ccwd) {
 DECLARE_SYSCALL(link) {
 	ARGC_2;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle1 = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle1 = process_resolve_fd(arg1);
 
 	if (!handle1) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct fs_handle_t* handle2 = array_list_get(pcb->fd_table, arg2);
+	struct fs_handle_t* handle2 = process_resolve_fd(arg2);
 
 	if (!handle2) {
 		return SYSCALL_STS_FAIL;
@@ -433,8 +396,7 @@ DECLARE_SYSCALL(link) {
 DECLARE_SYSCALL(unlink) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -446,8 +408,7 @@ DECLARE_SYSCALL(unlink) {
 DECLARE_SYSCALL(stat) {
 	ARGC_2;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-	struct fs_handle_t* handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* handle = process_resolve_fd(arg1);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -467,53 +428,16 @@ DECLARE_SYSCALL(stat) {
 DECLARE_SYSCALL(getpid) {
 	ARGC_0;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-
-	return pcb->pid;
+	return process_get_pid();
 }
 
 DECLARE_SYSCALL(waitpid) {
 	ARGC_4;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
+	uint64_t ec;
 
-	uint64_t ec = 0;
-
-	void* child;
-
-	if (arg3 & U_WNOHANG) {
-		if (arg1 == -1uLL) {
-			// TODO: implement
-			ec = 0;
-			arg1 = 0;
-		}
-		else {
-			if (!hash_table_get(pcb->child_table, arg1, &child)) {
-				return SYSCALL_STS_FAIL;
-			}
-
-			if (((struct pcb_t*)child)->sched_cntr == SCHED_ZOMBIE) {
-				ec = process_reap_child(child);
-			}
-			else {
-				ec = 0;
-				arg1 = 0;
-			}
-		}
-	}
-	else {
-		if (arg1 == -1uLL) {
-			if (!hash_table_get_any(pcb->child_table, &arg1, &child)) {
-				return SYSCALL_STS_FAIL;
-			}
-		}
-		else {
-			if (!hash_table_get(pcb->child_table, arg1, &child)) {
-				return SYSCALL_STS_FAIL;
-			}
-		}
-
-		ec = process_reap_child(child);
+	if (!process_wait_pid(arg1, arg3 & U_WNOHANG, &ec)) {
+		return SYSCALL_STS_FAIL;
 	}
 
 	*(uint32_t*)arg2 = (uint32_t)(ec & 0xFF) << 8;
@@ -524,21 +448,13 @@ DECLARE_SYSCALL(waitpid) {
 DECLARE_SYSCALL(getppid) {
 	ARGC_0;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-
-	if (pcb->parent) {
-		return pcb->parent->pid;
-	}
-
-	return 1;
+	return process_get_ppid();
 }
 
 DECLARE_SYSCALL(dup) {
 	ARGC_1;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-
-	struct fs_handle_t* old_handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* old_handle = process_resolve_fd(arg1);
 
 	if (!old_handle) {
 		return SYSCALL_STS_FAIL;
@@ -550,15 +466,13 @@ DECLARE_SYSCALL(dup) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	return array_list_push(pcb->fd_table, new_handle);
+	return process_register_fd(new_handle);
 }
 
 DECLARE_SYSCALL(dup2) {
 	ARGC_2;
 
-	struct pcb_t* pcb = proc_data_get()->current_process;
-
-	struct fs_handle_t* old_handle = array_list_get(pcb->fd_table, arg1);
+	struct fs_handle_t* old_handle = process_resolve_fd(arg1);
 
 	if (!old_handle) {
 		return SYSCALL_STS_FAIL;
@@ -570,7 +484,7 @@ DECLARE_SYSCALL(dup2) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct fs_handle_t* old_new_handle = array_list_set(pcb->fd_table, arg2, dupped);
+	struct fs_handle_t* old_new_handle = process_replace_fd(arg2, dupped);
 
 	if (old_new_handle) {
 		fs_close(old_new_handle);

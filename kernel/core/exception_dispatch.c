@@ -123,8 +123,7 @@ void exception_dispatch(struct exception_context_t* context) {
 			break;
 	}	
 
-	if (context->vector != VECTOR_DF && proc_data_get()->current_process->wd) {
-		// only userland tasks have wds
+	if (context->vector != VECTOR_DF && process_is_userland()) {
 		logging_log_debug("Recoverable exception 0x%lX %s (0x%lX) @ 0x%lX",
 				context->vector, get_exception_name(context->vector), context->code, context->rip);
 

@@ -32,75 +32,6 @@
 
 struct pcb_t;
 
-struct pcb_t {
-	// order is important
-	uint64_t rsp; //0x00
-	uint64_t rbp; //0x08
-	uint64_t r15; //0x10
-	uint64_t r14; //0x18
-	uint64_t r13; //0x20
-	uint64_t r12; //0x28
-	uint64_t r11; //0x30
-	uint64_t r10; //0x38
-	uint64_t r9;  //0x40
-	uint64_t r8;  //0x48
-	uint64_t rdi; //0x50
-	uint64_t rsi; //0x58
-	uint64_t rdx; //0x60
-	uint64_t rcx; //0x68
-	uint64_t rbx; //0x70
-	uint64_t rax; //0x78
-
-	uint64_t rip; //0x80
-	uint64_t cs;  //0x88
-	uint64_t rflags; //0x90
-	uint64_t ss;  // 0x98
-	
-	// end of important order
-
-	uint64_t pid;
-	uint32_t k_rsp_lo;
-	uint32_t k_rsp_hi;
-	uint64_t init_k_rsp_vaddr;
-	uint64_t init_k_rsp_paddr;
-	uint64_t fsbase;
-	uint64_t mem_top;
-
-	uint64_t cr3;
-
-	struct pcb_t* next;
-
-	uint64_t exit_code;
-
-	struct fs_handle_t* wd;
-	struct array_list_t* fd_table;
-
-	uint8_t fxdata[512] __attribute__((aligned(16)));
-
-	struct hash_table_t* child_table;
-	struct pcb_t* parent;
-	struct signal_wait_t* monitor;
-
-	union {
-		uint64_t wake_time;
-		void (*callback)(struct pcb_t*);
-	} sleep_state;
-
-	void* meta[MAX_META];
-
-	enum {
-		SCHED_READY,
-		SCHED_KILL,
-		SCHED_SKIP,
-		SCHED_SLEEP,
-		SCHED_CALLBACK,
-		SCHED_SIGNAL_READY,
-		SCHED_ZOMBIE
-	} sched_cntr;
-
-	uint8_t plock;
-};
-
 struct preempt_frame_t {
 	uint64_t rbp;
 	uint64_t r15;
@@ -125,6 +56,16 @@ struct preempt_frame_t {
 	uint64_t ss;
 } __attribute__((packed));
 
+enum sched_cntr_t {
+	SCHED_READY,
+	SCHED_KILL,
+	SCHED_SKIP,
+	SCHED_SLEEP,
+	SCHED_CALLBACK,
+	SCHED_SIGNAL_READY,
+	SCHED_ZOMBIE
+};
+
 typedef void (*process_function_t)(void* cntx);
 
 extern uint64_t process_get_pid(void);
@@ -147,7 +88,7 @@ extern void process_discard(struct pcb_t* pcb);
 
 extern void process_preempt_entry(struct preempt_frame_t* context) __attribute__((noreturn));
 
-extern uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr, uint64_t* stack);
+extern uint8_t process_create_guarded_stack(uint64_t* init_vaddr, uint64_t* init_paddr);
 
 extern void process_sleep(uint64_t wake_time);
 
@@ -159,10 +100,63 @@ extern void process_init_reaper(void);
 
 extern uint64_t process_reap_child(struct pcb_t* pcb);
 
-extern void process_pause_reaping(void);
-
-extern void process_resume_reaping(void);
-
 extern uint64_t process_find_stack_top(uint64_t vaddr_base);
+
+extern uint8_t process_is_userland(void);
+
+extern uint64_t process_register_fd(struct fs_handle_t* handle);
+
+extern struct fs_handle_t* process_resolve_fd(uint64_t fd);
+
+extern void process_remove_fd(uint64_t fd);
+
+extern struct fs_handle_t* process_replace_fd(uint64_t fd, struct fs_handle_t* handle);
+
+extern void process_exit(uint64_t ec) __attribute__((noreturn));
+
+extern struct fs_handle_t* process_get_wd();
+
+extern void process_set_wd(struct fs_handle_t* handle);
+
+extern uint64_t process_get_mem_top(void);
+
+extern void process_set_mem_top(uint64_t top);
+
+extern uint64_t process_get_cr3(void);
+
+extern void process_set_cr3(uint64_t cr3);
+
+extern uint64_t process_get_ppid(void);
+
+extern uint64_t process_wait_pid(uint64_t pid, uint8_t no_hang, uint64_t* ec_ret);
+
+extern void** process_get_meta(struct pcb_t* pcb, size_t num);
+
+extern void process_execve(struct pcb_t* actual, struct pcb_t* desired);
+
+extern enum sched_cntr_t process_get_sched_cntr(struct pcb_t* pcb);
+
+extern void process_set_sched_cntr(struct pcb_t* pcb, enum sched_cntr_t cntr);
+
+extern void process_set_next(struct pcb_t* pcb, struct pcb_t* next);
+
+extern struct pcb_t* process_get_next(struct pcb_t* pcb);
+
+extern struct pcb_t** process_next_ref(struct pcb_t* pcb);
+
+extern uint64_t process_get_wake_time(struct pcb_t* pcb);
+
+extern void process_call_callback(struct pcb_t* pcb);
+
+extern void process_resume_transfer(struct pcb_t* run) __attribute__((noreturn));
+
+extern struct pcb_t* process_create_userland_pcb(uint64_t rdi,
+																								 uint64_t rdx,
+																								 uint64_t stack_vaddr,
+																								 uint64_t stack_paddr,
+																								 uint64_t cr3,
+																								 struct pcb_t* parent,
+																								 uint64_t memtop,
+																								 uint64_t pid);
 
 #endif /* KERNEL_CORE_PROCESS_H */

@@ -113,8 +113,6 @@
 #define AT_EXECFN 			31
 #define AT_SYSINFO_EHDR 33
 
-#define FD_INIT_SIZE		4
-#define FD_GROWTH				8
 
 #define CHILD_BUCKETS		4
 
@@ -247,49 +245,22 @@ uint8_t elf_is_elf(struct fs_handle_t* file) {
 }
 
 static struct pcb_t* load_base(struct fs_handle_t* file,
-															 uint64_t* cr3_ret,
 															 const char* const* argv,
-															 const char* const* envp) {
+															 const char* const* envp,
+															 uint64_t stack_vaddr,
+															 uint64_t stack_paddr,
+															 uint64_t pid,
+															 struct pcb_t* source) {
 	Elf64_Ehdr header;
 
 	if (check_valid(file, &header)) {
 		return 0;
 	}
 
-	struct pcb_t* pcb = kmalloc(sizeof(struct pcb_t));
-
-	pcb->rax =
-		pcb->rbx =
-		pcb->rcx =
-		//pcb->rdx = (parameter passing)
-		pcb->rbp =
-		//pcb->rsi = (parameter passing)
-		//pcb->rdi = (parameter passing)
-		pcb->r8 =
-		pcb->r9 =
-		pcb->r10 =
-		pcb->r11 =
-		pcb->r12 =
-		pcb->r13 =
-		pcb->r14 =
-		pcb->r15 = 0;
-
-	pcb->rflags = INIT_USERLAND_RFL;
-
-	pcb->rdi = header.e_entry; // rip
-	pcb->rsi = INIT_USERLAND_RFL; // rflags
-
-	pcb->rip = (uint64_t)syscall_return;
-	pcb->cs = GDT_KERNEL_CS;
-	pcb->ss = GDT_KERNEL_SS;
-
-	pcb->fsbase = 0;
-
-	pcb->sched_cntr = SCHED_READY;
-
-	cpu_save_fx(pcb->fxdata);
-
-	lock_init(&pcb->plock);
+	uint64_t cr3 = paging_create_pml4();
+	if (!cr3) {
+		return 0;
+	}
 
 	Elf64_Phdr pheader;
 
@@ -318,8 +289,6 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 
 		if (pheader.p_vaddr + pheader.p_memsz >= INIT_USERLAND_SB) {
 			// stack collision
-			kfree(pcb);
-			pcb = 0;
 			return 0;
 		}
 
@@ -366,7 +335,6 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 		if (j->top > j->next->base) {
 			if (j->perms != j->next->perms) {
 				// overlap
-				kfree(pcb);
 				return 0;
 			}
 
@@ -378,16 +346,10 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 		}
 	}
 
-	pcb->cr3 = paging_create_pml4();
-	if (!pcb->cr3) {
-		kfree(pcb);
-		return 0;
-	}
+	uint64_t old_cr3 = process_get_cr3();
+	process_set_cr3(cr3);
 
-	uint64_t old_cr3 = proc_data_get()->current_process->cr3;
-	proc_data_get()->current_process->cr3 = pcb->cr3;
-
-	cpu_set_cr3(pcb->cr3);
+	cpu_set_cr3(cr3);
 
 	// map in memory for copying
 	for (j = mem_regs; j; j = j->next) {
@@ -399,13 +361,11 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 			paddr = mm_alloc_p(PAGE_SIZE_4K);
 
 			if (!paddr) {
-				paging_free_userspace((uint64_t*)pcb->cr3);
-				kfree(pcb);
-				pcb = 0;
+				paging_free_userspace((uint64_t*)cr3);
 				goto restore_cr3;
 			}
 
-			paging_map_proc(j->base + off, paddr, PAGE_PRESENT | PAGE_RW, PAGE_4K, (uint64_t*)pcb->cr3);
+			paging_map_proc(j->base + off, paddr, PAGE_PRESENT | PAGE_RW, PAGE_4K, (uint64_t*)cr3);
 		}
 	}
 
@@ -419,18 +379,15 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 		paddr = mm_alloc_p(PAGE_SIZE_4K);
 
 		if (!paddr) {
-			paging_free_userspace((uint64_t*)pcb->cr3);
-			kfree(pcb);
-			pcb = 0;
+			paging_free_userspace((uint64_t*)cr3);
 			goto restore_cr3;
 		}
 
-		paging_map_proc(pheaders_base + off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		paging_map_proc(pheaders_base + off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)cr3);
 		memtop += PAGE_SIZE_4K;
 	}
 
 	memtop += PAGE_SIZE_4K;
-	pcb->mem_top = memtop;
 
 	ph_off = 0;
 	// copy pheaders
@@ -445,13 +402,11 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 		paddr = mm_alloc_p(PAGE_SIZE_4K);
 
 		if (!paddr) {
-			paging_free_userspace((uint64_t*)pcb->cr3);
-			kfree(pcb);
-			pcb = 0;
+			paging_free_userspace((uint64_t*)cr3);
 			goto restore_cr3;
 		}
 
-		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)cr3);
 		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
 	}
 
@@ -475,7 +430,7 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 	// update page permissions
 	for (j = mem_regs; j; j = j->next) {
 		for (uint64_t off = 0; off < j->top - j->base; off += PAGE_SIZE_4K) {
-			paging_update_perms(j->base + off, j->perms, PAGE_4K, (uint64_t*)pcb->cr3);
+			paging_update_perms(j->base + off, j->perms, PAGE_4K, (uint64_t*)cr3);
 		}
 	}
 
@@ -548,7 +503,14 @@ static struct pcb_t* load_base(struct fs_handle_t* file,
 	stack_builder--;
 	*stack_builder = (uint64_t)argc;
 
-	pcb->rdx = (uint64_t)stack_builder; // rsp
+	struct pcb_t* pcb = process_create_userland_pcb(header.e_entry,
+																									(uint64_t)stack_builder,
+																									stack_vaddr,
+																									stack_paddr,
+																									cr3,
+																									source,
+																									memtop,
+																									pid);
 
 restore_cr3:
 	while (mem_regs) {
@@ -557,57 +519,23 @@ restore_cr3:
 		mem_regs = temp;
 	}
 
-	*cr3_ret = old_cr3;
+	process_set_cr3(old_cr3);
+	cpu_set_cr3(old_cr3);
 	return pcb;
 }
 
 struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* const* invoker, const char* const* env) {
-	uint64_t stack_paddr, stack_vaddr, rsp;
+	uint64_t stack_paddr, stack_vaddr;
 
-	uint64_t old_cr3;
-
-
-	if (process_create_guarded_stack(&stack_vaddr, &stack_paddr, &rsp)) {
+	if (process_create_guarded_stack(&stack_vaddr, &stack_paddr)) {
 		logging_log_error("Failed to allocate stack");
 		return 0;
 	}
 
-	struct pcb_t* pcb = load_base(file, &old_cr3, invoker, env);
-
-	if (!pcb) {
-		return 0;
-	}
-
-	pcb->init_k_rsp_paddr = stack_paddr;
-	pcb->init_k_rsp_vaddr = stack_vaddr;
-	pcb->rsp = rsp;
-
-	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
-	pcb->k_rsp_hi = rsp >> 32;
-
-	pcb->pid = pid;
-	
-	pcb->parent = 0;
-	pcb->child_table = hash_table_alloc(CHILD_BUCKETS);
-	pcb->monitor = signal_wait_alloc();
-
-	pcb->fd_table = array_list_alloc(FD_INIT_SIZE, FD_GROWTH, 0);
-	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
-#ifdef SERIAL
-	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_READ));
-	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
-	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
-#endif /* SERIAL */
-
-	proc_data_get()->current_process->cr3 = old_cr3;
-	cpu_set_cr3(old_cr3);
-
-	return pcb;
+	return load_base(file, invoker, env, stack_vaddr, stack_paddr, pid, 0);
 }
 
 struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker, const char* const* env) {
-	uint64_t old_cr3;
-
 	uint64_t count;
 	for (count = 0; invoker[count]; count++);
 
@@ -629,7 +557,9 @@ struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker
 	}
 	envp[count] = 0;
 
-	struct pcb_t* pcb = load_base(file, &old_cr3, (const char* const*)argv, (const char* const*)envp);
+	struct pcb_t* cpcb = proc_data_get()->current_process;
+
+	struct pcb_t* pcb = load_base(file, (const char* const*)argv, (const char* const*)envp, 0, 0, 0, cpcb);
 
 	for (count = 0; argv[count]; count++) {
 		kfree(argv[count]);
@@ -640,34 +570,6 @@ struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker
 		kfree(envp[count]);
 	}
 	kfree(envp);
-
-	if (!pcb) {
-		return 0;
-	}
-
-	struct pcb_t* cpcb = proc_data_get()->current_process;
-
-	pcb->init_k_rsp_paddr = cpcb->init_k_rsp_paddr;
-	pcb->init_k_rsp_vaddr = cpcb->init_k_rsp_vaddr;
-
-	uint64_t rsp = process_find_stack_top(pcb->init_k_rsp_vaddr);
-
-	pcb->rsp = rsp;
-
-	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
-	pcb->k_rsp_hi = rsp >> 32;
-
-	pcb->pid = cpcb->pid;
-	
-	pcb->fd_table = cpcb->fd_table;
-	pcb->wd = cpcb->wd;
-
-	pcb->parent = cpcb->parent;
-	pcb->child_table = cpcb->child_table;
-	pcb->monitor = cpcb->monitor;
-
-	proc_data_get()->current_process->cr3 = old_cr3;
-	cpu_set_cr3(old_cr3);
 
 	return pcb;
 }

@@ -16,6 +16,8 @@
 
 export OBJ_DIR := ../$(OBJ_DIR)
 
+.DELETE_ON_ERROR:
+
 SRC_DIRS :=
 DEFINES :=
 BUILD_DIRS :=

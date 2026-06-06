@@ -52,6 +52,7 @@ build: $(TARGETS)
 
 $(OBJ_DIR)/test_helpers.a: $(filter $(OBJ_DIR)/./helpers/%,$(OBJ))
 	$(AR) rcs $@ $^
+	$(RANLIB) $@
 
 $(OBJ): $(OBJ_DIR)/%.o: %.c
 	mkdir -p $(dir $@)

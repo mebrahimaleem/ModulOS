@@ -154,7 +154,8 @@ static void* alloc(struct alloc_arena_t* arena, struct alloc_header_t* header, s
 	}
 
 	if (size > GET_SIZE(header->size)) {
-		return 0;
+		logging_log_error("Attempt to allocate block larger than arena");
+		panic(PANIC_NO_MEM);
 	}
 
 	// split block
@@ -249,7 +250,7 @@ next_arena:
 
 	if (!arena_base) {
 		logging_log_error("Out of memory for heap");
-		return 0;
+		panic(PANIC_NO_MEM);
 	}
 
 #ifdef DEBUG_LOGGING_MEM
