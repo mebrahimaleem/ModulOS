@@ -44,8 +44,8 @@ build: libc shell utils
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
-	git -C $@ checkout v6.3.1
-	git -C $@ apply ../mlibc-patch/mlibc-v6-3-1-port.patch
+	git -C $@ checkout c367b780a47dc1d6c70d19a8379f4a74e5a7ed96
+	git -C $@ apply ../mlibc-patch/mlibc-port.patch
 	cp -r mlibc-patch/* mlibc/
 
 $(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(SYSROOT)/usr/
