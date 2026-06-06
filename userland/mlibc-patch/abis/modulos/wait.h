@@ -3,7 +3,12 @@
 
 #include <mlibc-config.h>
 
-#include <abi-bits/wait_opt.h>
+#define WNOHANG 1
+#define WUNTRACED 2
+#define WSTOPPED 2
+#define WEXITED 4
+#define WCONTINUED 8
+#define WNOWAIT 0x01000000
 
 #if __MLIBC_LINUX_OPTION
 

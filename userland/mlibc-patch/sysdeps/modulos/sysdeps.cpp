@@ -535,3 +535,8 @@ int Sysdeps<Recvfrom>::operator()(int fd, void* buffer, size_t size, int flags, 
 }
 
 } //namespace mlibc
+
+extern "C" {
+#define __MODULOS_VERIFY_CONV
+#include <sys/userland_conv.h>
+}

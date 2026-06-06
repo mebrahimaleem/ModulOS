@@ -1,8 +1,8 @@
 #ifndef _ABIBITS_BLKCNT_T_H
 #define _ABIBITS_BLKCNT_T_H
 
-#include <stdint.h>
+#include <bits/types.h>
 
-typedef int64_t blkcnt_t;
+typedef __mlibc_int64 blkcnt_t;
 
 #endif /* _ABIBITS_BLKCNT_T_H */

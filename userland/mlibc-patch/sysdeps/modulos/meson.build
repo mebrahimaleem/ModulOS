@@ -95,21 +95,16 @@ if not no_headers
 		'include/abi-bits/sockaddr_storage.h',
 		'include/abi-bits/sig-limits.h',
 		'include/abi-bits/sigset_t.h',
-
-    'include/abi-bits/at.h',
-    'include/abi-bits/wait_opt.h',
-    'include/abi-bits/stat_opt.h',
-
 		subdir: 'abi-bits',
 		follow_symlinks: true
 	)
 
-    install_headers('include/sys/syscall.h', subdir: 'sys')
-    install_headers('include/sys/syscall_vectors.h', subdir: 'sys')
+  install_headers('include/sys/syscall.h', subdir: 'sys')
+  install_headers('include/sys/syscall_vectors.h', subdir: 'sys')
 
-    install_headers('include/sys/sysmacros.h', subdir: 'sys')
-    install_headers('include/mlibc/sysdeps.hpp', subdir: 'mlibc')
-    install_headers('include/features.h')
+  install_headers('include/sys/sysmacros.h', subdir: 'sys')
+  install_headers('include/mlibc/sysdeps.hpp', subdir: 'mlibc')
+  install_headers('include/features.h')
 endif
 
 if not headers_only

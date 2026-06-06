@@ -36,18 +36,7 @@
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
 
-#include <abi/at.h>
-#include <abi/wait_opt.h>
-#include <abi/dev_t.h>
-#include <abi/ino_t.h>
-#include <abi/limits.h>
-#include <abi/nlink_t.h>
-#include <abi/mode_t.h>
-#include <abi/uid_t.h>
-#include <abi/gid_t.h>
-#include <abi/blkcnt_t.h>
-#include <abi/blksize_t.h>
-#include <abi/stat_opt.h>
+#include <abi/userland_conv.h>
 
 #define ARGC_6 \
 	(void)rbp; \
@@ -80,51 +69,7 @@
 
 //TODO: include these from mlibc
 
-#define DT_UNKNOWN 0
-#define DT_FIFO 1
-#define DT_CHR 2
-#define DT_DIR 4
-#define DT_BLK 6
-#define DT_REG 8
-#define DT_LNK 10
-#define DT_SOCK 12
-#define DT_WHT 14
 
-typedef int64_t off_t;
-typedef unsigned short reclen_t;
-
-typedef long time_t;
-
-struct timespec {
-	time_t tv_sec;
-	long tv_nsec;
-};
-
-struct dirent {
-	ino_t d_ino;
-	off_t d_off;
-	reclen_t d_reclen;
-	unsigned char d_type;
-	char d_name[__MLIBC_NAME_MAX+1];
-};
-
-struct stat {
-	dev_t st_dev;
-	ino_t st_ino;
-	nlink_t st_nlink;
-	mode_t st_mode;
-	uid_t st_uid;
-	gid_t st_gid;
-	unsigned int __pad0;
-	dev_t st_rdev;
-	off_t st_size;
-	blksize_t st_blksize;
-	blkcnt_t st_blocks;
-	struct timespec st_atim;
-	struct timespec st_mtim;
-	struct timespec st_ctim;
-	long __unused[3];
-};
 
 DECLARE_SYSCALL(exit) {
 	ARGC_1;
@@ -290,11 +235,11 @@ DECLARE_SYSCALL(read_dir) {
 	while (fs_read_dir(handle, &info) == FILE_OK) {
 		size_t name_len = kstrlen(info.name) + 1;
 
-		if (bytes + name_len + sizeof(struct dirent) > arg3) {
+		if (bytes + name_len + sizeof(struct u_dirent) > arg3) {
 			break;
 		}
 
-		struct dirent* ent = (struct dirent*)(arg2 + bytes);
+		struct u_dirent* ent = (struct u_dirent*)(arg2 + bytes);
 		ent->d_ino = (uint32_t)info.inode_num;
 		ent->d_off = (int32_t)info.seek_pos;
 		switch (info.type) {
@@ -309,9 +254,9 @@ DECLARE_SYSCALL(read_dir) {
 				break;
 		}
 		kstrcpy(ent->d_name, info.name);
-		ent->d_reclen = (uint16_t)(name_len + sizeof(struct dirent));
+		ent->d_reclen = (uint16_t)(name_len + sizeof(struct u_dirent));
 
-		bytes += name_len + sizeof(struct dirent);
+		bytes += name_len + sizeof(struct u_dirent);
 		fs_next_dir(handle);
 	}
 
@@ -464,12 +409,12 @@ DECLARE_SYSCALL(stat) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct stat* u_stat = (struct stat*)arg2;
+	struct u_stat* stat = (struct u_stat*)arg2;
 
-	kmemset(u_stat, 0, sizeof(struct stat));
-	u_stat->st_size = (off_t)info.size;
-	u_stat->st_mode = info.mode;
-	u_stat->st_ino = (ino_t)info.inode;
+	kmemset(stat, 0, sizeof(struct u_stat));
+	stat->st_size = (u_off_t)info.size;
+	stat->st_mode = info.mode;
+	stat->st_ino = (u_ino_t)info.inode;
 
 	return SYSCALL_STS_OK;
 }
