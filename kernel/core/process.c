@@ -32,6 +32,7 @@
 #include <core/fs.h>
 #include <core/syscall.h>
 #include <core/signal.h>
+#include <core/panic.h>
 
 #include <lib/kmemset.h>
 #include <lib/kmemcpy.h>
@@ -171,14 +172,17 @@ static struct pcb_t* reap_queue;
 
 static struct signal_wait_t* reap_wait;
 
+static struct pcb_t* init_reaper_pcb;
+
 __attribute__((noreturn)) static void function_setup(process_function_t func, void* cntx) {
 	func(cntx);
 	process_kill_current();
 }
 
 void process_init(uint64_t init_rsp_vaddr, uint64_t init_rsp_paddr) {
-	next_pid = 1;
+	next_pid = 2;
 	reap_queue = 0;
+	init_reaper_pcb = 0;
 	lock_init(&lock_proc);
 	lock_init(&lock_reap);
 	reap_wait = signal_wait_alloc();
@@ -263,6 +267,11 @@ static void close_fd(void* handle) {
 }
 
 void process_discard(struct pcb_t* pcb) {
+	if (pcb->pid == 1) {
+		logging_log_error("Init process discarded");
+		panic(PANIC_STATE);
+	}
+
 	lock_acquire(&lock_reap);
 	pcb->next = reap_queue;
 	reap_queue = pcb;
@@ -402,27 +411,20 @@ static void reap_final(struct pcb_t* pcb);
 static void orphan_children(void* child) {
 	struct pcb_t* pcb = child;
 
-	pcb->parent = 0;
-
-	if (pcb->sched_cntr == SCHED_ZOMBIE) {
-		reap_final(pcb);
-	}
-
-	if (pcb->monitor) {
-		signal_free(pcb->monitor);
-	}
+	pcb->parent = init_reaper_pcb;
+	hash_table_insert(init_reaper_pcb->child_table, pcb->pid, pcb);
 }
 
 static void reap_final(struct pcb_t* pcb) {
-	if (pcb->parent) {
-		void* ign;
-		hash_table_remove(pcb->parent->child_table, pcb->pid, &ign);
-	}
+	void* ign;
+	hash_table_remove(pcb->parent->child_table, pcb->pid, &ign);
+
+	signal_free(pcb->monitor);
 
 	kfree(pcb);
 }
 
-static void reap_early(struct pcb_t* pcb) {
+static void reap_prepare(struct pcb_t* pcb) {
 	_Static_assert(INIT_STACK_SIZE == 4 * PAGE_SIZE_4K, "stack size must be page size multiple of four");
 
 	uint8_t stale = 1;
@@ -446,22 +448,19 @@ static void reap_early(struct pcb_t* pcb) {
 		paging_free_userspace((uint64_t*)pcb->cr3);
 
 		// execve creates stale pcbs that must not cleanup heiracrhy resources
-		if (!stale) {
+		if (stale) {
+			kfree(pcb);
+		}
+		else {
 			fs_close(pcb->wd);
 			array_list_free(pcb->fd_table, close_fd);
 
 			// orphan all children
 			hash_table_free(pcb->child_table, orphan_children);
 
-			// only fully reap orphans
-			if (pcb->parent == 0) {
-				reap_final(pcb);
-			}
-			else {
-				lock_acquire(&pcb->plock);
-				pcb->sched_cntr = SCHED_ZOMBIE;
-				signal_awake_locked(pcb->monitor, &pcb->plock);
-			}
+			lock_acquire(&pcb->plock);
+			pcb->sched_cntr = SCHED_ZOMBIE;
+			signal_awake_locked(pcb->monitor, &pcb->plock);
 		}
 	}
 }
@@ -486,7 +485,7 @@ __attribute__((noreturn)) static void process_reap(void* _ign) {
 		for (; pcb; pcb = next) {
 			next = pcb->next;
 
-			reap_early(pcb);
+			reap_prepare(pcb);
 		}
 	}
 }
@@ -581,12 +580,9 @@ void process_set_cr3(uint64_t cr3) {
 }
 
 uint64_t process_get_ppid(void) {
-	uint64_t pid = 1;
 	struct pcb_t* pcb = proc_data_get()->current_process;
 	lock_acquire(&lock_reap);
-	if (pcb->parent) {
-		pid = pcb->parent->pid;
-	}
+	uint64_t pid = pcb->parent->pid;
 	lock_release(&lock_reap);
 	return pid;
 }
@@ -732,17 +728,11 @@ struct pcb_t* process_create_userland_pcb(uint64_t rdi,
 		monitor = source->monitor;
 	}
 	else {
-		wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
+		wd = fs_open("/", O_RDWR);
 		fd_table = array_list_alloc(FD_INIT_SIZE, FD_GROWTH, 0);
 		child_table = hash_table_alloc(CHILD_BUCKETS);
 		parent = 0;
 		monitor = signal_wait_alloc();
-
-#ifdef SERIAL
-	array_list_push(fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_READ));
-	array_list_push(fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
-	array_list_push(fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
-#endif /* SERIAL */
 	}
 
 	struct pcb_t* pcb = init_pcb((uint64_t)syscall_return,
@@ -760,6 +750,10 @@ struct pcb_t* process_create_userland_pcb(uint64_t rdi,
 	pcb->rdi = rdi;
 	pcb->rsi = pcb->rflags;
 	pcb->rdx = rdx;
+
+	if (pid == 1) {
+		init_reaper_pcb = pcb;
+	}
 
 	return pcb;
 }

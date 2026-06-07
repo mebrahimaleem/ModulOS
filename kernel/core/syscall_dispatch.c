@@ -190,7 +190,7 @@ static void execve_transfer(struct pcb_t* pcb) {
 DECLARE_SYSCALL(execve) {
 	ARGC_3;
 
-	struct fs_handle_t* handle = fs_openat((const char*)arg1, FILE_FLAGS_READ, process_get_wd(), 0);
+	struct fs_handle_t* handle = fs_openat((const char*)arg1, O_RDONLY, process_get_wd(), 0);
 
 	if (!handle) {
 		return SYSCALL_STS_FAIL;
@@ -242,17 +242,7 @@ DECLARE_SYSCALL(read_dir) {
 		struct u_dirent* ent = (struct u_dirent*)(arg2 + bytes);
 		ent->d_ino = (uint32_t)info.inode_num;
 		ent->d_off = (int32_t)info.seek_pos;
-		switch (info.type) {
-			case FILE_INFO_REG:
-				ent->d_type = DT_REG;
-				break;
-			case FILE_INFO_DIR:
-				ent->d_type = DT_DIR;
-				break;
-			default:
-				ent->d_type = DT_UNKNOWN;
-				break;
-		}
+		ent->d_type = info.type;
 		kstrcpy(ent->d_name, info.name);
 		ent->d_reclen = (uint16_t)(name_len + sizeof(struct u_dirent));
 
@@ -485,4 +475,12 @@ DECLARE_SYSCALL(dup2) {
 	}
 
 	return arg2;
+}
+
+DECLARE_SYSCALL(log) {
+	ARGC_1;
+
+	logging_log_info("Userland Log: %s", (const char*)arg1);
+
+	return SYSCALL_STS_OK;
 }

@@ -24,7 +24,6 @@ SYSROOT := $(abspath $(OBJ_DIR)/../userland_files/)
 U_CFLAGS := -fno-pie -static \
 						-ffreestanding -nostdlibinc -nostdlib \
 						--sysroot=$(SYSROOT)/ -isystem $(SYSROOT)/usr/include/ \
-						-Wall \
 						$(CDEBUG) -UDEBUG
 
 ifndef DEBUG
@@ -40,7 +39,7 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: libc shell utils
+build: _libc _shell _utils _init
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
@@ -59,14 +58,14 @@ $(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(SYSROOT)/usr/
 		mlibc/
 	touch $@
 
-.PHONY: libc
-libc: $(OBJ_DIR)/mlibc-meson-setup
+.PHONY: _libc
+_libc: $(OBJ_DIR)/mlibc-meson-setup
 	cp -u -r mlibc-patch/* mlibc/
 	ninja -C $(OBJ_DIR)/libc-build/
 	meson install --only-changed -C $(OBJ_DIR)/libc-build/
 
-$(LIB)/crt1.o: | libc
-$(LIB)/libc.a: | libc
+$(LIB)/crt1.o: | _libc
+$(LIB)/libc.a: | _libc
 
 dash/:
 	git clone https://git.kernel.org/pub/scm/utils/dash/dash.git
@@ -86,8 +85,8 @@ $(OBJ_DIR)/dash-setup: $(LIB)/crt1.o $(LIB)/libc.a | dash/ $(OBJ_DIR)/dash-build
 		--host=x86_64-unkown-modulos-elf
 	touch $@
  
-.PHONY: shell
-shell: $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
+.PHONY: _shell
+_shell: $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
 	make -C $(OBJ_DIR)/dash-build/ install
 	ln -f -r -s $(SYSROOT)/usr/bin/dash $(SYSROOT)/bin/sh
 
@@ -118,6 +117,15 @@ $(OBJ_DIR)/utils-setup: $(LIB)/crt1.o $(LIB)/libc.a | sbase/ $(OBJ_DIR)/utils-bu
 			$(OBJ_DIR)/utils-build/Makefile
 	touch $@
 
-.PHONY: utils
-utils: $(OBJ_DIR)/utils-setup
+.PHONY: _utils
+_utils: $(OBJ_DIR)/utils-setup
 	make -C $(OBJ_DIR)/utils-build/ install
+
+$(OBJ_DIR)/init.o: init/init.c
+	$(CC) $(U_CFLAGS) -c -o $@ $<
+
+$(SYSROOT)/init: $(OBJ_DIR)/init.o $(LIB)/crt1.o $(LIB)/libc.a | $(SYSROOT)/
+	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $^
+
+.PHONY: _init
+_init: $(SYSROOT)/init

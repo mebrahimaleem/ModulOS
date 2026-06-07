@@ -44,7 +44,7 @@ namespace mlibc {
 // misc
 
 void Sysdeps<LibcLog>::operator()(const char *message) {
-	(void)message;
+	syscall_1((uint64_t)message, 0, 0, SYSCALL_LOG);
 }
 
 void Sysdeps<LibcPanic>::operator()() {

@@ -568,7 +568,7 @@ enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info)
 size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count) {
 	size_t ret;
 
-	if (!(handle->flags & FILE_FLAGS_READ)) {
+	if (handle->flags != O_RDONLY && handle->flags != O_RDWR) {
 		return 0;
 	}
 
@@ -602,7 +602,7 @@ enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek) {
 size_t fs_write(struct fs_handle_t* handle, const void* buffer, size_t count) {
 	size_t ret;
 
-	if (!(handle->flags & FILE_FLAGS_WRITE)) {
+	if (handle->flags != O_WRONLY && handle->flags != O_RDWR) {
 		return 0;
 	}
 

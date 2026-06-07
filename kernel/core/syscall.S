@@ -94,6 +94,7 @@ syscall_handlers:
 .quad syscall_dispatch_getppid
 .quad syscall_dispatch_dup
 .quad syscall_dispatch_dup2
+.quad syscall_dispatch_log
 
 .set num_entries, . - syscall_handlers
 .if num_entries != SYSCALL_MAX * 8

@@ -209,8 +209,14 @@
 /*
  * rdi: old fd (int)
  * rsi: new fd (int)
- * ret: new fd (int(
+ * ret: new fd (int)
  */
 #define SYSCALL_DUP2				26
 
-#define SYSCALL_MAX					27
+/*
+ * rdi: msg (const char*)
+ * ret: success (int)
+ */
+#define SYSCALL_LOG					27
+
+#define SYSCALL_MAX					28

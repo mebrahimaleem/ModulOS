@@ -43,6 +43,8 @@
 
 #include <devfs/tty.h>
 
+#define INIT_PID	1
+
 #ifdef MEM_TEST
 #include <mem_test/alloc_test.h>
 #endif /* MEM_TEST */
@@ -224,13 +226,13 @@ void prepare_userland(void* cntx) {
 	init_done = 1;
 	lock_release(&prepare_userland_lock);
 
-	struct fs_handle_t* shell = fs_open("/usr/bin/dash", FILE_FLAGS_READ);
-	if (!shell) {
-		logging_log_error("Failed to open shell file");
+	struct fs_handle_t* init_file = fs_open("/init", O_RDONLY);
+	if (!init_file) {
+		logging_log_error("Failed to open init file");
 	}
 
 	else {
-		const char* const invoker[] = {"/usr/bin/dash", "/", 0};
+		const char* const invoker[] = {"/init", 0};
 		const char* const env[] = {
 			"PATH=/usr/bin:/bin",
 			"HOME=/",
@@ -241,12 +243,12 @@ void prepare_userland(void* cntx) {
 			"SHELL=/bin/dash",
 			"PS1=$ ",
 			0};
-		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), invoker, env);
-		if (!shell_pcb) {
-			logging_log_error("Failed to load shell file");
+		struct pcb_t* init_pcb = elf_load(init_file, INIT_PID, invoker, env);
+		if (!init_pcb) {
+			logging_log_error("Failed to load init file");
 		}
-		fs_close(shell);
+		fs_close(init_file);
 
-		scheduler_schedule(shell_pcb);
+		scheduler_schedule(init_pcb);
 	}
 }

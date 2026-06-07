@@ -21,15 +21,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define FILE_FLAGS_READ		0x1
-#define FILE_FLAGS_WRITE	0x2
-
-#define FILE_FLAGS_CREATE	0100
-
-#define FILE_INFO_UNK			0
-#define FILE_INFO_REG			1
-#define FILE_INFO_DIR			2
-#define FILE_INFO_CHR			3
+#include <kernel/abi/fs.h>
 
 struct mount_cntx_t;
 
@@ -53,7 +45,6 @@ struct file_info_t {
 	uint64_t size;
 	uint64_t inode;
 	uint16_t mode;
-	uint8_t type;  // TODO: replace with mode
 };
 
 struct dir_info_t {

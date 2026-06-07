@@ -46,17 +46,9 @@ __MODULOS_VERIFY_SIZE(uint8)
 __MODULOS_VERIFY_SIZE(uint16)
 __MODULOS_VERIFY_SIZE(uint32)
 __MODULOS_VERIFY_SIZE(uint64)
-#endif /* __MODULOS_VERIFY_CONV */
 
-#define DT_UNKNOWN 0
-#define DT_FIFO 1
-#define DT_CHR 2
-#define DT_DIR 4
-#define DT_BLK 6
-#define DT_REG 8
-#define DT_LNK 10
-#define DT_SOCK 12
-#define DT_WHT 14
+#include <sys/fs.h>
+#endif /* __MODULOS_VERIFY_CONV */
 
 #define AT_FDCWD -100
 #define AT_SYMLINK_NOFOLLOW 0x100

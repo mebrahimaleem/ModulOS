@@ -51,8 +51,29 @@
 #define EXT2_S_IFREG	0x8000
 #define EXT2_S_IFDIR	0x4000
 
+_Static_assert(EXT2_S_IFREG == S_IFREG, "IFREG abi mismatch");
+_Static_assert(EXT2_S_IFDIR == S_IFDIR, "IFREG abi mismatch");
+
+#define EXT2_FT_UNKOWN		0
 #define EXT2_FT_REG_FILE	1
 #define EXT2_FT_DIR				2
+#define EXT2_FT_CHRDEV		3
+#define EXT2_FT_BLKDEV		4
+#define EXT2_FT_FIFO			5
+#define EXT2_FT_SOCK			6
+#define EXT2_FT_SYMLINK		7
+#define EXT2_FT_MAX				7
+
+static uint8_t ext2_dt_conv[] = {
+	[0] = DT_UNKNOWN,
+	[1] = DT_REG,
+	[2] = DT_DIR,
+	[3] = DT_CHR,
+	[4] = DT_BLK,
+	[5] = DT_FIFO,
+	[6] = DT_SOCK,
+	[7] = DT_LNK
+};
 
 #define MODE_DIR			0x1
 
@@ -835,16 +856,6 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 		return FILE_ERROR;
 	}
 
-	if (inode.i_mode & EXT2_S_IFREG) {
-		info->type = FILE_INFO_REG;
-	}
-	else if (inode.i_mode & EXT2_S_IFDIR) {
-		info->type = FILE_INFO_DIR;
-	}
-	else {
-		return FILE_NO_SUPPORT;
-	}
-
 	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
 	info->inode = inode_handle->inode_index;
 	info->mode = inode.i_mode;
@@ -860,7 +871,7 @@ static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 		return FILE_ERROR;
 	}
 
-	if (info.type != FILE_INFO_DIR) {
+	if (!(info.mode & S_IFDIR)) {
 		return FILE_NOT_DIR;
 	}
 
@@ -929,18 +940,7 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 				if (entry->inode != 0) {
 					info->inode_num = entry->inode;
 					info->rec_len = entry->rec_len;
-
-					switch (entry->file_type) {
-						case EXT2_FT_REG_FILE:
-							info->type = FILE_INFO_REG;
-							break;
-						case EXT2_FT_DIR:
-							info->type = FILE_INFO_DIR;
-							break;
-						default:
-							info->type = FILE_INFO_UNK;
-							break;
-					}
+					info->type = entry->file_type;
 
 					kmemcpy(info->name, entry->name, entry->name_len);
 					info->name[entry->name_len] = 0;
@@ -1059,7 +1059,7 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 		return sts;
 	}
 
-	if (info.type != FILE_INFO_DIR) {
+	if (!(info.mode & S_IFDIR)) {
 		return FILE_NO_SUPPORT;
 	}
 
@@ -1146,7 +1146,7 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 					.inode = (uint32_t)inode_index,
 					.rec_len = (uint16_t)parent_handle->ext2->block_size,
 					.name_len = (uint8_t)kstrlen(name),
-					.file_type = EXT2_FT_REG_FILE
+					.file_type = ext2_dt_conv[EXT2_FT_REG_FILE]
 				};
 
 				kmemcpy(&dir_entry->name, name, dir_entry->name_len);
@@ -1187,10 +1187,10 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* pa
 		// file not found
 		kfree(handle);
 
-		if (flags & FILE_FLAGS_CREATE) {
+		if (flags & O_CREAT) {
 			enum file_status_t create_sts = ext2_create(ext2, path, mode);
 			if (create_sts == FILE_OK) {
-				return ext2_open(cntx, path, flags & FILE_FLAGS_CREATE, mode);
+				return ext2_open(cntx, path, flags & O_CREAT, mode);
 			}
 		}
 		return 0;

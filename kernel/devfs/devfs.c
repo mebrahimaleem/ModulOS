@@ -84,7 +84,7 @@ static enum file_status_t devfs_stat(struct file_handle_t* handle, struct file_i
 
 	switch (dev_handle->type) {
 		case DEV_TYPE_TTY:
-			info->type = FILE_INFO_CHR;
+			info->mode = S_IFCHR;
 			info->size = TTY_READ_BUFFER_SIZE;
 			return FILE_OK;
 	}

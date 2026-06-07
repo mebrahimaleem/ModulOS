@@ -158,5 +158,4 @@ extern struct pcb_t* process_create_userland_pcb(uint64_t rdi,
 																								 struct pcb_t* parent,
 																								 uint64_t memtop,
 																								 uint64_t pid);
-
 #endif /* KERNEL_CORE_PROCESS_H */
