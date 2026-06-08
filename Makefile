@@ -55,10 +55,16 @@ endif
 export SRC_TREE_ROOT = .
 export OBJ_DIR = build
 
-export CC := clang
-export AR := llvm-ar
-export RANLIB = llvm-ranlib
-export STRIP := llvm-strip
+export CC := clang-19
+export LD := ld-19
+export AR := llvm-ar-19
+export NM := llvm-nm-19
+export RANLIB = llvm-ranlib-19
+export OBJCOPY := llvm-objcopy-19
+export OBJDUMP := llvm-objdump-19
+export STRIP := llvm-strip-19
+export AS := llvm-as-19
+
 
 SUBDIRS := kernel boot drivers test userland
 KERNEL_TARGETS := \

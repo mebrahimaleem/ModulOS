@@ -1,5 +1,5 @@
 #!/bin/bash
 
-scan-build --use-cc=clang --use-c++=clang++ \
+scan-build --use-cc=clang-19 --use-c++=clang++-19 \
 	-analyze-headers -enable-checker core,deadcode,nullability,security,unix \
 	make all

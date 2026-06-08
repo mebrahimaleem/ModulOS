@@ -49,7 +49,7 @@ mlibc/:
 
 $(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(SYSROOT)/usr/
 	meson setup \
-		--native-file mlibc/ci/linux-x86_64-clang.cross-file \
+		--native-file mlibc/ci/linux-x86_64-clang-19.cross-file \
 		--cross-file mlibc/ci/modulos.cross-file \
 		--prefix $(SYSROOT)/usr/ \
 		--reconfigure \
@@ -75,8 +75,7 @@ $(OBJ_DIR)/dash-setup: $(LIB)/crt1.o $(LIB)/libc.a | dash/ $(OBJ_DIR)/dash-build
 	make -C $(OBJ_DIR)/dash-build/ distclean || true
 	env -C dash/ ./autogen.sh
 	env -C $(OBJ_DIR)/dash-build/ \
-		CC=clang LD=ld.lld \
-		AR=llvm-ar NM=llvm-nm RANLIB=llvm-ranlib OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip AS=llvm-as \
+		CC=$(CC) LD=$(LD) AR=$(AR) NM=$(NM) RANLIB=$(RANLIB) OBJCOPY=$(OBJCOPY) OBJDUMP=$(OBJDUMP) STRIP=$(STRIP) AS=$(AS) \
 		CFLAGS="$(U_CFLAGS)" \
 		LDFLAGS="$(U_CLFAGS) -fuse-ld=lld -L$(LIB)/" \
 		LIBS="$(LIB)/crt1.o $(LIB)/libc.a" \
@@ -99,11 +98,11 @@ $(OBJ_DIR)/utils-setup: $(LIB)/crt1.o $(LIB)/libc.a | sbase/ $(OBJ_DIR)/utils-bu
 	rsync -a --exclude='.git' sbase/ $(OBJ_DIR)/utils-build/
 	sed -i \
 			-e 's|^PREFIX = .*|PREFIX = $(SYSROOT)/usr/|' \
-			-e 's|^#CC =.*|CC = clang|' \
-			-e 's|^#AR =.*|AR = llvm-ar|' \
-			-e 's|^RANLIB = .*|RANLIB = llvm-ranlib|' \
+			-e 's|^#CC =.*|CC = $(CC)|' \
+			-e 's|^#AR =.*|AR = $(AR)|' \
+			-e 's|^RANLIB = .*|RANLIB = $(RANLIB)|' \
 			-e '/^# tools/a \
-	LD = ld.lld\nNM = llvm-nm\nOBJCOPY = llvm-objcopy\nOBJDUMP = llvm-objdump\nSTRIP = llvm-strip\nAS = llvm-as' \
+	LD = $(LD)\nNM = $(NM)\nOBJCOPY = $(OBJCOPY)\nOBJDUMP = $(OBJDUMP)\nSTRIP = $(STRIP)\nAS = $(AS)' \
 			-e 's|^# CFLAGS .*|CFLAGS = $(U_CFLAGS)|' \
 			-e 's|^# LDFLAGS .*|LDFLAGS = $(U_CFLAGS) -fuse-ld=lld -L$(LIB)/|' \
 			$(OBJ_DIR)/utils-build/config.mk

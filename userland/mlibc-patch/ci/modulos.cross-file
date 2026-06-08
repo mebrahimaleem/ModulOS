@@ -1,9 +1,10 @@
 [binaries]
-c = 'clang'
-cpp = 'clang++'
-ar = 'llvm-ar'
-ld = 'llvm-ld'
-strip = 'llvm-strip'
+c = 'clang-19'
+cpp = 'clang++-19'
+ar = 'llvm-ar-19'
+ld = 'llvm-ld-19'
+cpp_ld = 'llvm-ld-19'
+strip = 'llvm-strip-19'
 
 [host_machine]
 system = 'modulos'
