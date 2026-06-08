@@ -15,6 +15,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install clang-19 lld-19 llvm-19 grub-efi-amd64-bin mtools meson ninja-build
+          sudo ln -s -f /usr/bin/lld-19 /usr/bin/lld
+          sudo ln -s -f /usr/bin/ld.lld-19 /usr/bin/ld.lld
 
       - name: Build ModulOS
         run: |

@@ -56,7 +56,7 @@ export SRC_TREE_ROOT = .
 export OBJ_DIR = build
 
 export CC := clang-19
-export LD := ld-19
+export LD := ld.lld-19
 export AR := llvm-ar-19
 export NM := llvm-nm-19
 export RANLIB = llvm-ranlib-19
