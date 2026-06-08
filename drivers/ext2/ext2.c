@@ -51,8 +51,29 @@
 #define EXT2_S_IFREG	0x8000
 #define EXT2_S_IFDIR	0x4000
 
+_Static_assert(EXT2_S_IFREG == S_IFREG, "IFREG abi mismatch");
+_Static_assert(EXT2_S_IFDIR == S_IFDIR, "IFREG abi mismatch");
+
+#define EXT2_FT_UNKOWN		0
 #define EXT2_FT_REG_FILE	1
 #define EXT2_FT_DIR				2
+#define EXT2_FT_CHRDEV		3
+#define EXT2_FT_BLKDEV		4
+#define EXT2_FT_FIFO			5
+#define EXT2_FT_SOCK			6
+#define EXT2_FT_SYMLINK		7
+#define EXT2_FT_MAX				7
+
+static uint8_t ext2_dt_conv[] = {
+	[0] = DT_UNKNOWN,
+	[1] = DT_REG,
+	[2] = DT_DIR,
+	[3] = DT_CHR,
+	[4] = DT_BLK,
+	[5] = DT_FIFO,
+	[6] = DT_SOCK,
+	[7] = DT_LNK
+};
 
 #define MODE_DIR			0x1
 
@@ -169,6 +190,7 @@ struct ext2_t {
 	struct ext2_bg_desc_t* bgdt;
 	struct disk_t* disk;
 	uint64_t block_size;
+	uint64_t devid;
 	uint8_t lock;
 };
 
@@ -178,6 +200,7 @@ struct ext2_inode_handle_t {
 	uint64_t seek;
 	uint64_t seek_block;
 	uint8_t ext2_mode;
+	uint64_t next_seek;
 };
 
 enum ext2_block_state_t {
@@ -826,7 +849,7 @@ static uint64_t ext2_get_seek(struct file_handle_t* handle) {
 	return inode_handle->seek_block * block_size + inode_handle->seek;
 }
 
-static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_info_t* info) {
+static enum file_status_t ext2_stat(struct file_handle_t* handle, file_info_t* info) {
 	struct ext2_inode_t inode;
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 
@@ -834,17 +857,17 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 		return FILE_ERROR;
 	}
 
-	if (inode.i_mode & EXT2_S_IFREG) {
-		info->type = FILE_TYPE_REG;
-	}
-	else if (inode.i_mode & EXT2_S_IFDIR) {
-		info->type = FILE_TYPE_DIR;
-	}
-	else {
-		return FILE_NO_SUPPORT;
-	}
-
-	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
+	kmemset(info, 0, sizeof(file_info_t));
+	info->st_size = (int64_t)((uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32));
+	info->st_ino = inode_handle->inode_index;
+	info->st_mode = inode.i_mode;
+	info->st_blksize = (int64_t)inode_handle->ext2->block_size;
+	info->st_blocks = inode.i_blocks;
+	info->st_atim.tv_sec = inode.i_atime;
+	info->st_mtim.tv_sec = inode.i_mtime;
+	info->st_ctim.tv_sec = inode.i_ctime;
+	info->st_nlink = inode.i_links_count;
+	info->st_dev = inode_handle->ext2->devid;
 
 	return FILE_OK;
 }
@@ -852,12 +875,12 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 
-	struct file_info_t info;
+	file_info_t info;
 	if (ext2_stat(handle, &info) != FILE_OK) {
 		return FILE_ERROR;
 	}
 
-	if (info.type != FILE_TYPE_DIR) {
+	if (!(info.st_mode & S_IFDIR)) {
 		return FILE_NOT_DIR;
 	}
 
@@ -874,6 +897,19 @@ static void ext2_reset_dir(struct file_handle_t* handle) {
 	inode_handle->seek = 0;
 	inode_handle->seek_block = 0;
 	inode_handle->ext2_mode &= ~MODE_DIR;
+}
+
+static enum file_status_t ext2_next_dir(struct file_handle_t* handle) {
+	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
+
+	inode_handle->seek = inode_handle->next_seek;
+
+	if (inode_handle->seek >= inode_handle->ext2->block_size) {
+		inode_handle->seek_block++;
+		inode_handle->seek = 0;
+	}
+
+	return FILE_OK;
 }
 
 static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir_info_t* info) {
@@ -908,27 +944,12 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 
 				struct ext2_ll_dir_entry_t* entry = (struct ext2_ll_dir_entry_t*)((uint64_t)buffer + inode_handle->seek);
 
-				inode_handle->seek += entry->rec_len;
-				if (inode_handle->seek >= inode_handle->ext2->block_size) {
-					inode_handle->seek_block++;
-					inode_handle->seek = 0;
-				}
+				inode_handle->next_seek = inode_handle->seek + entry->rec_len;
 
 				if (entry->inode != 0) {
 					info->inode_num = entry->inode;
 					info->rec_len = entry->rec_len;
-
-					switch (entry->file_type) {
-						case EXT2_FT_REG_FILE:
-							info->type = FILE_INFO_REG;
-							break;
-						case EXT2_FT_DIR:
-							info->type = FILE_INFO_DIR;
-							break;
-						default:
-							info->type = FILE_INFO_UNK;
-							break;
-					}
+					info->type = entry->file_type;
 
 					kmemcpy(info->name, entry->name, entry->name_len);
 					info->name[entry->name_len] = 0;
@@ -938,6 +959,8 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 				}
 
 				kfree(buffer);
+
+				ext2_next_dir(handle);
 				continue;
 			case BLOCK_SPARSE:
 				inode_handle->seek_block++;
@@ -949,11 +972,23 @@ static enum file_status_t ext2_read_dir(struct file_handle_t* handle, struct dir
 	}
 }
 
+static enum file_status_t ext2_read_dir_next(struct file_handle_t* handle, struct dir_info_t* info) {
+	enum file_status_t sts = ext2_read_dir(handle, info);
+	if (sts != FILE_OK) {
+		return sts;
+	}
+	return ext2_next_dir(handle);
+}
+
 static struct ext2_inode_handle_t* ext2_duplicate(struct ext2_inode_handle_t* handle) {
 	struct ext2_inode_handle_t* dup = kmalloc(sizeof(struct ext2_inode_handle_t));
 
 	*dup = *handle;
 	return dup;
+}
+
+static struct file_handle_t* ext2_dup(struct file_handle_t* handle) {
+	return (struct file_handle_t*)ext2_duplicate((struct ext2_inode_handle_t*)handle);
 }
 
 static void ext2_close(struct file_handle_t* handle) {
@@ -979,7 +1014,7 @@ static const char* reduce_path(struct ext2_t* ext2, const char* path, struct ext
 		path_len = path_entry_len(path);
 
 		cntrl = 1;
-		while (ext2_read_dir((struct file_handle_t*)handle, &info) == FILE_OK) {
+		while (ext2_read_dir_next((struct file_handle_t*)handle, &info) == FILE_OK) {
 			if (path_len == kstrlen(info.name) && kmemcmp(path, info.name, path_len) == 0) {
 				cntrl = 0;
 				ext2_reset_dir((struct file_handle_t*)handle);
@@ -1028,12 +1063,12 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 		return FILE_DNE;
 	}
 
-	struct file_info_t info;
+	file_info_t info;
 	if ((sts = ext2_stat((struct file_handle_t*)handle, &info)) != FILE_OK) {
 		return sts;
 	}
 
-	if (info.type != FILE_TYPE_DIR) {
+	if (!(info.st_mode & S_IFDIR)) {
 		return FILE_NO_SUPPORT;
 	}
 
@@ -1044,7 +1079,7 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 
 	ext2_open_dir((struct file_handle_t*)inode_handle);
 
-	while (ext2_read_dir((struct file_handle_t*)inode_handle, &dir_info) == FILE_OK) {
+	while (ext2_read_dir_next((struct file_handle_t*)inode_handle, &dir_info) == FILE_OK) {
 		if (kstrcmp(dir_info.name, name) == 0) {
 			ext2_reset_dir((struct file_handle_t*)inode_handle);
 
@@ -1120,7 +1155,7 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 					.inode = (uint32_t)inode_index,
 					.rec_len = (uint16_t)parent_handle->ext2->block_size,
 					.name_len = (uint8_t)kstrlen(name),
-					.file_type = EXT2_FT_REG_FILE
+					.file_type = ext2_dt_conv[EXT2_FT_REG_FILE]
 				};
 
 				kmemcpy(&dir_entry->name, name, dir_entry->name_len);
@@ -1161,10 +1196,10 @@ static struct file_handle_t* ext2_open(struct mount_cntx_t* cntx, const char* pa
 		// file not found
 		kfree(handle);
 
-		if (flags & FILE_FLAGS_CREATE) {
+		if (flags & O_CREAT) {
 			enum file_status_t create_sts = ext2_create(ext2, path, mode);
 			if (create_sts == FILE_OK) {
-				return ext2_open(cntx, path, flags & FILE_FLAGS_CREATE, mode);
+				return ext2_open(cntx, path, flags & O_CREAT, mode);
 			}
 		}
 		return 0;
@@ -1344,42 +1379,6 @@ update_inode:
 	return written;
 }
 
-static void ext2_delete_final(struct file_handle_t* handle) {
-	(void)handle;
-}
-
-static enum file_status_t ext2_create_dir(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_delete_dir(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_truncate(struct file_handle_t* handle, size_t size) {
-	(void)handle;
-	(void)size;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_link(struct file_handle_t* handle, struct file_handle_t* replace) {
-	(void)handle;
-	(void)replace;
-
-	return FILE_NO_SUPPORT;
-}
-
-static enum file_status_t ext2_unlink(struct file_handle_t* handle) {
-	(void)handle;
-
-	return FILE_NO_SUPPORT;
-}
-
 uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_lba) {
 	struct ext2_superblock_t* superblock = kmalloc(sizeof(struct ext2_superblock_t));
 	struct ext2_bg_desc_t* bgdt;
@@ -1421,6 +1420,7 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 	ext2->bgdt = bgdt;
 	ext2->disk = disk;
 	ext2->block_size = 1024u << superblock->s_log_block_size;
+	ext2->devid = fs_assign_id();
 	lock_init(&ext2->lock);
 
 	logging_log_debug("ext2 blocks: 0x%x x 0x%x (0x%lX)",
@@ -1428,28 +1428,19 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 			(uint64_t)(1024u << superblock->s_log_block_size) * (uint64_t)superblock->s_blocks_count);
 
 	if (!kmemcmp(label_rootfs, superblock->s_volume_name, sizeof(superblock->s_volume_name))) {
-		if (fs_mount(
-					"/",
-					(struct mount_cntx_t*)ext2,
-					ext2_open,
-					ext2_close,
-					ext2_stat,
-					ext2_read,
-					ext2_get_seek,
-					ext2_seek,
-					ext2_write,
-					ext2_delete_final,
-					ext2_open_dir,
-					ext2_read_dir,
-					ext2_create_dir,
-					ext2_delete_dir,
-					ext2_truncate,
-					ext2_link,
-					ext2_unlink
-					) != FILE_OK) {
-			logging_log_error("Failed to mount rootfs");
-			panic(PANIC_STATE);
-		}
+		struct fs_mount_t* mount = fs_mount("/", (struct mount_cntx_t*)ext2);
+
+		fs_mount_assign_open(mount, ext2_open);
+		fs_mount_assign_close(mount, ext2_close);
+		fs_mount_assign_stat(mount, ext2_stat);
+		fs_mount_assign_read(mount, ext2_read);
+		fs_mount_assign_get_seek(mount, ext2_get_seek);
+		fs_mount_assign_seek(mount, ext2_seek);
+		fs_mount_assign_write(mount, ext2_write);
+		fs_mount_assign_open_dir(mount, ext2_open_dir);
+		fs_mount_assign_read_dir(mount, ext2_read_dir);
+		fs_mount_assign_next_dir(mount, ext2_next_dir);
+		fs_mount_assign_dup(mount, ext2_dup);
 
 		scheduler_schedule(process_from_func(prepare_userland, 0));
 	}

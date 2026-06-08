@@ -21,6 +21,7 @@
 export DEBUG_LOGGING = 1
 export SMP_ENABLE = 1
 #export CHECK_ALLOC = 1
+#export DEBUG_LOGGING_MEM = 1
 
 # Global options
 
@@ -54,9 +55,16 @@ endif
 export SRC_TREE_ROOT = .
 export OBJ_DIR = build
 
-export CC := clang
-export AR := llvm-ar
-export STRIP := llvm-strip
+export CC := clang-19
+export LD := ld.lld-19
+export AR := llvm-ar-19
+export NM := llvm-nm-19
+export RANLIB = llvm-ranlib-19
+export OBJCOPY := llvm-objcopy-19
+export OBJDUMP := llvm-objdump-19
+export STRIP := llvm-strip-19
+export AS := llvm-as-19
+
 
 SUBDIRS := kernel boot drivers test userland
 KERNEL_TARGETS := \
@@ -105,7 +113,7 @@ index: cscope.files
 
 .PHONY: clean-full
 clean-full: clean
-	-rm -rdf userland/mlibc/
+	-rm -rdf userland/mlibc/ userland/dash/ userland/sbase/
 
 .PHONY: clean
 clean:
@@ -138,7 +146,7 @@ $(TEST_TARGETS): test
 
 .PHONY: $(TEST_EXEC)
 $(TEST_EXEC): %: %.a $(OBJ_DIR)/boot.a $(OBJ_DIR)/kernel.a $(OBJ_DIR)/drivers.a
-	$(CC) -g -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
+	$(CC) -g -no-pie -O0 -std=c23 $(CWARN) -fuse-ld=lld -o $@ $^
 
 .PHONY: copy-doc
 copy-doc: COPYING LICENSES | $(COPY_DOC_TO)

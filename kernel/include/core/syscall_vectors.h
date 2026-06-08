@@ -79,14 +79,17 @@
 #define SYSCALL_ALLOC				5
 
 /*
- * reserved
+ * ret: child pid (pid_t)
  */
-#define SYSCALL_RESV1				6
+#define SYSCALL_FORK				6
 
 /*
- * reserved
+ * rdi: path (const char*)
+ * rsi: argv (const char*)
+ * rdx: envp (const char*)
+ * ret: success (int)
  */
-#define SYSCALL_RESV2				7
+#define SYSCALL_EXECVE			7
 
 /*
  * rdi: handle (int)
@@ -178,6 +181,42 @@
  */
 #define SYSCALL_STAT				21
 
-#define SYSCALL_MAX					22
+/*
+ * ret: current pid (pid_t)
+ */
+#define SYSCALL_GETPID			22
 
+/*
+ * rdi: pid (pid_t)
+ * rsi: status (int*)
+ * rdx: flags (int)
+ * r8 : out pid (pid_t*)
+ * ret: child pid (pid_t)
+ */
+#define SYSCALL_WAITPID			23
 
+/*
+ * ret: parent pid (pid_t)
+ */
+#define SYSCALL_GETPPID			24
+
+/*
+ * rdi: old fd (int)
+ * ret: new fd (int)
+ */
+#define SYSCALL_DUP					25
+
+/*
+ * rdi: old fd (int)
+ * rsi: new fd (int)
+ * ret: new fd (int)
+ */
+#define SYSCALL_DUP2				26
+
+/*
+ * rdi: msg (const char*)
+ * ret: success (int)
+ */
+#define SYSCALL_LOG					27
+
+#define SYSCALL_MAX					28

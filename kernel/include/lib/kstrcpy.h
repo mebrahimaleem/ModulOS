@@ -22,6 +22,8 @@
 
 extern char* kstrcpy(char* dest, const char* src);
 
+extern char* kstpcpy(char* dest, const char* src);
+
 extern char* kstrcpy_no_null(char* dest, const char* src);
 
 extern char* kstrncpy(char* dest, const char* src, size_t len);

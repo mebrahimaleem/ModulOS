@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <kernel/core/process.h>
+
 #define CANON_HIGH			0xFFFF800000000000
 #define VIRTUAL_LIMIT		IDENT_BASE
 
@@ -40,6 +42,10 @@ struct free_transaction_list_t {
 	uint64_t base;
 	size_t size;
 	struct free_transaction_list_t* next;
+	enum {
+		MM_TRANS_VIRT,
+		MM_TRANS_IDNT
+	} type;
 };
 
 extern void mm_init(
@@ -56,12 +62,17 @@ extern uint64_t mm_alloc_pmax(size_t size, uint64_t align, uint64_t max);
 extern uint64_t mm_alloc_vmax(size_t size, uint64_t align, uint64_t max);
 
 extern void mm_free_p(uint64_t base, size_t size);
+extern void mm_free_p_ident(uint64_t base, size_t size);
 extern void mm_free_v(uint64_t base, size_t size);
 
 extern void mm_transaction_init(void);
 extern struct free_transaction_list_t* mm_get_shootdown_list(void);
 extern void mm_register_barrier(uint8_t id);
 extern void mm_barrier_disarm(uint8_t id);
+
+#ifdef DEBUG_LOGGING_MEM
+extern void mm_log_usage(void);
+#endif /* DEBUG_LOGGING_MEM */
 
 #endif /* KERNEL_CORE_MM_H */
 

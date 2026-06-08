@@ -53,7 +53,9 @@ extern uint8_t paging_update_perms(uint64_t vaddr, uint64_t flg, enum page_size_
 
 extern uint64_t paging_map(uint64_t vaddr, uint64_t paddr, uint64_t flg, enum page_size_t page_size);
 extern void paging_unmap(uint64_t vaddr, enum page_size_t page_size);
+
 extern uint64_t paging_ident(uint64_t paddr);
+extern uint64_t paging_unident(uint64_t vaddr);
 
 extern void paging_install_guard(uint64_t vaddr);
 extern void paging_remove_guard(uint64_t vaddr);
@@ -62,5 +64,7 @@ extern uint8_t paging_check_guard(uint64_t vaddr);
 extern uint64_t paging_create_pml4(void);
 
 extern void paging_free_userspace(uint64_t* pml4);
+
+extern uint64_t paging_duplicate_lower(uint64_t cr3);
 
 #endif /* KERNEL_CORE_PAGING_H */

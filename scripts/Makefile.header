@@ -16,6 +16,8 @@
 
 export OBJ_DIR := ../$(OBJ_DIR)
 
+.DELETE_ON_ERROR:
+
 SRC_DIRS :=
 DEFINES :=
 BUILD_DIRS :=
@@ -38,6 +40,10 @@ endif
 
 ifdef DEBUG_LOGGING
 CDEBUG := $(CDEBUG) -DDEBUG_LOGGING
+endif
+
+ifdef DEBUG_LOGGING_MEM
+CDEBUG := $(CDEBUG) -DDEBUG_LOGGING_MEM
 endif
 
 ifdef SMP_ENABLE

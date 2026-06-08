@@ -33,6 +33,8 @@ struct proc_data_t {
 	uint64_t sts;
 };
 
+_Static_assert(offsetof(struct proc_data_t, kernel_rsp) == 0, "kernel_rsp has bad offset in proc data");
+
 extern struct proc_data_t bsp_proc_data;
 extern struct proc_data_t** proc_data_ptr;
 

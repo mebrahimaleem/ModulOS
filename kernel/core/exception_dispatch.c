@@ -22,6 +22,8 @@
 #include <core/panic.h>
 #include <core/paging.h>
 #include <core/cpu_instr.h>
+#include <core/process.h>
+#include <core/proc_data.h>
 
 #define VECTOR_DE		0x00
 #define VECTOR_DB		0x01
@@ -101,9 +103,6 @@ static inline const char* get_exception_name(uint64_t vector) {
 }
 
 void exception_dispatch(struct exception_context_t* context) {
-	logging_log_error("Unrecoverable exception 0x%lX %s (0x%lX) @ 0x%lX",
-			context->vector, get_exception_name(context->vector), context->code, context->rip);
-
 	logging_log_debug("Register Dump:\r\nrax 0x%lX\r\nrbx 0x%lX\r\nrcx 0x%lX\r\nrdx 0x%lX\
 \r\nrsi 0x%lX\r\nrdi 0x%lX\r\nrbp 0x%lX\r\nrsp 0x%lX\r\nr8  0x%lX\r\nr9  0x%lX\r\nr10 0x%lX\
 \r\nr11 0x%lX\r\nr12 0x%lX\r\nr13 0x%lX\r\nr14 0x%lX\r\nr15 0x%lX\r\nrfl 0x%lX\r\ncs  0x%lX\
@@ -123,6 +122,17 @@ void exception_dispatch(struct exception_context_t* context) {
 		default:
 			break;
 	}	
+
+	if (context->vector != VECTOR_DF && process_is_userland()) {
+		logging_log_debug("Recoverable exception 0x%lX %s (0x%lX) @ 0x%lX",
+				context->vector, get_exception_name(context->vector), context->code, context->rip);
+
+		logging_log_info("Segmentation Fault");
+		process_kill_current();
+	}
+
+	logging_log_error("Unrecoverable exception 0x%lX %s (0x%lX) @ 0x%lX",
+			context->vector, get_exception_name(context->vector), context->code, context->rip);
 
 	panic(PANIC_STATE);
 }

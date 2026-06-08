@@ -23,10 +23,12 @@
 .globl syscall_5
 .globl syscall_6
 
+.globl syscall_6_nr
+
 .section .text
 
 syscall_6:
-popq %r10
+movq 8(%rsp), %r10
 syscall_5:
 syscall_4:
 syscall_3:
@@ -35,4 +37,24 @@ syscall_1:
 syscall_0:
 movq %rcx, %rax
 syscall
+ret
+
+syscall_6_nr:
+movq 8(%rsp), %r10
+
+pushq %rbx
+pushq %r12
+pushq %r13
+pushq %r14
+pushq %r15
+
+movq %rcx, %rax
+syscall
+
+popq %r15
+popq %r14
+popq %r13
+popq %r12
+popq %rbx
+
 ret

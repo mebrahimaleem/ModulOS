@@ -1,0 +1,17 @@
+diff --git a/meson.build b/meson.build
+index 662ba916..5a61f21a 100644
+--- a/meson.build
++++ b/meson.build
+@@ -294,6 +294,12 @@ elif host_machine.system() == 'zinnia'
+ elif host_machine.system() == 'demo'
+ 	subdir('sysdeps/demo')
+ # ANCHOR_END: demo-sysdeps
++elif host_machine.system() == 'modulos'
++	add_project_arguments('-mno-avx', '-mno-avx2', '-mno-avx512f', language: ['c', 'cpp'])
++  rtld_include_dirs += include_directories('sysdeps/modulos/include')
++  libc_include_dirs += include_directories('sysdeps/modulos/include')
++  subdir('sysdeps/modulos')
++# ANCHOR_END: modulos-sysdeps
+ else
+ 	error('No sysdeps defined for OS: ' + host_machine.system())
+ endif

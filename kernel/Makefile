@@ -55,3 +55,4 @@ build: $(OBJ_DIR)/../kernel.a $(LDS)
 $(OBJ_DIR)/kernel.a: $(TARGETS) | $(BUILD_DIRS)
 	rm -f $@
 	$(AR) rcs $@ $(TARGETS)
+	$(RANLIB) $@

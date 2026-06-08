@@ -51,3 +51,4 @@ $(OBJ_DIR)/../esp.img:
 $(OBJ_DIR)/boot.a: $(TARGETS) | $(BUILD_DIRS)
 	rm -f $@
 	$(AR) rcs $@ $(TARGETS)
+	$(RANLIB) $@

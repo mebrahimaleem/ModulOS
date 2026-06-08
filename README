@@ -4,7 +4,8 @@ An operating system that aims to be customizable and modular to provide a fast u
 ## Licensing
 
 This software is provided under the GPLv3 license, found in COPYING. This project also uses
-mlibc which has a seperate license in LICENCES/MLIBC.
+mlibc which has a seperate license in LICENCES/MLIBC, dash which has a seperate license
+in LICENSES/DASH, and sbase which has a seperate license in LICENSES/SBASE
 
 ## Installing
 

@@ -1,0 +1,11 @@
+[binaries]
+c = 'clang-19'
+c_ld = 'lld-19'
+cpp = 'clang++-19'
+cpp_ld = 'lld-19'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

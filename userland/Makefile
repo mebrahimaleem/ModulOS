@@ -19,12 +19,18 @@ include $(SRC_TREE_ROOT)/scripts/Makefile.header
 
 OBJ_DIR := $(OBJ_DIR)/userland
 
-U_CFLAGS := -g -fno-pie -static \
-						-nostdlib -nodefaultlibs \
-						-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables \
-						--sysroot=$(OBJ_DIR)/../userland_files/
+SYSROOT := $(abspath $(OBJ_DIR)/../userland_files/)
 
-LIB := $(OBJ_DIR)/../userland_files/usr/lib
+U_CFLAGS := -fno-pie -static \
+						-ffreestanding -nostdlibinc -nostdlib \
+						--sysroot=$(SYSROOT)/ -isystem $(SYSROOT)/usr/include/ \
+						$(CDEBUG) -UDEBUG
+
+ifndef DEBUG
+U_CFLAGS := $(U_CFLAGS)
+endif
+
+LIB := $(SYSROOT)/usr/lib
 
 .PHONY: all
 all: build
@@ -33,35 +39,95 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: libc $(OBJ_DIR)/../userland_files/bin/shell
+build: _libc _shell _utils _init _fs
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
-	git -C $@ checkout v6.3.1
-	git -C $@ apply ../mlibc-patch/mlibc-v6-3-1-port.patch
+	git -C $@ checkout c367b780a47dc1d6c70d19a8379f4a74e5a7ed96
+	git -C $@ apply ../mlibc-patch/mlibc-port.patch
 	cp -r mlibc-patch/* mlibc/
 
-$(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(OBJ_DIR)/../userland_files/usr/
+$(OBJ_DIR)/mlibc-meson-setup: | mlibc/ $(OBJ_DIR)/libc-build/ $(SYSROOT)/usr/
 	meson setup \
-		--native-file mlibc/ci/linux-x86_64-clang.cross-file \
+		--native-file mlibc/ci/linux-x86_64-clang-19.cross-file \
 		--cross-file mlibc/ci/modulos.cross-file \
-		--prefix $(abspath $(OBJ_DIR)/../userland_files/usr/) \
+		--prefix $(SYSROOT)/usr/ \
 		--reconfigure \
 		-Ddefault_library=static \
 		$(OBJ_DIR)/libc-build \
 		mlibc/
 	touch $@
 
-.PHONY: libc
-libc: $(OBJ_DIR)/mlibc-meson-setup
+.PHONY: _libc
+_libc: $(OBJ_DIR)/mlibc-meson-setup
 	cp -u -r mlibc-patch/* mlibc/
 	ninja -C $(OBJ_DIR)/libc-build/
 	meson install --only-changed -C $(OBJ_DIR)/libc-build/
 
-$(LIB)/crt1.o $(LIB)/libc.a: libc
+$(LIB)/crt1.o: | _libc
+$(LIB)/libc.a: | _libc
 
-$(OBJ_DIR)/shell.o: shell/main.c | $(OBJ_DIR)
-	$(CC) $(U_CFLAGS) -c -o $(OBJ_DIR)/shell.o $<
+dash/:
+	git clone https://git.kernel.org/pub/scm/utils/dash/dash.git
+	git -C $@ checkout v0.5.13.3
 
-$(OBJ_DIR)/../userland_files/bin/shell: $(OBJ_DIR)/shell.o $(LIB)/crt1.o $(LIB)/libc.a | $(OBJ_DIR)/../userland_files/bin/
-	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $(LIB)/crt1.o $< $(LIB)/libc.a
+$(OBJ_DIR)/dash-setup: $(LIB)/crt1.o $(LIB)/libc.a | dash/ $(OBJ_DIR)/dash-build/ $(SYSROOT)/usr/
+	make -C $(OBJ_DIR)/dash-build/ distclean || true
+	env -C dash/ ./autogen.sh
+	env -C $(OBJ_DIR)/dash-build/ \
+		CC=$(CC) LD=$(LD) AR=$(AR) NM=$(NM) RANLIB=$(RANLIB) OBJCOPY=$(OBJCOPY) OBJDUMP=$(OBJDUMP) STRIP=$(STRIP) AS=$(AS) \
+		CFLAGS="$(U_CFLAGS)" \
+		LDFLAGS="$(U_CLFAGS) -fuse-ld=lld -L$(LIB)/" \
+		LIBS="$(LIB)/crt1.o $(LIB)/libc.a" \
+		$(CURDIR)/dash/configure \
+		--prefix $(SYSROOT)/usr/ \
+		--host=x86_64-unkown-modulos-elf
+	touch $@
+ 
+.PHONY: _shell
+_shell: $(OBJ_DIR)/dash-setup | $(SYSROOT)/bin/
+	make -C $(OBJ_DIR)/dash-build/ install
+	ln -f -r -s $(SYSROOT)/usr/bin/dash $(SYSROOT)/bin/sh
+
+sbase/:
+	git clone git://git.suckless.org/sbase
+	git -C $@ checkout c546c3a5724c81cee9a11d816a38ccdf17472129
+
+$(OBJ_DIR)/utils-setup: $(LIB)/crt1.o $(LIB)/libc.a | sbase/ $(OBJ_DIR)/utils-build/ $(SYSROOT)/usr/share/man/
+	make -C $(OBJ_DIR)/utils-build/ clean || true
+	rsync -a --exclude='.git' sbase/ $(OBJ_DIR)/utils-build/
+	sed -i \
+			-e 's|^PREFIX = .*|PREFIX = $(SYSROOT)/usr/|' \
+			-e 's|^#CC =.*|CC = $(CC)|' \
+			-e 's|^#AR =.*|AR = $(AR)|' \
+			-e 's|^RANLIB = .*|RANLIB = $(RANLIB)|' \
+			-e '/^# tools/a \
+	LD = $(LD)\nNM = $(NM)\nOBJCOPY = $(OBJCOPY)\nOBJDUMP = $(OBJDUMP)\nSTRIP = $(STRIP)\nAS = $(AS)' \
+			-e 's|^# CFLAGS .*|CFLAGS = $(U_CFLAGS)|' \
+			-e 's|^# LDFLAGS .*|LDFLAGS = $(U_CFLAGS) -fuse-ld=lld -L$(LIB)/|' \
+			$(OBJ_DIR)/utils-build/config.mk
+	sed -i \
+			-e 's|-o \$$@ \$$< \$$(LIB)|-o $$@ $$< $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e 's|-o \$$@ bc\.c \$$(LIB)|-o $$@ bc.c $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e 's|-o \$$@ \$$(MAKEOBJ) \$$(LIB)|-o $$@ $$(MAKEOBJ) $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e 's|-o \$$@ build/\*\.c \$$(LIB)|-o $$@ build/*.c $$(LIB) $(LIB)/crt1.o $(LIB)/libc.a|' \
+			-e '/\$$(RANLIB) \$$@/a \
+		$$(OBJCOPY) --weaken $$@' \
+			$(OBJ_DIR)/utils-build/Makefile
+	touch $@
+
+.PHONY: _utils
+_utils: $(OBJ_DIR)/utils-setup
+	make -C $(OBJ_DIR)/utils-build/ install
+
+$(OBJ_DIR)/init.o: init/init.c
+	$(CC) $(U_CFLAGS) -c -o $@ $<
+
+$(SYSROOT)/init: $(OBJ_DIR)/init.o $(LIB)/crt1.o $(LIB)/libc.a | $(SYSROOT)/
+	$(CC) $(U_CFLAGS) -fuse-ld=lld -o $@ $^
+
+.PHONY: _init
+_init: $(SYSROOT)/init
+
+.PHONY: _fs
+_fs: | $(SYSROOT)/dev/

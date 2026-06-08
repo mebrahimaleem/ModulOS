@@ -29,6 +29,8 @@ extern uint64_t array_list_push(struct array_list_t* list, void* value);
 
 extern void* array_list_get(struct array_list_t* list, uint64_t index);
 
+extern void* array_list_set(struct array_list_t* list, uint64_t index, void* value);
+
 extern void* array_list_remove(struct array_list_t* list, uint64_t index);
 
 extern void array_list_clear(struct array_list_t* list, void (*free_func)(void*));

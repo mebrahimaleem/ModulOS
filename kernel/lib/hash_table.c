@@ -170,3 +170,28 @@ void hash_table_resize(struct hash_table_t* table, size_t buckets) {
 size_t hash_table_count(struct hash_table_t* table) {
 	return table->num_elems;
 }
+
+uint8_t hash_table_get_any(struct hash_table_t* table, uint64_t* out_key, void** out_val) {
+	for (size_t i = 0; i < table->num_buckets; i++) {
+		if (table->buckets[i]) {
+			*out_key = table->buckets[i]->key;
+			return hash_table_get(table, *out_key, out_val);
+		}
+	}
+
+	return 0;
+}
+
+uint8_t hash_table_find(struct hash_table_t* table, uint64_t* out_key, void** out_val, uint8_t (*cond)(void*)) {
+	for (size_t i = 0; i < table->num_buckets; i++) {
+		for (struct node_t* node = table->buckets[i]; node; node = node->next) {
+			if (cond(node->value)) {
+				*out_key = node->key;
+				*out_val = node->value;
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}

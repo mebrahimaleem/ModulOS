@@ -43,6 +43,8 @@
 
 #include <devfs/tty.h>
 
+#define INIT_PID	1
+
 #ifdef MEM_TEST
 #include <mem_test/alloc_test.h>
 #endif /* MEM_TEST */
@@ -84,6 +86,21 @@ static inline void write_syscall_msr(void) {
 	msr_write(MSR_LSTAR, (uint64_t)syscall_entry);
 	msr_write(MSR_FMASK, RFL_MASK);
 }
+
+#ifdef DEBUG_LOGGING_MEM
+#define LOG_DELAY_MS	1000
+
+__attribute__((noreturn)) static void periodic_logging(void* _ign) {
+	(void)_ign;
+
+	while (1) {
+		mm_log_usage();
+		alloc_log_usage();
+
+		time_sleep(LOG_DELAY_MS);
+	}
+}
+#endif /* DEBUG_LOGGING_MEM */
 
 void kentry(void) {
 	logging_log_debug("Kernel Entry");
@@ -135,7 +152,6 @@ void kentry(void) {
 	logging_log_debug("Early PCIE init");
 	disk_init();
 	fs_init();
-	mm_transaction_init();
 	tty_init();
 	pcie_init();
 	pcie_enumerate();
@@ -154,6 +170,13 @@ void kentry(void) {
 #endif /* SMP_ENABLE */
 
 	logging_log_info("AP bootstrap sequence done");
+
+	mm_transaction_init();
+	process_init_reaper();
+
+#ifdef DEBUG_LOGGING_MEM
+	scheduler_schedule(process_from_func(periodic_logging, 0));
+#endif /* DEBUG_LOGGING_MEM */
 
 	process_kill_current();
 }
@@ -194,13 +217,6 @@ void kapentry(uint64_t arb_id) {
 void prepare_userland(void* cntx) {
 	(void)cntx;
 
-	struct fs_handle_t* f = fs_open("/test.txt", FILE_FLAGS_READ | FILE_FLAGS_WRITE | FILE_FLAGS_CREATE);
-	if (f == 0) {
-		logging_log_error("Failed to create /test.txt");
-	}
-	fs_write(f, "Hi\n", 3);
-	fs_close(f);
-
 	lock_acquire(&prepare_userland_lock);
 	if (init_done) {
 		logging_log_error("Multiple calls to prepare userland");
@@ -210,18 +226,29 @@ void prepare_userland(void* cntx) {
 	init_done = 1;
 	lock_release(&prepare_userland_lock);
 
-	struct fs_handle_t* shell = fs_open("/bin/shell", FILE_FLAGS_READ);
-	if (!shell) {
-		logging_log_error("Failed to open shell file");
+	struct fs_handle_t* init_file = fs_open("/init", O_RDONLY);
+	if (!init_file) {
+		logging_log_error("Failed to open init file");
 	}
 
 	else {
-		struct pcb_t* shell_pcb = elf_load(shell, process_assign_pid(), "/bin/shell ModulOS", "USER=root PWD=/");
-		if (!shell_pcb) {
-			logging_log_error("Failed to load shell file");
+		const char* const invoker[] = {"/init", 0};
+		const char* const env[] = {
+			"PATH=/usr/bin:/bin",
+			"HOME=/",
+			"PWD=/",
+			"OLDPWD=/",
+			"USER=ROOT",
+			"LOGNAME=ROOT",
+			"SHELL=/bin/dash",
+			"PS1=$ ",
+			0};
+		struct pcb_t* init_pcb = elf_load(init_file, INIT_PID, invoker, env);
+		if (!init_pcb) {
+			logging_log_error("Failed to load init file");
 		}
-		fs_close(shell);
+		fs_close(init_file);
 
-		scheduler_schedule(shell_pcb);
+		scheduler_schedule(init_pcb);
 	}
 }

@@ -29,6 +29,8 @@
 #include <core/cpu_instr.h>
 #include <core/proc_data.h>
 #include <core/time.h>
+#include <core/signal.h>
+#include <core/lock.h>
 
 #include <lib/kmemcmp.h>
 #include <lib/kmemset.h>
@@ -36,6 +38,7 @@
 #include <lib/kstrlen.h>
 #include <lib/kstrcpy.h>
 #include <lib/array_list.h>
+#include <lib/hash_table.h>
 
 #define EI_MAG0				0
 #define EI_CLASS			4
@@ -110,8 +113,8 @@
 #define AT_EXECFN 			31
 #define AT_SYSINFO_EHDR 33
 
-#define FD_INIT_SIZE		4
-#define FD_GROWTH				8
+
+#define CHILD_BUCKETS		4
 
 enum at_index_t {
 	AT_INDEX_PHDR,
@@ -241,68 +244,24 @@ uint8_t elf_is_elf(struct fs_handle_t* file) {
 	return check_valid(file, &header);
 }
 
-struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invoker, const char* env) {
+static struct pcb_t* load_base(struct fs_handle_t* file,
+															 const char* const* argv,
+															 const char* const* envp,
+															 uint64_t stack_vaddr,
+															 uint64_t stack_paddr,
+															 uint64_t pid,
+															 struct pcb_t* source) {
 	Elf64_Ehdr header;
-	uint64_t stack_paddr, stack_vaddr, rsp;
 
 	if (check_valid(file, &header)) {
 		return 0;
 	}
 
-	if (process_create_guarded_stack(&stack_vaddr, &stack_paddr, &rsp)) {
-		logging_log_error("Failed to allocate stack");
+	uint64_t cr3 = paging_create_pml4();
+	if (!cr3) {
 		return 0;
 	}
 
-	struct pcb_t* pcb = kmalloc(sizeof(struct pcb_t));
-
-	pcb->rax =
-		pcb->rbx =
-		pcb->rcx =
-		//pcb->rdx = (parameter passing)
-		pcb->rbp =
-		//pcb->rsi = (parameter passing)
-		//pcb->rdi = (parameter passing)
-		pcb->r8 =
-		pcb->r9 =
-		pcb->r10 =
-		pcb->r11 =
-		pcb->r12 =
-		pcb->r13 =
-		pcb->r14 =
-		pcb->r15 = 0;
-
-
-	pcb->init_k_rsp_paddr = stack_paddr;
-	pcb->init_k_rsp_vaddr = stack_vaddr;
-	pcb->rsp = rsp;
-
-	pcb->k_rsp_lo = rsp & 0xFFFFFFFF;
-	pcb->k_rsp_hi = rsp >> 32;
-
-	pcb->fsbase = 0;
-
-	pcb->rflags = INIT_USERLAND_RFL;
-
-	pcb->rdi = header.e_entry; // rip
-	pcb->rsi = INIT_USERLAND_RFL; // rflags
-
-	pcb->rip = (uint64_t)syscall_return;
-	pcb->cs = GDT_KERNEL_CS;
-	pcb->ss = GDT_KERNEL_SS;
-
-	pcb->sched_cntr = SCHED_READY;
-	pcb->pid = pid;
-
-	cpu_restore_fx(pcb->fxdata);
-
-	pcb->cr3 = paging_create_pml4();
-	if (!pcb->cr3) {
-		logging_log_error("Failed to create pml4 for process");
-		kfree(pcb);
-		return 0;
-	}
-	
 	Elf64_Phdr pheader;
 
 	Elf64_Off ph_off = header.e_phoff;
@@ -330,8 +289,6 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 
 		if (pheader.p_vaddr + pheader.p_memsz >= INIT_USERLAND_SB) {
 			// stack collision
-			kfree(pcb);
-			pcb = 0;
 			return 0;
 		}
 
@@ -378,7 +335,6 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		if (j->top > j->next->base) {
 			if (j->perms != j->next->perms) {
 				// overlap
-				kfree(pcb);
 				return 0;
 			}
 
@@ -390,10 +346,10 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		}
 	}
 
-	uint64_t old_cr3 = proc_data_get()->current_process->cr3;
-	proc_data_get()->current_process->cr3 = pcb->cr3;
+	uint64_t old_cr3 = process_get_cr3();
+	process_set_cr3(cr3);
 
-	cpu_set_cr3(pcb->cr3);
+	cpu_set_cr3(cr3);
 
 	// map in memory for copying
 	for (j = mem_regs; j; j = j->next) {
@@ -405,13 +361,11 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 			paddr = mm_alloc_p(PAGE_SIZE_4K);
 
 			if (!paddr) {
-				paging_free_userspace((uint64_t*)pcb->cr3);
-				kfree(pcb);
-				pcb = 0;
+				paging_free_userspace((uint64_t*)cr3);
 				goto restore_cr3;
 			}
 
-			paging_map_proc(j->base + off, paddr, PAGE_PRESENT | PAGE_RW, PAGE_4K, (uint64_t*)pcb->cr3);
+			paging_map_proc(j->base + off, paddr, PAGE_PRESENT | PAGE_RW, PAGE_4K, (uint64_t*)cr3);
 		}
 	}
 
@@ -420,23 +374,20 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 	uint64_t pheaders_base = memtop;
 
 	// map in pheaders
-	size_t pheader_total = header.e_phentsize & header.e_phnum;
+	size_t pheader_total = header.e_phentsize * header.e_phnum;
 	for (size_t off = 0; off < pheader_total; off += PAGE_SIZE_4K) {
 		paddr = mm_alloc_p(PAGE_SIZE_4K);
 
 		if (!paddr) {
-			paging_free_userspace((uint64_t*)pcb->cr3);
-			kfree(pcb);
-			pcb = 0;
+			paging_free_userspace((uint64_t*)cr3);
 			goto restore_cr3;
 		}
 
-		paging_map_proc(pheaders_base + off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		paging_map_proc(pheaders_base + off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)cr3);
 		memtop += PAGE_SIZE_4K;
 	}
 
 	memtop += PAGE_SIZE_4K;
-	pcb->mem_top = memtop;
 
 	ph_off = 0;
 	// copy pheaders
@@ -451,71 +402,13 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 		paddr = mm_alloc_p(PAGE_SIZE_4K);
 
 		if (!paddr) {
-			paging_free_userspace((uint64_t*)pcb->cr3);
-			kfree(pcb);
-			pcb = 0;
+			paging_free_userspace((uint64_t*)cr3);
 			goto restore_cr3;
 		}
 
-		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)pcb->cr3);
+		paging_map_proc(img_off, paddr, PAGE_PRESENT | PAGE_RW | PAGE_US | PAGE_XD, PAGE_4K, (uint64_t*)cr3);
 		kmemset((void*)img_off, 0, PAGE_SIZE_4K);
 	}
-
-	// create auxv
-	uint64_t invoke_addr = INIT_USERLAND_RSP - kstrlen(invoker) - 1;
-	uint64_t env_addr = invoke_addr - kstrlen(env) - 1;
-	uint64_t random_addr = env_addr - 16;
-	auxv_t* auxv_addr = (auxv_t*)(random_addr - sizeof(default_auxv));
-
-	kstrcpy((char*)invoke_addr, invoker);
-	kstrcpy((char*)env_addr, env);
-	kmemcpy(auxv_addr, default_auxv, sizeof(default_auxv));
-
-	// leave upper bytes untouched for "randomness"
-	*(volatile uint64_t*)random_addr = time_since_init_fs(); //TODO: better randomization
-
-	auxv_addr[AT_INDEX_PHDR].a_un.a_val = (int64_t)pheaders_base;
-	auxv_addr[AT_INDEX_PHENT].a_un.a_val = header.e_phentsize;
-	auxv_addr[AT_INDEX_PHNUM].a_un.a_val = header.e_phnum;
-	auxv_addr[AT_INDEX_RANDOM].a_un.a_val = (int64_t)random_addr;
-
-	uint64_t* stack_builder = (uint64_t*)auxv_addr;
-	stack_builder--;
-	*stack_builder = 0; // env end
-	
-	char* inf_chars;
-	for (inf_chars = (char*)(env_addr + kstrlen(env)); inf_chars >= (char*)env_addr; inf_chars--) {
-		if (*inf_chars == ' ') {
-			stack_builder--;
-			*stack_builder = (uint64_t)inf_chars + 1;
-			*inf_chars = 0;
-		}
-	}
-
-	stack_builder--;
-	*stack_builder = (uint64_t)inf_chars + 1;
-
-	stack_builder--;
-	*stack_builder = 0; // env start
-	
-	uint64_t argc = 1;
-
-	for (inf_chars = (char*)(invoke_addr + kstrlen(invoker)); inf_chars >= (char*)invoke_addr; inf_chars--) {
-		if (*inf_chars == ' ') {
-			stack_builder--;
-			*stack_builder = (uint64_t)inf_chars + 1;
-			*inf_chars = 0;
-			argc++;
-		}
-	}
-
-	stack_builder--;
-	*stack_builder = (uint64_t)inf_chars + 1;
-
-	stack_builder--;
-	*stack_builder = argc;
-
-	pcb->rdx = (uint64_t)stack_builder; // rsp
 
 	// copy in executable
 	ph_off = header.e_phoff;
@@ -537,28 +430,146 @@ struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* invok
 	// update page permissions
 	for (j = mem_regs; j; j = j->next) {
 		for (uint64_t off = 0; off < j->top - j->base; off += PAGE_SIZE_4K) {
-			paging_update_perms(j->base + off, j->perms, PAGE_4K, (uint64_t*)pcb->cr3);
+			paging_update_perms(j->base + off, j->perms, PAGE_4K, (uint64_t*)cr3);
 		}
 	}
 
-	pcb->fd_table = array_list_alloc(FD_INIT_SIZE, FD_GROWTH, 0);
-	pcb->wd = fs_open("/", FILE_FLAGS_READ | FILE_FLAGS_WRITE);
-#ifdef SERIAL
-	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_READ));
-	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
-	array_list_push(pcb->fd_table, fs_open("/dev/ttyS0", FILE_FLAGS_WRITE));
-#endif /* SERIAL */
+	size_t argv_len = 0;
+	int64_t argc = 0;
+	int64_t envc = 0;
+
+	for (uint64_t i = 0; argv[i]; i++) {
+		argv_len += kstrlen(argv[i]) + 1;
+		argc++;
+	}
+
+	size_t envp_len = 0;
+
+	for (uint64_t i = 0; envp[i]; i++) {
+		envp_len += kstrlen(envp[i]) + 1;
+		envc++;
+	}
+
+	// create auxv
+	uint64_t invoke_addr = INIT_USERLAND_RSP - argv_len;
+	uint64_t env_addr = invoke_addr - envp_len;
+	env_addr -= env_addr % 16;
+	// even number of envp and argv needs to be shifted by another 8, so that rsp is aligned after argc
+	if ((argc + envc) % 2 == 0) {
+		env_addr -= 8;
+	}
+
+	uint64_t random_addr = env_addr - 16;
+	auxv_t* auxv_addr = (auxv_t*)(random_addr - sizeof(default_auxv));
+
+	kmemcpy(auxv_addr, default_auxv, sizeof(default_auxv));
+
+	((uint64_t*)random_addr)[0] = time_since_init_fs();
+	((uint64_t*)random_addr)[1] = time_since_init_fs() ^ (argv_len * envp_len); //TODO: better randomization
+
+	auxv_addr[AT_INDEX_PHDR].a_un.a_val = (int64_t)pheaders_base;
+	auxv_addr[AT_INDEX_PHENT].a_un.a_val = header.e_phentsize;
+	auxv_addr[AT_INDEX_PHNUM].a_un.a_val = header.e_phnum;
+	auxv_addr[AT_INDEX_RANDOM].a_un.a_val = (int64_t)random_addr;
+
+	uint64_t* stack_builder = (uint64_t*)auxv_addr;
+	stack_builder--;
+	*stack_builder = 0; // env end
+	
+	char* data_char = (char*)env_addr;
+	char* next_char;
+
+	for (int64_t i = envc - 1; i >= 0; i--) {
+		next_char = kstpcpy(data_char, envp[i]) + 1;
+
+		stack_builder--;
+		*stack_builder = (uint64_t)data_char;
+
+		data_char = next_char;
+	}
+
+	stack_builder--;
+	*stack_builder = 0; // env start
+
+	for (int64_t i = argc - 1; i >= 0; i--) {
+		next_char = kstpcpy(data_char, argv[i]) + 1;
+
+		stack_builder--;
+		*stack_builder = (uint64_t)data_char;
+
+		data_char = next_char;
+	}
+
+	stack_builder--;
+	*stack_builder = (uint64_t)argc;
+
+	struct pcb_t* pcb = process_create_userland_pcb(header.e_entry,
+																									(uint64_t)stack_builder,
+																									stack_vaddr,
+																									stack_paddr,
+																									cr3,
+																									source,
+																									memtop,
+																									pid);
 
 restore_cr3:
-
 	while (mem_regs) {
 		temp = mem_regs->next;
 		kfree(mem_regs);
 		mem_regs = temp;
 	}
 
-	proc_data_get()->current_process->cr3 = old_cr3;
+	process_set_cr3(old_cr3);
 	cpu_set_cr3(old_cr3);
+	return pcb;
+}
+
+struct pcb_t* elf_load(struct fs_handle_t* file, uint64_t pid, const char* const* invoker, const char* const* env) {
+	uint64_t stack_paddr, stack_vaddr;
+
+	if (process_create_guarded_stack(&stack_vaddr, &stack_paddr)) {
+		logging_log_error("Failed to allocate stack");
+		return 0;
+	}
+
+	return load_base(file, invoker, env, stack_vaddr, stack_paddr, pid, 0);
+}
+
+struct pcb_t* elf_overwrite(struct fs_handle_t* file, const char* const* invoker, const char* const* env) {
+	uint64_t count;
+	for (count = 0; invoker[count]; count++);
+
+	char** argv = kmalloc(sizeof(char*) * (count + 1));
+
+	for (count = 0; invoker[count]; count++) {
+		argv[count] = kmalloc(kstrlen(invoker[count]) + 1);
+		kstrcpy(argv[count], invoker[count]);
+	}
+	argv[count] = 0;
+
+	for (count = 0; env[count]; count++);
+
+	char** envp = kmalloc(sizeof(char*) * (count + 1));
+
+	for (count = 0; env[count]; count++) {
+		envp[count] = kmalloc(kstrlen(env[count]) + 1);
+		kstrcpy(envp[count], env[count]);
+	}
+	envp[count] = 0;
+
+	struct pcb_t* cpcb = proc_data_get()->current_process;
+
+	struct pcb_t* pcb = load_base(file, (const char* const*)argv, (const char* const*)envp, 0, 0, 0, cpcb);
+
+	for (count = 0; argv[count]; count++) {
+		kfree(argv[count]);
+	}
+	kfree(argv);
+
+	for (count = 0; envp[count]; count++) {
+		kfree(envp[count]);
+	}
+	kfree(envp);
 
 	return pcb;
 }

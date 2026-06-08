@@ -1,10 +1,15 @@
 #ifndef _ABIBITS_STAT_H
 #define _ABIBITS_STAT_H
 
+#include <abi-bits/uid_t.h>
+#include <abi-bits/gid_t.h>
+#include <bits/off_t.h>
 #include <abi-bits/mode_t.h>
 #include <abi-bits/dev_t.h>
-
-#include <bits/size_t.h>
+#include <abi-bits/ino_t.h>
+#include <abi-bits/blksize_t.h>
+#include <abi-bits/blkcnt_t.h>
+#include <abi-bits/nlink_t.h>
 #include <bits/ansi/time_t.h>
 #include <bits/ansi/timespec.h>
 
@@ -37,11 +42,101 @@
 #define S_IWRITE S_IWUSR
 #define S_IEXEC  S_IXUSR
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if defined(__x86_64__)
+
 struct stat {
-	size_t st_size;
+	dev_t st_dev;
+	ino_t st_ino;
+	nlink_t st_nlink;
+	mode_t st_mode;
+	uid_t st_uid;
+	gid_t st_gid;
+	unsigned int __pad0;
+	dev_t st_rdev;
+	off_t st_size;
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	long __unused[3];
 };
 
+#elif (defined(__riscv) && __riscv_xlen == 64) || defined (__aarch64__) || defined(__loongarch64)
+
+struct stat {
+	dev_t st_dev;
+	ino_t st_ino;
+	mode_t st_mode;
+	nlink_t st_nlink;
+	uid_t st_uid;
+	gid_t st_gid;
+	dev_t st_rdev;
+	dev_t __pad1;
+	off_t st_size;
+	blksize_t st_blksize;
+	int __pad2;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	int __pad3[2];
+};
+
+#elif defined(__i386__)
+
+struct stat {
+	dev_t st_dev;
+	unsigned short int __st_dev_padding;
+	long __st_ino_truncated;
+	mode_t st_mode;
+	nlink_t st_nlink;
+	uid_t st_uid;
+	gid_t st_gid;
+	dev_t st_rdev;
+	unsigned short int __st_rdev_padding;
+	off64_t st_size;
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	ino64_t st_ino;
+};
+
+#elif defined (__m68k__)
+
+struct stat {
+	dev_t st_dev;
+	unsigned char __st_dev_padding[2];
+	unsigned long __st_ino;
+	mode_t st_mode;
+	nlink_t st_nlink;
+	uid_t st_uid;
+	gid_t st_gid;
+	dev_t st_rdev;
+	unsigned char __st_rdev_padding;
+	long long st_size; /* TODO: off64_t? */
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	ino_t st_ino;
+};
+
+#endif
+
+#if defined(_DEFAULT_SOURCE) || defined(_LARGEFILE64_SOURCE)
 #define stat64 stat
+#endif
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _ABIBITS_STAT_H */
-

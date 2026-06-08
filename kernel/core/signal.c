@@ -31,12 +31,18 @@ struct signal_wait_t {
 };
 
 static void signal_wait_callback(struct pcb_t* pcb) {
-	struct signal_wait_t* wait = pcb->meta[0];
+	void** meta = process_get_meta(pcb, 2);
+	struct signal_wait_t* wait = meta[0];
+	uint8_t* rlock = meta[1];
 
 	lock_acquire(&wait->lock);
-	pcb->next = wait->queue;
+	process_set_next(pcb, wait->queue);
 	wait->queue = pcb;
 	lock_release(&wait->lock);
+
+	if (rlock) {
+		lock_release(rlock);
+	}
 }
 
 struct signal_wait_t* signal_wait_alloc(void) {
@@ -49,29 +55,48 @@ struct signal_wait_t* signal_wait_alloc(void) {
 }
 
 void signal_wait(struct signal_wait_t* wait) {
-	struct pcb_t* current = proc_data_get()->current_process;
-
-	current->meta[0] = wait;
-	process_set_callback(signal_wait_callback);
-
-	while (current->sched_cntr != SCHED_SIGNAL_READY) {
-		cpu_hlt();
-	}
-
-	current->sched_cntr = SCHED_READY;
+	signal_wait_locked(wait, 0);
 }
 
 void signal_awake(struct signal_wait_t* wait) {
+	signal_awake_locked(wait, 0);
+}
+
+void signal_wait_locked(struct signal_wait_t* wait, uint8_t* rlock) {
+	struct pcb_t* current = proc_data_get()->current_process;
+
+	void** meta = process_get_meta(current, 2);
+	meta[0] = wait;
+	meta[1] = rlock;
+	process_set_callback(signal_wait_callback);
+
+	while (process_get_sched_cntr(current) != SCHED_SIGNAL_READY) {
+		cpu_hlt();
+	}
+
+	process_set_sched_cntr(current, SCHED_READY);
+}
+
+void signal_awake_locked(struct signal_wait_t* wait, uint8_t* rlock) {
 	struct pcb_t* i, * next;
 	lock_acquire(&wait->lock);
 	i = wait->queue;
 	wait->queue = 0;
 	lock_release(&wait->lock);
+	if (rlock) {
+		lock_release(rlock);
+	}
 
 	for (; i; i = next) {
-		next = i->next;
+		next = process_get_next(i);
 
-		i->sched_cntr = SCHED_SIGNAL_READY;
+		process_set_sched_cntr(i, SCHED_SIGNAL_READY);
 		scheduler_schedule(i);
 	}
+}
+
+
+void signal_free(struct signal_wait_t* wait) {
+	signal_awake(wait);
+	kfree(wait);
 }

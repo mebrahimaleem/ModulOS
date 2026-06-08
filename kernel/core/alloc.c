@@ -73,6 +73,19 @@ _Static_assert(sizeof(struct alloc_arena_t) % ALLOC_ALIGN == 0, "Bad arena metad
 static struct alloc_arena_t* arena_head;
 static uint8_t alloc_lock;
 
+#ifdef DEBUG_LOGGING_MEM
+static int64_t num_arena;
+static int64_t bytes_allocated;
+static int64_t bytes_freed;
+static int64_t total_bytes;
+
+static int64_t num_allocs;
+static int64_t num_frees;
+static int64_t total_allocs;
+
+static uint8_t u_lock;
+#endif /* DEBUG_LOGGING_MEM */
+
 static inline struct alloc_header_t* get_next(struct alloc_header_t* header) {
 	return IS_LAST(header->size) ? 0 : (struct alloc_header_t*)((uint64_t)header + GET_SIZE(header->size));
 }
@@ -97,6 +110,22 @@ void alloc_init() {
 	lock_init(&alloc_lock);
 
 	arena_head = 0;
+
+#ifdef DEBUG_LOGGING_MEM
+	num_arena = 0;
+	bytes_allocated = 0;
+
+	num_arena = 0;
+	bytes_allocated = 0;
+	bytes_freed = 0;
+	total_bytes = 0;
+
+	num_allocs = 0;
+	num_frees = 0;
+	total_allocs = 0;
+
+	lock_init(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
 }
 
 static void patch_list(struct alloc_arena_t* arena, struct alloc_header_t* header) {
@@ -125,7 +154,8 @@ static void* alloc(struct alloc_arena_t* arena, struct alloc_header_t* header, s
 	}
 
 	if (size > GET_SIZE(header->size)) {
-		return 0;
+		logging_log_error("Attempt to allocate block larger than arena");
+		panic(PANIC_NO_MEM);
 	}
 
 	// split block
@@ -162,6 +192,13 @@ static void* alloc(struct alloc_arena_t* arena, struct alloc_header_t* header, s
 	patch_list(arena, header);
 
 	header->next_free.arena = arena;
+
+#ifdef DEBUG_LOGGING_MEM
+	lock_acquire(&u_lock);
+	bytes_allocated += size;
+	num_allocs++;
+	lock_release(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
 
 	return (void*)((uint64_t)header + sizeof(struct alloc_header_t));
 }
@@ -213,8 +250,14 @@ next_arena:
 
 	if (!arena_base) {
 		logging_log_error("Out of memory for heap");
-		return 0;
+		panic(PANIC_NO_MEM);
 	}
+
+#ifdef DEBUG_LOGGING_MEM
+	lock_acquire(&u_lock);
+	num_arena++;
+	lock_release(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
 
 	arena_base = paging_ident(arena_base);
 
@@ -252,7 +295,7 @@ void kfree(void* ptr) {
 	struct alloc_header_t* next;
 
 	if (IS_FREE(header->size)) {
-		logging_log_warning("Double free @ 0x%x", ptr);
+		logging_log_warning("Double free @ 0x%lx", ptr);
 		return;
 	}
 
@@ -261,6 +304,13 @@ void kfree(void* ptr) {
 	lock_acquire(&arena->arena_lock);
 
 	header->size = GET_SIZE(header->size) | TYPE_HEADER_FREE | (header->size & MASK_HEADER_LAST);
+
+#ifdef DEBUG_LOGGING_MEM
+	lock_acquire(&u_lock);
+	bytes_freed += GET_SIZE(header->size);
+	num_frees++;
+	lock_release(&u_lock);
+#endif /* DEBUG_LOGGING_MEM */
 
 	next = get_next(header);
 
@@ -305,3 +355,29 @@ void kfree(void* ptr) {
 	alloc_check();
 #endif /* CHECK_ALLOC */
 }
+
+#ifdef DEBUG_LOGGING_MEM
+void alloc_log_usage(void) {
+	lock_acquire(&u_lock);
+	int64_t a = num_arena;
+	int64_t ba = bytes_allocated;
+	int64_t bf = bytes_freed;
+	total_bytes += ba - bf;
+	int64_t b = total_bytes;
+
+	int64_t na = num_allocs;
+	int64_t nf = num_frees;
+	total_allocs += na - nf;
+	int64_t n = total_allocs;
+
+	bytes_allocated = 0;
+	bytes_freed = 0;
+
+	num_allocs = 0;
+	num_frees = 0;
+	lock_release(&u_lock);
+
+	logging_log_debug("Heap - Bytes Allocated %ld/%lu (+%lu/-%lu) # %ld (+%lu/-%lu)",
+			b, a, ba, bf, n, na, nf);
+}
+#endif /* DEBUG_LOGGING_MEM */

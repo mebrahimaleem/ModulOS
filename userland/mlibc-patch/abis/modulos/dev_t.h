@@ -1,9 +1,10 @@
+
 #ifndef _ABIBITS_DEV_T_H
 #define _ABIBITS_DEV_T_H
 
-#include <stdint.h>
+#include <bits/types.h>
 
-typedef uint32_t dev_t;
+typedef __mlibc_uint64 dev_t;
 
 #endif /* _ABIBITS_DEV_T_H */
 

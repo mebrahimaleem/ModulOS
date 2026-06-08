@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-CWARN := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
+CWARN := -Wall -Wextra -Wpedantic -Wshadow -Wpointer-arith -Wwrite-strings -Wmissing-prototypes \
 	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline -Wno-long-long -Wconversion \
 	-Wstrict-prototypes -Wundef -Wcast-qual -Wstrict-overflow=5 -Wswitch-enum -Winit-self -Wdouble-promotion \
 	-Wformat=2 -Wnull-dereference -Wpacked -Wvolatile-register-var -Walloca -Wvla -Wframe-larger-than=1024 \
@@ -28,11 +28,11 @@ LD_USR_FLAGS := -std=c23 -fno-pie -mno-mmx -mno-sse -mno-sse2 -mno-avx -mno-avx2
 	-fomit-frame-pointer -nodefaultlibs -nostdlib -mcmodel=kernel \
 	-ffreestanding -fno-unwind-tables -fno-exceptions -fno-rtti \
 	-fno-semantic-interposition -fvisibility=hidden \
-	-fno-stack-protector -fno-builtin -fno-pic -mgeneral-regs-only --target=x86_64-elf \
+	-fno-stack-protector -fintegrated-as -fno-builtin -fno-pic -mgeneral-regs-only --target=x86_64-elf \
 	-static -D_MODULOS $(CDEBUG)
 
 ifndef DEBUG
-	LD_USR_FLAGS := $(LD_USR_FLAGS) -flto=thin
+	LD_USR_FLAGS := $(LD_USR_FLAGS) -flto=full
 endif
 
 LD_FLAGS := $(LD_USR_FLAGS) -mcmodel=kernel -mno-red-zone

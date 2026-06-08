@@ -36,11 +36,11 @@ static struct pcb_t* active_queue_tail;
 static struct pcb_t* sleep_queue;
 
 static void _scheduler_schedule(struct pcb_t* pcb) {
-	pcb->next = 0;
+	process_set_next(pcb, 0);
 
 	if (active_queue_tail) {
-		active_queue_tail->next = pcb;
-		active_queue_tail = active_queue_tail->next;
+		process_set_next(active_queue_tail, pcb);
+		active_queue_tail = pcb;
 	}
 	else {
 		active_queue = pcb;
@@ -66,7 +66,7 @@ void scheduler_run(void) {
 	struct proc_data_t* pd = proc_data_get();
 	struct pcb_t* current_pcb = pd->current_process;
 	if (current_pcb) {
-		switch (current_pcb->sched_cntr) {
+		switch (process_get_sched_cntr(current_pcb)) {
 			case SCHED_SKIP:
 				cpu_cli();
 				apic_write_reg(APIC_REG_EOI, APIC_EOI);
@@ -75,26 +75,29 @@ void scheduler_run(void) {
 				process_discard(current_pcb);
 				break;
 			case SCHED_SLEEP:
-				current_pcb->sched_cntr = SCHED_READY;
+				process_set_sched_cntr(current_pcb, SCHED_READY);
 
 				lock_acquire(&lock_sched);
 				struct pcb_t* i = sleep_queue, **prev = &sleep_queue;
 
-				for (; i && current_pcb->sleep_state.wake_time < i->sleep_state.wake_time; i = i->next) {
-					prev = &i->next;
+				for (; i && process_get_wake_time(current_pcb) < process_get_wake_time(i); i = process_get_next(i)) {
+					prev = process_next_ref(i);
 				}
 				
 				*prev = current_pcb;
-				current_pcb->next = i;
+				process_set_next(current_pcb, i);
 
 				lock_release(&lock_sched);
 				break;
 			case SCHED_CALLBACK:
-				current_pcb->sleep_state.callback(current_pcb);
+				process_call_callback(current_pcb);
 				break;
 			case SCHED_READY:
 			case SCHED_SIGNAL_READY:
 				scheduler_schedule(current_pcb);
+				break;
+			case SCHED_ZOMBIE:
+				logging_log_warning("Zombie process still running");
 				break;
 		}
 	}
@@ -104,8 +107,8 @@ void scheduler_run(void) {
 	// wakup sleeping processes
 	const uint64_t now = time_since_init_fs();
 	struct pcb_t* i, * next;
-	for (i = sleep_queue; i && i->sleep_state.wake_time <= now; i = next) {
-		next = i->next;
+	for (i = sleep_queue; i && process_get_wake_time(i) <= now; i = next) {
+		next = process_get_next(i);
 		_scheduler_schedule(i);
 	}
 
@@ -115,7 +118,7 @@ void scheduler_run(void) {
 	if (active_queue) {
 		// next process
 		run = (struct pcb_t*)active_queue;
-		active_queue = active_queue->next;
+		active_queue = process_get_next(active_queue);
 		if (!active_queue) {
 			active_queue_tail = 0;
 		}
@@ -133,17 +136,5 @@ void scheduler_run(void) {
 		cpu_wait_loop();
 	}
 	
-	cpu_cli();
-
-	pd->tss->rsp0_lo = run->k_rsp_lo;
-	pd->tss->rsp0_hi = run->k_rsp_hi;
-	pd->kernel_rsp = (uint64_t)run->k_rsp_lo | ((uint64_t)run->k_rsp_hi << 32);
-	pd->current_process = run;
-	cpu_set_cr3(run->cr3);
-	cpu_set_fsbase(run->fsbase);
-	cpu_restore_fx(run->fxdata);
-
-	apic_write_reg(APIC_REG_EOI, APIC_EOI);
-
-	process_resume(run);
+	process_resume_transfer(run);
 }

@@ -18,6 +18,7 @@
 #include <lib/kstrcpy.h>
 
 char* kstrcpy(char* dest, const char* src) {
+	char* init = dest;
 	while (*src) {
 		*dest = *src;
 		src++;
@@ -25,17 +26,30 @@ char* kstrcpy(char* dest, const char* src) {
 	}
 
 	*dest = 0;
-	return dest + 1;
+	return init;
 }
 
-char* kstrcpy_no_null(char* dest, const char* src) {
+char* kstpcpy(char* dest, const char* src) {
 	while (*src) {
 		*dest = *src;
 		src++;
 		dest++;
 	}
 
+	*dest = 0;
 	return dest;
+}
+
+char* kstrcpy_no_null(char* dest, const char* src) {
+	char* init = dest;
+
+	while (*src) {
+		*dest = *src;
+		src++;
+		dest++;
+	}
+
+	return init;
 }
 
 char* kstrncpy(char* dest, const char* src, size_t len) {
