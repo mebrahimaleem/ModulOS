@@ -37,6 +37,7 @@
 #define OPEN_TABLE_BUCKETS		100
 
 static struct semaphore_t* fs_sem;
+static uint64_t devid_counter;
 
 struct fs_mount_t {
 	struct mount_cntx_t* cntx;
@@ -171,6 +172,8 @@ void fs_init(void) {
 
 	open_table = hash_table_alloc(OPEN_TABLE_BUCKETS);
 
+	devid_counter = 0;
+
 	devfs_init();
 }
 
@@ -182,7 +185,7 @@ static void fs_close_stub(struct file_handle_t*) {
 	return;
 }
 
-static enum file_status_t fs_stat_stub(struct file_handle_t*, struct file_info_t*) {
+static enum file_status_t fs_stat_stub(struct file_handle_t*, file_info_t*) {
 	return FILE_NO_SUPPORT;
 }
 
@@ -556,7 +559,7 @@ void fs_close(struct fs_handle_t* handle) {
 	kfree(handle);
 }
 
-enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info) {
+enum file_status_t fs_stat(struct fs_handle_t* handle, file_info_t* info) {
 
 	lock_acquire(&handle->shared->lock);
 	enum file_status_t ret = handle->mount->stat(handle->handle, info);
@@ -732,4 +735,12 @@ struct fs_handle_t* fs_dup(struct fs_handle_t* handle) {
 	fs_handle->shared = handle->shared;
 	fs_handle->flags = handle->flags;
 	return fs_handle;
+}
+
+uint64_t fs_assign_id(void) {
+	semaphore_wait_full(fs_sem);
+	uint64_t devid = devid_counter++;
+	semaphore_signal_full(fs_sem);
+
+	return devid;
 }

@@ -181,3 +181,17 @@ uint8_t hash_table_get_any(struct hash_table_t* table, uint64_t* out_key, void**
 
 	return 0;
 }
+
+uint8_t hash_table_find(struct hash_table_t* table, uint64_t* out_key, void** out_val, uint8_t (*cond)(void*)) {
+	for (size_t i = 0; i < table->num_buckets; i++) {
+		for (struct node_t* node = table->buckets[i]; node; node = node->next) {
+			if (cond(node->value)) {
+				*out_key = node->key;
+				*out_val = node->value;
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}

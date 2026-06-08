@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <kernel/abi/userland_conv.h>
 #include <kernel/abi/fs.h>
 
 struct mount_cntx_t;
@@ -47,6 +48,8 @@ struct file_info_t {
 	uint16_t mode;
 };
 
+typedef struct u_stat file_info_t;
+
 struct dir_info_t {
 	uint64_t inode_num;
 	uint64_t seek_pos;
@@ -58,7 +61,7 @@ struct dir_info_t {
 typedef struct file_handle_t* (*fs_open_t)(struct mount_cntx_t*, const char*, uint32_t, uint32_t);
 typedef void (*fs_close_t)(struct file_handle_t*);
 
-typedef enum file_status_t (*fs_stat_t)(struct file_handle_t*, struct file_info_t*);
+typedef enum file_status_t (*fs_stat_t)(struct file_handle_t*, file_info_t*);
 typedef size_t (*fs_read_t)(struct file_handle_t*, void*, size_t);
 typedef uint64_t (*fs_get_seek_t)(struct file_handle_t*);
 typedef enum file_status_t (*fs_seek_t)(struct file_handle_t*, uint64_t);
@@ -112,7 +115,7 @@ extern struct fs_handle_t* fs_anon(struct fs_mount_t* mount, struct file_handle_
 
 extern struct fs_handle_t* fs_openat(const char* path, uint32_t flags, struct fs_handle_t* at, uint32_t mode);
 
-extern enum file_status_t fs_stat(struct fs_handle_t* handle, struct file_info_t* info);
+extern enum file_status_t fs_stat(struct fs_handle_t* handle, file_info_t* info);
 extern size_t fs_read(struct fs_handle_t* handle, void* buffer, size_t count);
 extern uint64_t fs_get_seek(struct fs_handle_t* handle);
 extern enum file_status_t fs_seek(struct fs_handle_t* handle, uint64_t seek);
@@ -135,5 +138,7 @@ extern uint8_t fs_is_interactive(struct fs_handle_t* handle);
 extern void fs_path(struct fs_handle_t* handle, size_t max_len, char* buf);
 
 extern struct fs_handle_t* fs_dup(struct fs_handle_t* handle);
+
+extern uint64_t fs_assign_id(void);
 
 #endif /* KERNEL_CORE_FS_H */

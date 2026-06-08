@@ -39,7 +39,7 @@ all: build
 	mkdir -p $@
 
 .PHONY: build
-build: _libc _shell _utils _init
+build: _libc _shell _utils _init _fs
 
 mlibc/:
 	git clone https://github.com/managarm/mlibc.git $@
@@ -129,3 +129,6 @@ $(SYSROOT)/init: $(OBJ_DIR)/init.o $(LIB)/crt1.o $(LIB)/libc.a | $(SYSROOT)/
 
 .PHONY: _init
 _init: $(SYSROOT)/init
+
+.PHONY: _fs
+_fs: | $(SYSROOT)/dev/

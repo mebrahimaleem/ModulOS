@@ -394,17 +394,12 @@ DECLARE_SYSCALL(stat) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct file_info_t info;
+	file_info_t info;
 	if (fs_stat(handle, &info) != FILE_OK) {
 		return SYSCALL_STS_FAIL;
 	}
 
-	struct u_stat* stat = (struct u_stat*)arg2;
-
-	kmemset(stat, 0, sizeof(struct u_stat));
-	stat->st_size = (u_off_t)info.size;
-	stat->st_mode = info.mode;
-	stat->st_ino = (u_ino_t)info.inode;
+	*(struct u_stat*)arg2 = info;
 
 	return SYSCALL_STS_OK;
 }

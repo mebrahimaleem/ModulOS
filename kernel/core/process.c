@@ -587,6 +587,12 @@ uint64_t process_get_ppid(void) {
 	return pid;
 }
 
+static uint8_t is_zombie(void* pcb) {
+	struct pcb_t* child = pcb;
+
+	return child->sched_cntr == SCHED_ZOMBIE;
+}
+
 uint64_t process_wait_pid(uint64_t pid, uint8_t no_hang, uint64_t* ec_ret) {
 	struct pcb_t* pcb = proc_data_get()->current_process;
 
@@ -596,9 +602,13 @@ uint64_t process_wait_pid(uint64_t pid, uint8_t no_hang, uint64_t* ec_ret) {
 
 	if (no_hang) {
 		if (pid == -1uLL) {
-			// TODO: implement
-			ec = 0;
-			pid = 0;
+			if (hash_table_find(pcb->child_table, &pid, &child, is_zombie)) {
+				ec = process_reap_child(child);
+			}
+			else {
+				ec = 0;
+				pid = 0;
+			}
 		}
 		else {
 			if (!hash_table_get(pcb->child_table, pid, &child)) {

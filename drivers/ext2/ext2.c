@@ -190,6 +190,7 @@ struct ext2_t {
 	struct ext2_bg_desc_t* bgdt;
 	struct disk_t* disk;
 	uint64_t block_size;
+	uint64_t devid;
 	uint8_t lock;
 };
 
@@ -848,7 +849,7 @@ static uint64_t ext2_get_seek(struct file_handle_t* handle) {
 	return inode_handle->seek_block * block_size + inode_handle->seek;
 }
 
-static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_info_t* info) {
+static enum file_status_t ext2_stat(struct file_handle_t* handle, file_info_t* info) {
 	struct ext2_inode_t inode;
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 
@@ -856,9 +857,17 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 		return FILE_ERROR;
 	}
 
-	info->size = (uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32);
-	info->inode = inode_handle->inode_index;
-	info->mode = inode.i_mode;
+	kmemset(info, 0, sizeof(file_info_t));
+	info->st_size = (int64_t)((uint64_t)inode.i_size | ((uint64_t)inode.i_dir_acl << 32));
+	info->st_ino = inode_handle->inode_index;
+	info->st_mode = inode.i_mode;
+	info->st_blksize = (int64_t)inode_handle->ext2->block_size;
+	info->st_blocks = inode.i_blocks;
+	info->st_atim.tv_sec = inode.i_atime;
+	info->st_mtim.tv_sec = inode.i_mtime;
+	info->st_ctim.tv_sec = inode.i_ctime;
+	info->st_nlink = inode.i_links_count;
+	info->st_dev = inode_handle->ext2->devid;
 
 	return FILE_OK;
 }
@@ -866,12 +875,12 @@ static enum file_status_t ext2_stat(struct file_handle_t* handle, struct file_in
 static enum file_status_t ext2_open_dir(struct file_handle_t* handle) {
 	struct ext2_inode_handle_t* inode_handle = (struct ext2_inode_handle_t*)handle;
 
-	struct file_info_t info;
+	file_info_t info;
 	if (ext2_stat(handle, &info) != FILE_OK) {
 		return FILE_ERROR;
 	}
 
-	if (!(info.mode & S_IFDIR)) {
+	if (!(info.st_mode & S_IFDIR)) {
 		return FILE_NOT_DIR;
 	}
 
@@ -1054,12 +1063,12 @@ static enum file_status_t ext2_create(struct ext2_t* ext2, const char* path, uin
 		return FILE_DNE;
 	}
 
-	struct file_info_t info;
+	file_info_t info;
 	if ((sts = ext2_stat((struct file_handle_t*)handle, &info)) != FILE_OK) {
 		return sts;
 	}
 
-	if (!(info.mode & S_IFDIR)) {
+	if (!(info.st_mode & S_IFDIR)) {
 		return FILE_NO_SUPPORT;
 	}
 
@@ -1411,6 +1420,7 @@ uint8_t ext2_attempt_init(struct disk_t* disk, uint64_t start_lba, uint64_t end_
 	ext2->bgdt = bgdt;
 	ext2->disk = disk;
 	ext2->block_size = 1024u << superblock->s_log_block_size;
+	ext2->devid = fs_assign_id();
 	lock_init(&ext2->lock);
 
 	logging_log_debug("ext2 blocks: 0x%x x 0x%x (0x%lX)",

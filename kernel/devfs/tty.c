@@ -119,21 +119,6 @@ struct tty_handle_t* tty_com2(void) {
 }
 #endif /* SERIAL */
 
-struct tty_handle_t* tty_open(const char* name) {
-#ifdef SERIAL
-	if (!kstrcmp(name, "S0")) {
-		// COM1
-		return &com1;
-	}
-	else if (!kstrcmp(name, "S1")) {
-		// COM2
-		return &com2;
-	}
-#endif /* SERIAL */
-
-	return 0;
-}
-
 size_t tty_read(struct tty_handle_t* tty, void* buffer, size_t count) {
 	size_t read = 0;
 	uint8_t* write = buffer;
